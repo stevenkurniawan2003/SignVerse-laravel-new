@@ -74,15 +74,15 @@ jobs:
             set -e
             cd /opt/signverse-laravel
             # Semua perintah compose wajib membaca .env.docker (password DB, port, dll.)
-            export COMPOSE_ENV_FILES=.env.docker
+            dc() { docker compose --env-file .env.docker "$@"; }
             git fetch origin main
             git reset --hard origin/main
-            docker compose up -d --build --remove-orphans
+            dc up -d --build --remove-orphans
             docker image prune -f
 
             echo "Menunggu aplikasi siap..."
             for i in $(seq 1 30); do
-              if [ "$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q app)")" = "healthy" ]; then
+              if [ "$(docker inspect -f '{{.State.Health.Status}}' "$(dc ps -q app)")" = "healthy" ]; then
                 echo "Deploy berhasil, container healthy."
                 exit 0
               fi
@@ -90,5 +90,5 @@ jobs:
             done
 
             echo "Container tidak healthy setelah 150 detik. Log terakhir:"
-            docker compose logs --tail=100 app
+            dc logs --tail=100 app
             exit 1
