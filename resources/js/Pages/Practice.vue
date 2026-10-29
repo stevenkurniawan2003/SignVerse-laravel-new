@@ -226,6 +226,7 @@ async function performDetection() {
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
+                'X-CSRF-TOKEN': window.csrfToken,
             },
             body: JSON.stringify({
                 target_letter: target.value.letter,
