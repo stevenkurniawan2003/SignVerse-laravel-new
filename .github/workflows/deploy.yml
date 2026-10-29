@@ -73,9 +73,11 @@ jobs:
           script: |
             set -e
             cd /opt/signverse-laravel
+            # Semua perintah compose wajib membaca .env.docker (password DB, port, dll.)
+            export COMPOSE_ENV_FILES=.env.docker
             git fetch origin main
             git reset --hard origin/main
-            docker compose --env-file .env.docker up -d --build --remove-orphans
+            docker compose up -d --build --remove-orphans
             docker image prune -f
 
             echo "Menunggu aplikasi siap..."
