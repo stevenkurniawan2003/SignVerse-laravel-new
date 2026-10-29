@@ -1,6 +1,6 @@
 <x-guest-layout>
-    <h1 class="text-2xl font-extrabold tracking-tight text-ink">Selamat datang kembali 👋</h1>
-    <p class="mt-1 text-sm text-ink-muted">Masuk untuk melanjutkan belajar.</p>
+    <h1 class="text-2xl font-extrabold tracking-tight text-ink">Selamat datang kembali</h1>
+    <p class="mt-1 text-sm text-ink-muted">Masuk untuk melanjutkan belajar di SignTech.</p>
 
     {{-- Session Status (mis. "Registrasi berhasil") --}}
     <x-auth-session-status class="mt-5" :status="session('status')" />
@@ -69,13 +69,13 @@
                 @csrf
                 <input type="hidden" name="email" value="siswa@signteach.id">
                 <input type="hidden" name="password" value="siswa123">
-                <button type="submit" class="btn-secondary w-full text-sm">🎓 Demo Siswa</button>
+                <button type="submit" class="btn-secondary w-full text-sm inline-flex items-center justify-center gap-1.5"><x-icon name="user" class="h-4 w-4 text-primary" /> Demo Siswa</button>
             </form>
             <form method="POST" action="{{ route('login') }}">
                 @csrf
                 <input type="hidden" name="email" value="guru@signteach.id">
                 <input type="hidden" name="password" value="guru123">
-                <button type="submit" class="btn-secondary w-full text-sm">👨‍🏫 Demo Guru</button>
+                <button type="submit" class="btn-secondary w-full text-sm inline-flex items-center justify-center gap-1.5"><x-icon name="users" class="h-4 w-4 text-secondary" /> Demo Guru</button>
             </form>
         </div>
     </div>

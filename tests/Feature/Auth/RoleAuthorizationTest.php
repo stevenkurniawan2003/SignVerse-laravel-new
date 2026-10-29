@@ -91,6 +91,6 @@ class RoleAuthorizationTest extends TestCase
         $response = $this->get(route('landing'));
 
         $response->assertOk();
-        $response->assertSee('SignVerse');
+        $response->assertSee('SignTech');
     }
 }

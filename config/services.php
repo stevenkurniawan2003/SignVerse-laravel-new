@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'ai' => [
+        'url' => env('SIGNTECH_AI_URL', 'https://ai.signtech.tech'),
+        'timeout' => (int) env('SIGNTECH_AI_TIMEOUT', 15),
+        'recognizer' => env('GESTURE_RECOGNIZER', 'ai'),
+    ],
+
 ];

@@ -156,6 +156,6 @@ class StudentStatsService
      */
     public function forUser(User $user): Student
     {
-        return $user->student ?? $user->student()->create();
+        return $user->student()->firstOrCreate(['user_id' => $user->id]);
     }
 }

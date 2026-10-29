@@ -17,7 +17,7 @@ class ContentSeeder extends Seeder
         $categories = [
             [
                 'name' => 'Alphabet',
-                'icon' => '🔤',
+                'icon' => 'alphabet',
                 'description' => 'Isyarat huruf A-Z (SIBI & BISINDO).',
                 'materials' => [
                     [
@@ -36,7 +36,7 @@ class ContentSeeder extends Seeder
             ],
             [
                 'name' => 'Number',
-                'icon' => '🔢',
+                'icon' => 'number',
                 'description' => 'Angka 1-10 dalam bahasa isyarat.',
                 'materials' => [
                     [
@@ -49,7 +49,7 @@ class ContentSeeder extends Seeder
             ],
             [
                 'name' => 'Word',
-                'icon' => '💬',
+                'icon' => 'word',
                 'description' => 'Kosakata sehari-hari.',
                 'materials' => [
                     [
@@ -62,7 +62,7 @@ class ContentSeeder extends Seeder
             ],
             [
                 'name' => 'Phrase',
-                'icon' => '🗣️',
+                'icon' => 'phrase',
                 'description' => 'Frasa percakapan sederhana.',
                 'materials' => [
                     [
