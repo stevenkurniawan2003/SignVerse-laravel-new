@@ -27,7 +27,10 @@ const selectedLesson = ref(null);
 onMounted(async () => {
     if (categoryList.value.length === 0) {
         try {
-            const res = await fetch('/api/materials');
+            const res = await fetch('/api/materials', {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+            });
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data.categories)) {
@@ -83,7 +86,7 @@ function isLessonCompleted(lesson) {
             <header class="learn-header">
                 <div class="heading-badge">Kurikulum Terstruktur · SignTech</div>
                 <h1>Katalog Materi Pembelajaran</h1>
-                <p>Materi pembelajaran interaktif langsung dari basis data kurikulum bahasa isyarat.</p>
+                <p>Materi pembelajaran interaktif kurikulum bahasa isyarat Indonesia.</p>
             </header>
 
             <div class="path-section">

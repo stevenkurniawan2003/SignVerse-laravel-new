@@ -9,7 +9,6 @@ import {
     Camera,
     CheckCircle,
     ChevronRight,
-    Clock,
     Flame,
     Hand,
     RotateCcw,
@@ -68,6 +67,7 @@ async function claimQuest(ch) {
     try {
         const res = await fetch('/api/challenges/claim', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({ challenge_id: ch.id }),
         });
@@ -128,334 +128,328 @@ const filteredSessions = computed(() => {
     <AppLayout>
         <Head title="Dashboard Belajar" />
 
-        <div class="dashboard-revamp">
-            <!-- Hero Welcome Banner -->
+        <div class="dashboard-wrap">
+            <!-- 1. Hero Welcome Banner -->
             <section class="dash-hero">
-                <div class="dash-hero-content">
-                    <div class="dash-eyebrow">
-                        <span class="dash-pill-brand">SignTech Learning</span>
-                        <span class="dash-system-badge">Basis Data Aktif</span>
+                <div class="dash-hero-main">
+                    <div class="dash-hero-badge">
+                        <span>Kurikulum Bahasa Isyarat SIBI & BISINDO</span>
                     </div>
 
-                    <h1 class="dash-title">
-                        {{ greeting }}, <span class="dash-name">{{ userName }}</span>
+                    <h1 class="dash-hero-title">
+                        {{ greeting }}, <span class="text-primary-gradient">{{ userName }}</span>
                     </h1>
 
-                    <p class="dash-subtitle">
+                    <p class="dash-hero-desc">
                         <template v-if="currentStreak > 0">
-                            Kamu telah berlatih <strong>{{ currentStreak }} hari berturut-turut</strong>. Pertahankan momentum belajarmu hari ini!
+                            Kamu telah berlatih <strong>{{ currentStreak }} hari berturut-turut</strong>. Pertahankan konsistensi latihan isyaratmu hari ini!
                         </template>
                         <template v-else>
-                            Mulai sesi latihan pertamamu hari ini dan kumpulkan poin pengalaman di database SignTech.
+                            Mulai latihan isyarat mandiri dengan panduan visual dan verifikasi kamera secara langsung.
                         </template>
                     </p>
 
                     <div class="dash-hero-actions">
-                        <Link href="/practice" class="dash-btn-primary">
-                            <Camera :size="18" />
+                        <Link href="/practice" class="btn-primary-action">
+                            <Camera :size="17" />
                             <span>Buka AI Practice Studio</span>
-                            <ArrowRight :size="16" />
+                            <ArrowRight :size="15" />
                         </Link>
 
-                        <Link href="/learn" class="dash-btn-glass">
-                            <BookOpen :size="18" />
+                        <Link href="/learn" class="btn-secondary-action">
+                            <BookOpen :size="17" />
                             <span>Katalog Materi Belajar</span>
                         </Link>
                     </div>
                 </div>
 
-                <!-- Level & XP Widget on Hero -->
-                <div class="dash-hero-level-box">
-                    <div class="dash-level-header">
-                        <span class="dash-level-label">Peringkat Pelajar</span>
-                        <span class="dash-level-xp-value">{{ totalXp }} XP</span>
-                    </div>
-                    <div class="dash-level-name-row">
-                        <Award :size="24" class="dash-award-icon" />
-                        <span class="dash-level-title">{{ currentLevel.name }}</span>
+                <!-- Level & XP Widget -->
+                <div class="dash-hero-level">
+                    <div class="dash-level-head">
+                        <span class="level-label">Peringkat Pelajar</span>
+                        <span class="level-xp">{{ totalXp }} XP</span>
                     </div>
 
-                    <div class="dash-xp-track">
-                        <div class="dash-xp-bar" :style="{ width: `${levelPercent}%` }"></div>
+                    <div class="dash-level-title-row">
+                        <Award :size="22" class="level-icon" />
+                        <span class="level-title">{{ currentLevel.name }}</span>
                     </div>
 
-                    <div class="dash-level-footer">
+                    <div class="level-track">
+                        <div class="level-bar" :style="{ width: `${levelPercent}%` }"></div>
+                    </div>
+
+                    <div class="level-foot">
                         <span v-if="currentLevel.next_xp">{{ currentLevel.next_xp - totalXp }} XP lagi menuju level berikutnya</span>
                         <span v-else>Peringkat tertinggi tercapai!</span>
-                        <span class="dash-pct-text">{{ levelPercent }}%</span>
+                        <span class="level-pct">{{ levelPercent }}%</span>
                     </div>
                 </div>
             </section>
 
-            <!-- 4 Key Stat Metrics -->
+            <!-- 2. 4 Key Stat Metrics -->
             <section class="dash-stats-grid" aria-label="Statistik Utama">
                 <!-- Streak Card -->
-                <article class="dash-stat-card streak-theme">
-                    <div class="dash-stat-icon-tile gold">
-                        <Flame :size="22" />
-                    </div>
-                    <div class="dash-stat-data">
-                        <span class="dash-stat-label">Daily Streak</span>
-                        <div class="dash-stat-number">
-                            <b>{{ currentStreak }}</b> <small>hari</small>
+                <article class="stat-card">
+                    <div class="stat-card-head">
+                        <span class="stat-title">Daily Streak</span>
+                        <div class="stat-icon-tile gold">
+                            <Flame :size="20" />
                         </div>
                     </div>
-                    <div class="dash-stat-subtext">Rekor: {{ longestStreak }} hari</div>
+                    <div class="stat-value">
+                        <b>{{ currentStreak }}</b> <small>hari</small>
+                    </div>
+                    <div class="stat-foot">Rekor: {{ longestStreak }} hari berturut-turut</div>
                 </article>
 
                 <!-- XP Card -->
-                <article class="dash-stat-card xp-theme">
-                    <div class="dash-stat-icon-tile emerald">
-                        <Star :size="22" />
-                    </div>
-                    <div class="dash-stat-data">
-                        <span class="dash-stat-label">Total Pengalaman</span>
-                        <div class="dash-stat-number">
-                            <b>{{ totalXp }}</b> <small>XP</small>
+                <article class="stat-card">
+                    <div class="stat-card-head">
+                        <span class="stat-title">Total XP</span>
+                        <div class="stat-icon-tile emerald">
+                            <Star :size="20" />
                         </div>
                     </div>
-                    <div class="dash-stat-subtext">Tingkat {{ currentLevel.name }}</div>
+                    <div class="stat-value">
+                        <b>{{ totalXp }}</b> <small>XP</small>
+                    </div>
+                    <div class="stat-foot">Peringkat {{ currentLevel.name }}</div>
                 </article>
 
                 <!-- Mastery Card -->
-                <article class="dash-stat-card mastery-theme">
-                    <div class="dash-stat-icon-tile green">
-                        <CheckCircle :size="22" />
-                    </div>
-                    <div class="dash-stat-data">
-                        <span class="dash-stat-label">Modul Dikuasai</span>
-                        <div class="dash-stat-number">
-                            <b>{{ masteredCount }}</b> <small>/ {{ totalGoals }}</small>
+                <article class="stat-card">
+                    <div class="stat-card-head">
+                        <span class="stat-title">Modul Dikuasai</span>
+                        <div class="stat-icon-tile green">
+                            <CheckCircle :size="20" />
                         </div>
                     </div>
-                    <div class="dash-stat-subtext">{{ masteryPercent }}% tuntas</div>
+                    <div class="stat-value">
+                        <b>{{ masteredCount }}</b> <small>/ {{ totalGoals }} modul</small>
+                    </div>
+                    <div class="stat-foot">{{ masteryPercent }}% dari kurikulum selesai</div>
                 </article>
 
                 <!-- Accuracy Card -->
-                <article class="dash-stat-card session-theme">
-                    <div class="dash-stat-icon-tile mint">
-                        <Activity :size="22" />
-                    </div>
-                    <div class="dash-stat-data">
-                        <span class="dash-stat-label">Rata-rata Akurasi</span>
-                        <div class="dash-stat-number">
-                            <b>{{ avgScore }}</b><small>%</small>
+                <article class="stat-card">
+                    <div class="stat-card-head">
+                        <span class="stat-title">Rata-rata Akurasi</span>
+                        <div class="stat-icon-tile mint">
+                            <Activity :size="20" />
                         </div>
                     </div>
-                    <div class="dash-stat-subtext">{{ sessionsCount }} sesi tervalidasi</div>
+                    <div class="stat-value">
+                        <b>{{ avgScore }}</b><small>%</small>
+                    </div>
+                    <div class="stat-foot">{{ sessionsCount }} sesi latihan tervalidasi</div>
                 </article>
             </section>
 
-            <!-- 2 Columns: 7-Day Habit Tracker & Daily Challenge Quest -->
+            <!-- 3. Split Grid: Ritme Belajar & Daily Challenge -->
             <section class="dash-split-grid">
                 <!-- 7-Day Habit Tracker Card -->
-                <div class="dash-card habit-box-card">
-                    <div class="dash-card-header">
+                <div class="dash-panel habit-panel">
+                    <div class="panel-header">
                         <div>
-                            <span class="dash-card-eyebrow">RITME BELAJAR</span>
-                            <h2 class="dash-card-title">Aktivitas 7 Hari Terakhir</h2>
+                            <span class="panel-eyebrow">RITME BELAJAR</span>
+                            <h2 class="panel-title">Aktivitas 7 Hari Terakhir</h2>
                         </div>
-                        <span class="dash-habit-badge">
+                        <span class="habit-badge">
                             <Flame :size="14" />
                             {{ currentStreak }} Hari Aktif
                         </span>
                     </div>
 
-                    <p class="dash-card-desc">Rekapan sesi latihan harianmu yang tercatat langsung di database.</p>
+                    <p class="panel-desc">Pantau ritme dan konsistensi latihan isyaratmu setiap hari.</p>
 
-                    <div class="dash-week-strip">
+                    <div class="week-strip">
                         <div
                             v-for="(day, index) in weekDays"
                             :key="index"
-                            class="dash-day-col"
+                            class="day-col"
                             :class="{ 'is-active': day.count > 0, 'is-today': day.isToday }"
                         >
-                            <div class="dash-day-indicator">
+                            <div class="day-indicator">
                                 <CheckCircle v-if="day.count > 0" :size="16" />
-                                <span v-else class="dash-dot"></span>
+                                <span v-else class="day-dot"></span>
                             </div>
-                            <span class="dash-day-label">{{ day.label }}</span>
-                            <span v-if="day.isToday" class="dash-today-tag">Hari ini</span>
+                            <span class="day-label">{{ day.label }}</span>
+                            <span v-if="day.isToday" class="today-tag">Hari ini</span>
                         </div>
                     </div>
 
-                    <div class="dash-habit-footer">
-                        <div class="dash-habit-legend">
-                            <span class="dash-legend-dot active"></span>
+                    <div class="panel-footer">
+                        <div class="legend-row">
+                            <span class="legend-dot active"></span>
                             <span>Sudah Latihan</span>
-                            <span class="dash-legend-dot inactive"></span>
+                            <span class="legend-dot inactive"></span>
                             <span>Belum Ada Sesi</span>
                         </div>
-                        <Link href="/progress" class="dash-link-action">
-                            Lihat Analisis Detail <ArrowRight :size="14" />
+                        <Link href="/progress" class="panel-link">
+                            Analisis Detail <ArrowRight :size="13" />
                         </Link>
                     </div>
                 </div>
 
-                <!-- Daily Challenge Quest Checklist -->
-                <div class="dash-card challenge-box-card">
-                    <div class="dash-card-header">
+                <!-- Daily Challenge Quest Card -->
+                <div class="dash-panel quest-panel">
+                    <div class="panel-header">
                         <div>
-                            <span class="dash-card-eyebrow">TARGET HARIAN</span>
-                            <h2 class="dash-card-title">Challenge Hari Ini</h2>
+                            <span class="panel-eyebrow">TARGET HARIAN</span>
+                            <h2 class="panel-title">Tantangan Hari Ini</h2>
                         </div>
-                        <span v-if="activeQuest" class="dash-reward-pill">
-                            <Star :size="14" />
-                            +{{ activeQuest.reward_xp }} XP Bonus
+                        <span v-if="activeQuest" class="reward-pill">
+                            <Star :size="13" />
+                            +{{ activeQuest.reward_xp }} XP
                         </span>
                     </div>
 
-                    <div v-if="activeQuest" class="dash-quest-body">
-                        <div class="dash-quest-info">
-                            <div class="dash-quest-icon-box">
-                                <Target :size="24" />
+                    <div v-if="activeQuest" class="quest-content">
+                        <div class="quest-info-row">
+                            <div class="quest-icon-tile">
+                                <Target :size="22" />
                             </div>
-                            <div>
-                                <h3 class="dash-quest-name">{{ activeQuest.title }}</h3>
-                                <p class="dash-quest-desc">{{ activeQuest.description }}</p>
+                            <div class="quest-text">
+                                <h3 class="quest-name">{{ activeQuest.title }}</h3>
+                                <p class="quest-desc">{{ activeQuest.description }}</p>
                             </div>
                         </div>
 
-                        <div class="dash-quest-progress-block">
-                            <div class="dash-quest-progress-header">
-                                <span>Progres</span>
-                                <strong>{{ activeQuest.progress }} dari {{ activeQuest.target }} selesai</strong>
+                        <div class="quest-progress-box">
+                            <div class="quest-progress-head">
+                                <span>Progres Latihan</span>
+                                <strong>{{ activeQuest.progress }} / {{ activeQuest.target }} selesai</strong>
                             </div>
-                            <div class="dash-xp-track">
+                            <div class="quest-track">
                                 <div
-                                    class="dash-xp-bar"
+                                    class="quest-bar"
                                     :style="{ width: `${Math.min(100, Math.round(((activeQuest.progress || 0) / (activeQuest.target || 1)) * 100))}%` }"
                                 ></div>
                             </div>
                         </div>
 
-                        <div class="dash-quest-actions">
+                        <div class="quest-action-row">
                             <button
                                 v-if="activeQuest.progress >= activeQuest.target && !activeQuest.completed"
-                                class="dash-btn-gold w-full"
+                                class="btn-claim-bonus"
                                 @click="claimQuest(activeQuest)"
                             >
-                                <Trophy :size="16" />
-                                Klaim Bonus +{{ activeQuest.reward_xp }} XP Sekarang!
+                                <Trophy :size="15" />
+                                <span>Klaim Bonus +{{ activeQuest.reward_xp }} XP</span>
                             </button>
-                            <div v-else-if="activeQuest.completed" class="dash-claimed-banner">
-                                <CheckCircle :size="16" />
-                                Bonus tantangan hari ini telah berhasil diklaim!
+                            <div v-else-if="activeQuest.completed" class="banner-claimed">
+                                <CheckCircle :size="15" />
+                                <span>Bonus tantangan hari ini telah berhasil diklaim!</span>
                             </div>
-                            <Link v-else href="/practice" class="dash-btn-outline w-full">
-                                <Camera :size="16" />
-                                Kerjakan Tantangan Lewat AI Practice
+                            <Link v-else href="/practice" class="btn-start-quest">
+                                <Camera :size="15" />
+                                <span>Kerjakan Lewat AI Practice</span>
                             </Link>
                         </div>
                     </div>
-                    <div v-else class="text-xs text-muted py-6 text-center">
-                        Semua tantangan hari ini telah tuntas!
+                    <div v-else class="empty-quest-message">
+                        Semua tantangan latihan hari ini telah selesai dikerjakan!
                     </div>
                 </div>
             </section>
 
-            <!-- Category Pathways Grid from Database -->
+            <!-- 4. Category Pathways Grid -->
             <section v-if="props.progress && props.progress.length > 0" class="dash-section">
-                <div class="dash-section-header">
+                <div class="section-topline">
                     <div>
-                        <span class="dash-card-eyebrow">JALUR PEMBELAJARAN</span>
-                        <h2 class="dash-section-title">Kategori Materi Terstruktur</h2>
+                        <span class="panel-eyebrow">JALUR PEMBELAJARAN</span>
+                        <h2 class="section-heading">Kategori Materi Terstruktur</h2>
                     </div>
-                    <Link href="/learn" class="dash-link-action">
-                        Buka Semua Materi <ArrowRight :size="15" />
+                    <Link href="/learn" class="panel-link">
+                        Lihat Semua Modul <ArrowRight :size="14" />
                     </Link>
                 </div>
 
-                <div class="dash-category-grid">
+                <div class="categories-grid">
                     <article
                         v-for="cat in props.progress"
                         :key="cat.id"
-                        class="dash-cat-card card"
+                        class="category-card"
                     >
-                        <div class="dash-cat-top">
-                            <span class="dash-cat-icon-tile emerald">
+                        <div class="cat-card-head">
+                            <div class="cat-icon-tile">
                                 <component :is="getCategoryIcon(cat.slug)" :size="20" />
-                            </span>
-                            <span class="dash-cat-count">{{ cat.done }} / {{ cat.total }} modul</span>
-                        </div>
-
-                        <h3 class="dash-cat-title">{{ cat.name }}</h3>
-                        <p class="dash-cat-desc">Kategori materi isyarat {{ cat.name }} terdaftar di kurikulum.</p>
-
-                        <div class="dash-cat-progress">
-                            <div class="dash-xp-track">
-                                <div
-                                    class="dash-xp-bar"
-                                    :style="{ width: `${cat.percent}%` }"
-                                ></div>
                             </div>
-                            <span class="dash-cat-pct">{{ cat.percent }}%</span>
+                            <span class="cat-module-count">{{ cat.done }} / {{ cat.total }} modul</span>
                         </div>
 
-                        <Link href="/learn" class="dash-cat-btn">
-                            <span>Mulai Modul</span>
-                            <ChevronRight :size="16" />
+                        <h3 class="cat-title">{{ cat.name }}</h3>
+
+                        <div class="cat-progress-wrap">
+                            <div class="cat-track">
+                                <div class="cat-bar" :style="{ width: `${cat.percent}%` }"></div>
+                            </div>
+                            <span class="cat-pct">{{ cat.percent }}%</span>
+                        </div>
+
+                        <Link href="/learn" class="cat-action-link">
+                            <span>Mulai Belajar</span>
+                            <ChevronRight :size="15" />
                         </Link>
                     </article>
                 </div>
             </section>
 
-            <!-- Recommendations & Activity Feed -->
-            <div class="dash-split-grid bottom-split">
-                <!-- Recommended Lessons from Database -->
-                <div class="dash-card">
-                    <div class="dash-card-header">
-                        <div>
-                            <span class="dash-card-eyebrow">REKOMENDASI</span>
-                            <h2 class="dash-card-title">Materi Rekomendasi Berikutnya</h2>
-                        </div>
-                    </div>
-
-                    <div v-if="props.recommended && props.recommended.length > 0" class="dash-rec-list">
-                        <Link
-                            v-for="item in props.recommended"
-                            :key="item.id"
-                            :href="`/lesson/${item.id}`"
-                            class="dash-rec-item"
-                        >
-                            <div class="dash-rec-symbol">
-                                {{ item.title.slice(0, 2) }}
-                            </div>
-                            <div class="dash-rec-info">
-                                <b>{{ item.title }}</b>
-                                <small>{{ item.material_title }}</small>
-                            </div>
-                            <div class="dash-rec-tag">
-                                +{{ item.xp_reward }} XP
-                            </div>
-                        </Link>
-                    </div>
-                    <div v-else class="text-xs text-muted py-6 text-center">
-                        Belum ada rekomendasi latihan tambahan.
+            <!-- 5. Rekomendasi Materi Lanjutan (3 Kolom Bersih) -->
+            <section v-if="props.recommended && props.recommended.length > 0" class="dash-section">
+                <div class="section-topline">
+                    <div>
+                        <span class="panel-eyebrow">REKOMENDASI</span>
+                        <h2 class="section-heading">Latihan Isyarat Berikutnya</h2>
                     </div>
                 </div>
 
-                <!-- Recent Activity Feed from Database -->
-                <div class="dash-card">
-                    <div class="dash-card-header">
-                        <div>
-                            <span class="dash-card-eyebrow">RIWAYAT</span>
-                            <h2 class="dash-card-title">Sesi Latihan Terakhir</h2>
+                <div class="recommended-grid">
+                    <Link
+                        v-for="item in props.recommended.slice(0, 3)"
+                        :key="item.id"
+                        :href="`/lesson/${item.id}`"
+                        class="rec-card"
+                    >
+                        <div class="rec-symbol">{{ item.title.slice(0, 2) }}</div>
+                        <div class="rec-body">
+                            <b class="rec-title">{{ item.title }}</b>
+                            <small class="rec-sub">{{ item.material_title }}</small>
                         </div>
-                        <div class="dash-filter-pills">
+                        <span class="rec-xp-tag">+{{ item.xp_reward }} XP</span>
+                    </Link>
+                </div>
+            </section>
+
+            <!-- 6. Riwayat Sesi Latihan Terakhir (Full Width, Rapi & Bersih) -->
+            <section class="dash-section">
+                <div class="dash-panel history-panel">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-eyebrow">RIWAYAT AKTIVITAS</span>
+                            <h2 class="panel-title">Sesi Latihan Terakhir</h2>
+                        </div>
+                        <div class="filter-pills" role="radiogroup" aria-label="Filter status sesi">
                             <button
+                                type="button"
+                                class="filter-pill"
                                 :class="{ active: activityFilter === 'all' }"
                                 @click="activityFilter = 'all'"
                             >
                                 Semua
                             </button>
                             <button
+                                type="button"
+                                class="filter-pill"
                                 :class="{ active: activityFilter === 'passed' }"
                                 @click="activityFilter = 'passed'"
                             >
                                 Lulus
                             </button>
                             <button
+                                type="button"
+                                class="filter-pill"
                                 :class="{ active: activityFilter === 'needs-practice' }"
                                 @click="activityFilter = 'needs-practice'"
                             >
@@ -464,109 +458,103 @@ const filteredSessions = computed(() => {
                         </div>
                     </div>
 
-                    <div class="dash-table-wrap">
-                        <table v-if="filteredSessions.length > 0" class="dash-activity-table">
+                    <div class="table-container">
+                        <table v-if="filteredSessions.length > 0" class="history-table">
                             <thead>
                                 <tr>
-                                    <th>Materi Sesi</th>
-                                    <th>Akurasi</th>
-                                    <th>XP</th>
+                                    <th>Materi Isyarat</th>
+                                    <th>Akurasi Kamera</th>
+                                    <th>Poin XP</th>
                                     <th>Status</th>
+                                    <th>Waktu Selesai</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr v-for="session in filteredSessions" :key="session.id">
-                                    <td>
-                                        <b>{{ session.lesson_title }}</b>
-                                        <small>{{ session.completed_at }}</small>
+                                    <td class="font-semibold text-charcoal">
+                                        {{ session.lesson_title }}
                                     </td>
                                     <td>
-                                        <span class="dash-score-pill">{{ session.score }}%</span>
+                                        <span class="score-pill">{{ session.score }}%</span>
                                     </td>
                                     <td>
-                                        <span class="dash-xp-badge">+{{ session.xp_earned }}</span>
+                                        <span class="xp-pill">+{{ session.xp_earned }} XP</span>
                                     </td>
                                     <td>
-                                        <span v-if="session.passed" class="dash-status-passed">Tuntas</span>
-                                        <span v-else class="dash-status-retry">Coba Lagi</span>
+                                        <span v-if="session.passed" class="status-badge passed">Tuntas</span>
+                                        <span v-else class="status-badge retry">Coba Lagi</span>
+                                    </td>
+                                    <td class="text-xs text-muted">
+                                        {{ session.completed_at }}
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
-                        <div v-else class="text-xs text-muted py-8 text-center">
-                            Belum ada riwayat sesi latihan yang tercatat. Buka AI Practice Studio untuk memulai latihan.
+                        <div v-else class="empty-history-box">
+                            Belum ada riwayat sesi latihan. Buka AI Practice Studio untuk memulai latihan isyarat mandiri.
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
         </div>
     </AppLayout>
 </template>
 
 <style scoped>
-.dashboard-revamp {
+.dashboard-wrap {
     display: flex;
     flex-direction: column;
-    gap: 28px;
-    padding-bottom: 36px;
+    gap: 24px;
+    padding-bottom: 40px;
+    font-family: 'Poppins', sans-serif;
 }
 
+/* 1. Hero Welcome Banner */
 .dash-hero {
-    background: linear-gradient(135deg, #eefaf4 0%, #f6fbf8 60%, #fdf9ef 100%);
-    border: 1px solid #d5f3e5;
-    border-radius: 20px;
-    padding: 28px 32px;
+    background: #ffffff;
+    border: 1px solid #e5ede8;
+    border-radius: 18px;
+    padding: 26px 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 24px;
-    box-shadow: 0 4px 18px rgba(52, 177, 130, 0.06);
+    box-shadow: 0 2px 10px rgba(20, 34, 29, 0.03);
 }
 
-.dash-hero-content {
-    max-width: 580px;
+.dash-hero-main {
+    max-width: 600px;
 }
 
-.dash-eyebrow {
-    display: flex;
+.dash-hero-badge {
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
     margin-bottom: 10px;
 }
 
-.dash-pill-brand {
+.dash-hero-badge span {
     font-size: 11px;
     font-weight: 700;
     color: #1e7253;
-    background: #d5f3e5;
-    padding: 3px 10px;
-    border-radius: 6px;
+    background: #eefaf4;
+    border: 1px solid #d5f3e5;
+    padding: 4px 12px;
+    border-radius: 20px;
 }
 
-.dash-system-badge {
-    font-size: 11px;
-    font-weight: 700;
-    color: #a58230;
-    background: #fdf9ef;
-    border: 1px solid #f1deaf;
-    padding: 3px 10px;
-    border-radius: 6px;
-}
-
-.dash-title {
-    font-size: 28px;
+.dash-hero-title {
+    font-size: 26px;
     font-weight: 800;
     color: #14221d;
-    line-height: 1.2;
+    line-height: 1.25;
     margin: 0 0 10px;
-    letter-spacing: -0.5px;
 }
 
-.dash-name {
+.text-primary-gradient {
     color: #34B182;
 }
 
-.dash-subtitle {
+.dash-hero-desc {
     font-size: 13px;
     color: #52685d;
     line-height: 1.6;
@@ -580,7 +568,7 @@ const filteredSessions = computed(() => {
     flex-wrap: wrap;
 }
 
-.dash-btn-primary {
+.btn-primary-action {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -589,304 +577,310 @@ const filteredSessions = computed(() => {
     font-weight: 700;
     font-size: 13px;
     padding: 10px 18px;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(52, 177, 130, 0.28);
-    transition: 0.18s;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: 0.18s ease;
 }
 
-.dash-btn-primary:hover {
+.btn-primary-action:hover {
     background: #279069;
-    transform: translateY(-1px);
 }
 
-.dash-btn-glass {
+.btn-secondary-action {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: #ffffff;
+    background: #f8faf9;
     color: #14221d;
-    border: 1px solid #d5f3e5;
+    border: 1px solid #dbe6e0;
     font-weight: 700;
     font-size: 13px;
-    padding: 10px 16px;
-    border-radius: 12px;
-    transition: 0.18s;
+    padding: 10px 18px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: 0.18s ease;
 }
 
-.dash-btn-glass:hover {
+.btn-secondary-action:hover {
     background: #eefaf4;
-    border-color: #ade6cc;
+    border-color: #34B182;
+    color: #1e7253;
 }
 
-.dash-hero-level-box {
-    background: #ffffff;
-    border: 1px solid #e2ede6;
-    border-radius: 16px;
+.dash-hero-level {
+    background: #fbfdfc;
+    border: 1px solid #e5ede8;
+    border-radius: 14px;
     padding: 18px 22px;
-    min-width: 250px;
-    box-shadow: 0 4px 12px rgba(20, 34, 29, 0.04);
+    min-width: 260px;
+    flex-shrink: 0;
 }
 
-.dash-level-header {
+.dash-level-head {
     display: flex;
-    align-items: center;
     justify-content: space-between;
+    align-items: center;
     margin-bottom: 8px;
 }
 
-.dash-level-label {
+.level-label {
     font-size: 10px;
     font-weight: 700;
     color: #859c90;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.6px;
 }
 
-.dash-level-xp-value {
+.level-xp {
     font-size: 13px;
     font-weight: 800;
     color: #C29B40;
 }
 
-.dash-level-name-row {
+.dash-level-title-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     margin-bottom: 12px;
 }
 
-.dash-award-icon {
+.level-icon {
     color: #34B182;
 }
 
-.dash-level-title {
-    font-size: 18px;
+.level-title {
+    font-size: 17px;
     font-weight: 800;
     color: #14221d;
 }
 
-.dash-xp-track {
-    height: 8px;
-    background: #f1f5f3;
+.level-track {
+    height: 7px;
+    background: #edf3f0;
     border-radius: 8px;
     overflow: hidden;
     margin-bottom: 8px;
 }
 
-.dash-xp-bar {
+.level-bar {
     height: 100%;
-    background: linear-gradient(90deg, #34B182, #5FAB6F);
+    background: #34B182;
     border-radius: 8px;
-    transition: width 0.4s ease;
+    transition: width 0.3s ease;
 }
 
-.dash-level-footer {
+.level-foot {
     display: flex;
-    align-items: center;
     justify-content: space-between;
     font-size: 10px;
     font-weight: 600;
     color: #859c90;
 }
 
-.dash-pct-text {
-    color: #1e7253;
+.level-pct {
     font-weight: 800;
+    color: #1e7253;
 }
 
-/* 4 Metrics Grid */
+/* 2. 4 Key Stat Metrics */
 .dash-stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
+    gap: 16px;
 }
 
-.dash-stat-card {
+.stat-card {
     background: #ffffff;
-    border: 1px solid #e2ede6;
-    border-radius: 16px;
-    padding: 16px 18px;
+    border: 1px solid #e5ede8;
+    border-radius: 14px;
+    padding: 18px 20px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    transition: 0.18s;
+    transition: 0.15s ease;
 }
 
-.dash-stat-card:hover {
+.stat-card:hover {
     border-color: #ade6cc;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 14px rgba(20, 34, 29, 0.05);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(20, 34, 29, 0.04);
 }
 
-.dash-stat-icon-tile {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
+.stat-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.stat-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #71887c;
+}
+
+.stat-icon-tile {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
     display: grid;
     place-items: center;
-    margin-bottom: 12px;
 }
 
-.dash-stat-icon-tile.gold { background: #fdf9ef; color: #C29B40; }
-.dash-stat-icon-tile.emerald { background: #eefaf4; color: #34B182; }
-.dash-stat-icon-tile.green { background: #f1f9f3; color: #5FAB6F; }
-.dash-stat-icon-tile.mint { background: #f0f7f4; color: #279069; }
+.stat-icon-tile.gold { background: #fdf9ef; color: #C29B40; }
+.stat-icon-tile.emerald { background: #eefaf4; color: #34B182; }
+.stat-icon-tile.green { background: #f1f9f3; color: #5FAB6F; }
+.stat-icon-tile.mint { background: #f0f7f4; color: #279069; }
 
-.dash-stat-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: #859c90;
-    display: block;
-    margin-bottom: 4px;
-}
-
-.dash-stat-number {
+.stat-value {
     font-size: 26px;
     font-weight: 800;
     color: #14221d;
     line-height: 1.1;
+    margin-bottom: 8px;
 }
 
-.dash-stat-number small {
+.stat-value small {
     font-size: 12px;
     font-weight: 600;
     color: #859c90;
 }
 
-.dash-stat-subtext {
+.stat-foot {
     font-size: 11px;
-    font-weight: 600;
-    color: #52685d;
-    margin-top: 10px;
+    font-weight: 500;
+    color: #859c90;
     padding-top: 8px;
     border-top: 1px solid #f1f5f3;
 }
 
-/* Split Grids */
+/* 3. Split Grid: Ritme & Challenge */
 .dash-split-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
 }
 
-.dash-card {
+.dash-panel {
     background: #ffffff;
-    border: 1px solid #e2ede6;
+    border: 1px solid #e5ede8;
     border-radius: 16px;
-    padding: 20px;
-}
-
-.dash-card-header {
+    padding: 22px;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 14px;
+    flex-direction: column;
 }
 
-.dash-card-eyebrow {
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.panel-eyebrow {
     font-size: 10px;
     font-weight: 800;
     color: #859c90;
-    letter-spacing: 0.8px;
+    letter-spacing: 0.7px;
 }
 
-.dash-card-title {
+.panel-title {
     font-size: 16px;
     font-weight: 800;
     color: #14221d;
     margin: 2px 0 0;
 }
 
-.dash-habit-badge, .dash-reward-pill {
+.panel-desc {
+    font-size: 12px;
+    color: #657b70;
+    margin: 0 0 16px;
+    line-height: 1.5;
+}
+
+.habit-badge, .reward-pill {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     font-size: 11px;
     font-weight: 700;
     padding: 4px 10px;
-    border-radius: 8px;
+    border-radius: 6px;
 }
 
-.dash-habit-badge {
+.habit-badge {
     background: #fdf9ef;
     color: #a58230;
     border: 1px solid #f1deaf;
 }
 
-.dash-reward-pill {
+.reward-pill {
     background: #eefaf4;
     color: #1e7253;
     border: 1px solid #ade6cc;
 }
 
-.dash-card-desc {
-    font-size: 12px;
-    color: #52685d;
-    margin: 0 0 16px;
-    line-height: 1.5;
-}
-
-.dash-week-strip {
+/* Week Strip */
+.week-strip {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 8px;
     margin-bottom: 16px;
 }
 
-.dash-day-col {
+.day-col {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 6px;
     background: #f8faf9;
-    border: 1px solid #eef3f0;
+    border: 1px solid #edf3f0;
     border-radius: 10px;
     padding: 10px 4px;
-    position: relative;
 }
 
-.dash-day-col.is-active {
+.day-col.is-active {
     background: #eefaf4;
     border-color: #ade6cc;
 }
 
-.dash-day-indicator {
+.day-indicator {
     width: 22px;
     height: 22px;
-    border-radius: 50%;
     display: grid;
     place-items: center;
     color: #34B182;
 }
 
-.dash-dot {
+.day-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #d0ded6;
+    background: #cfdcd5;
 }
 
-.dash-day-label {
+.day-label {
     font-size: 11px;
     font-weight: 700;
     color: #52685d;
 }
 
-.dash-today-tag {
+.today-tag {
     font-size: 9px;
     font-weight: 800;
     color: #34B182;
 }
 
-.dash-habit-footer {
+.panel-footer {
     display: flex;
-    align-items: center;
     justify-content: space-between;
-    padding-top: 12px;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 14px;
     border-top: 1px solid #f1f5f3;
 }
 
-.dash-habit-legend {
+.legend-row {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -895,16 +889,16 @@ const filteredSessions = computed(() => {
     color: #859c90;
 }
 
-.dash-legend-dot {
+.legend-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
 }
 
-.dash-legend-dot.active { background: #34B182; }
-.dash-legend-dot.inactive { background: #d0ded6; }
+.legend-dot.active { background: #34B182; }
+.legend-dot.inactive { background: #cfdcd5; }
 
-.dash-link-action {
+.panel-link {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -914,17 +908,28 @@ const filteredSessions = computed(() => {
     text-decoration: none;
 }
 
-.dash-quest-info {
+.panel-link:hover {
+    color: #279069;
+}
+
+/* Quest Card Body */
+.quest-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.quest-info-row {
     display: flex;
     align-items: flex-start;
     gap: 12px;
     margin-bottom: 14px;
 }
 
-.dash-quest-icon-box {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
+.quest-icon-tile {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
     background: #eefaf4;
     color: #34B182;
     display: grid;
@@ -932,33 +937,52 @@ const filteredSessions = computed(() => {
     flex-shrink: 0;
 }
 
-.dash-quest-name {
+.quest-name {
     font-size: 14px;
     font-weight: 800;
     color: #14221d;
-    margin: 0 0 4px;
+    margin: 0 0 2px;
 }
 
-.dash-quest-desc {
+.quest-desc {
     font-size: 11px;
-    color: #859c90;
+    color: #71887c;
     margin: 0;
     line-height: 1.4;
 }
 
-.dash-quest-progress-block {
+.quest-progress-box {
     margin-bottom: 14px;
 }
 
-.dash-quest-progress-header {
+.quest-progress-head {
     display: flex;
     justify-content: space-between;
     font-size: 11px;
-    margin-bottom: 6px;
     color: #52685d;
+    margin-bottom: 6px;
 }
 
-.dash-btn-gold {
+.quest-track {
+    height: 7px;
+    background: #edf3f0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.quest-bar {
+    height: 100%;
+    background: #34B182;
+    border-radius: 8px;
+    transition: width 0.3s ease;
+}
+
+.quest-action-row {
+    margin-top: auto;
+}
+
+.btn-claim-bonus {
+    width: 100%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -967,13 +991,29 @@ const filteredSessions = computed(() => {
     color: #ffffff;
     font-weight: 700;
     font-size: 12px;
-    padding: 8px 14px;
-    border-radius: 10px;
+    padding: 9px 14px;
+    border-radius: 8px;
     border: none;
     cursor: pointer;
 }
 
-.dash-claimed-banner {
+.btn-start-quest {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: #ffffff;
+    border: 1px solid #34B182;
+    color: #1e7253;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    text-decoration: none;
+}
+
+.banner-claimed {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -983,253 +1023,314 @@ const filteredSessions = computed(() => {
     font-size: 12px;
     font-weight: 700;
     padding: 8px 14px;
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
-.dash-btn-outline {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    border: 1px solid #34B182;
-    background: #ffffff;
-    color: #1e7253;
-    font-weight: 700;
+.empty-quest-message {
+    padding: 30px 0;
+    text-align: center;
     font-size: 12px;
-    padding: 8px 14px;
-    border-radius: 10px;
-    text-decoration: none;
+    color: #859c90;
 }
 
+/* 4. Category Pathways */
 .dash-section {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
 }
 
-.dash-section-header {
+.section-topline {
     display: flex;
-    align-items: center;
     justify-content: space-between;
+    align-items: flex-end;
 }
 
-.dash-section-title {
-    font-size: 18px;
+.section-heading {
+    font-size: 17px;
     font-weight: 800;
     color: #14221d;
     margin: 2px 0 0;
 }
 
-.dash-category-grid {
+.categories-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
+    gap: 16px;
 }
 
-.dash-cat-card {
+.category-card {
+    background: #ffffff;
+    border: 1px solid #e5ede8;
+    border-radius: 14px;
     padding: 18px;
     display: flex;
     flex-direction: column;
+    transition: 0.15s ease;
 }
 
-.dash-cat-top {
+.category-card:hover {
+    border-color: #ade6cc;
+    transform: translateY(-1px);
+}
+
+.cat-card-head {
     display: flex;
-    align-items: center;
     justify-content: space-between;
+    align-items: center;
     margin-bottom: 12px;
 }
 
-.dash-cat-icon-tile {
+.cat-icon-tile {
     width: 36px;
     height: 36px;
-    border-radius: 10px;
-    display: grid;
-    place-items: center;
+    border-radius: 8px;
     background: #eefaf4;
     color: #34B182;
+    display: grid;
+    place-items: center;
 }
 
-.dash-cat-count {
+.cat-module-count {
     font-size: 10px;
     font-weight: 700;
     color: #859c90;
 }
 
-.dash-cat-title {
+.cat-title {
     font-size: 14px;
     font-weight: 800;
     color: #14221d;
-    margin: 0 0 6px;
+    margin: 0 0 12px;
 }
 
-.dash-cat-desc {
-    font-size: 11px;
-    color: #859c90;
-    line-height: 1.4;
-    margin: 0 0 14px;
-    flex: 1;
-}
-
-.dash-cat-progress {
+.cat-progress-wrap {
     display: flex;
     align-items: center;
     gap: 8px;
     margin-bottom: 12px;
 }
 
-.dash-cat-pct {
+.cat-track {
+    flex: 1;
+    height: 6px;
+    background: #edf3f0;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.cat-bar {
+    height: 100%;
+    background: #34B182;
+    border-radius: 6px;
+}
+
+.cat-pct {
     font-size: 10px;
     font-weight: 800;
     color: #1e7253;
 }
 
-.dash-cat-btn {
+.cat-action-link {
     display: flex;
-    align-items: center;
     justify-content: space-between;
+    align-items: center;
     font-size: 11px;
     font-weight: 700;
     color: #34B182;
+    text-decoration: none;
     padding-top: 10px;
     border-top: 1px solid #f1f5f3;
-    text-decoration: none;
 }
 
-.dash-rec-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+/* 5. Recommended Grid */
+.recommended-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
 }
 
-.dash-rec-item {
+.rec-card {
+    background: #ffffff;
+    border: 1px solid #e5ede8;
+    border-radius: 12px;
+    padding: 12px 14px;
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 12px;
-    border-radius: 12px;
-    background: #fbfdfc;
-    border: 1px solid #eef3f0;
     text-decoration: none;
+    transition: 0.15s ease;
 }
 
-.dash-rec-symbol {
-    width: 32px;
-    height: 32px;
+.rec-card:hover {
+    border-color: #34B182;
+    transform: translateY(-1px);
+}
+
+.rec-symbol {
+    width: 36px;
+    height: 36px;
     border-radius: 8px;
     background: #eefaf4;
     color: #1e7253;
     font-weight: 800;
-    font-size: 13px;
+    font-size: 14px;
     display: grid;
     place-items: center;
+    flex-shrink: 0;
 }
 
-.dash-rec-info {
+.rec-body {
     flex: 1;
+    min-width: 0;
 }
 
-.dash-rec-info b {
+.rec-title {
     display: block;
-    font-size: 12px;
+    font-size: 13px;
     color: #14221d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.dash-rec-info small {
+.rec-sub {
     font-size: 10px;
     color: #859c90;
 }
 
-.dash-rec-tag {
+.rec-xp-tag {
     font-size: 10px;
     font-weight: 800;
     color: #C29B40;
     background: #fdf9ef;
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: 3px 7px;
+    border-radius: 6px;
+    flex-shrink: 0;
 }
 
-.dash-filter-pills {
+/* 6. History Table */
+.history-panel {
+    padding: 22px;
+}
+
+.filter-pills {
     display: flex;
-    gap: 4px;
+    gap: 6px;
 }
 
-.dash-filter-pills button {
+.filter-pill {
+    background: #f8faf9;
     border: 1px solid #e2ede6;
-    background: #ffffff;
-    font-size: 10px;
-    font-weight: 700;
     color: #52685d;
-    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
     border-radius: 6px;
     cursor: pointer;
+    transition: 0.12s;
 }
 
-.dash-filter-pills button.active {
+.filter-pill.active {
     background: #34B182;
     border-color: #34B182;
     color: #ffffff;
 }
 
-.dash-table-wrap {
+.table-container {
     overflow-x: auto;
+    margin-top: 10px;
 }
 
-.dash-activity-table {
+.history-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 11px;
+    font-size: 12px;
+    text-align: left;
 }
 
-.dash-activity-table th {
-    text-align: left;
-    padding: 8px;
-    border-bottom: 1px solid #eef3f0;
+.history-table th {
+    padding: 10px 12px;
+    border-bottom: 1px solid #edf3f0;
     color: #859c90;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
 }
 
-.dash-activity-table td {
-    padding: 10px 8px;
+.history-table td {
+    padding: 12px;
     border-bottom: 1px solid #f6f9f7;
+    vertical-align: middle;
 }
 
-.dash-activity-table td b {
-    display: block;
-    color: #14221d;
-}
-
-.dash-activity-table td small {
-    font-size: 10px;
-    color: #859c90;
-}
-
-.dash-score-pill {
+.score-pill {
     font-weight: 800;
     color: #14221d;
 }
 
-.dash-xp-badge {
+.xp-pill {
+    font-size: 11px;
     font-weight: 700;
     color: #C29B40;
     background: #fdf9ef;
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: 3px 8px;
+    border-radius: 6px;
 }
 
-.dash-status-passed {
+.status-badge {
+    display: inline-block;
+    font-size: 10px;
     font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
+.status-badge.passed {
+    background: #eefaf4;
     color: #1e7253;
 }
 
-.dash-status-retry {
-    font-weight: 700;
+.status-badge.retry {
+    background: #fdf2f2;
     color: #d9534f;
 }
 
-@media (max-width: 900px) {
-    .dash-stats-grid { grid-template-columns: repeat(2, 1fr); }
-    .dash-split-grid { grid-template-columns: 1fr; }
-    .dash-category-grid { grid-template-columns: repeat(2, 1fr); }
+.empty-history-box {
+    text-align: center;
+    padding: 36px 12px;
+    font-size: 12px;
+    color: #859c90;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .dash-hero {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .dash-hero-level {
+        min-width: 100%;
+    }
+    .dash-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .categories-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .dash-split-grid {
+        grid-template-columns: 1fr;
+    }
+    .recommended-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .dash-stats-grid {
+        grid-template-columns: 1fr;
+    }
+    .categories-grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>

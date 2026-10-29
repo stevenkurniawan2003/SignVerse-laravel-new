@@ -8,28 +8,29 @@ use App\Services\AssignmentService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class RegisteredUserController extends Controller
 {
     /**
      * Display the registration view.
      */
-    public function create(): View
+    public function create(): Response
     {
-        return view('auth.register');
+        return Inertia::render('Auth/Register');
     }
 
     /**
      * Handle an incoming registration request.
      *
-     * Registrasi publik hanya untuk role student (teacher dibuat via seeder
-     * oleh admin, sesuai behavior project lama). Setelah registrasi user tidak
-     * di-login otomatis, melainkan diarahkan ke form login.
+     * Registrasi publik untuk role student. Setelah registrasi,
+     * pengguna langsung diautentikasi dan diarahkan ke dashboard.
      *
      * @throws ValidationException
      */
@@ -50,7 +51,7 @@ class RegisteredUserController extends Controller
             ]);
 
             // Profil student (1:1) — data streak/gamification hidup di sini.
-            $student = $user->student()->create();
+            $student = $user->student()->firstOrCreate(['user_id' => $user->id]);
 
             // Tugas guru yang masih aktif ikut dibagikan ke siswa baru.
             $assignments->distributeActiveTo($student);

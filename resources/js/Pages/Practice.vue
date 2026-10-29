@@ -1,7 +1,19 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import { Camera, CameraOff, Check, Hand, Info, RefreshCw, RotateCcw } from '@lucide/vue';
+import {
+    Camera,
+    CameraOff,
+    Check,
+    Clock,
+    Hand,
+    Info,
+    Play,
+    RefreshCw,
+    RotateCcw,
+    Timer,
+    X,
+} from '@lucide/vue';
 import AppLayout from '../Layouts/AppLayout.vue';
 
 const props = defineProps({
@@ -19,6 +31,11 @@ const detectionConfidence = ref(0);
 const detectionRecognized = ref('');
 const feedbackMessage = ref('');
 const promptError = ref('');
+
+// Timer & Countdown system for SLB learners
+const selectedTimer = ref(3); // Options: 0s, 3s, 5s
+const countdown = ref(0);
+let countdownInterval = null;
 
 // Initialize completed letters from database props
 const completedLetters = ref(
@@ -53,7 +70,10 @@ const practicedCount = computed(
 onMounted(async () => {
     if (targetList.value.length === 0) {
         try {
-            const res = await fetch('/api/practice/targets');
+            const res = await fetch('/api/practice/targets', {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+            });
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data.targets) && data.targets.length > 0) {
@@ -105,6 +125,7 @@ async function startCamera() {
 }
 
 function stopCamera() {
+    cancelCountdown();
     if (mediaStream) {
         mediaStream.getTracks().forEach((track) => track.stop());
         mediaStream = null;
@@ -115,11 +136,20 @@ function stopCamera() {
     cameraActive.value = false;
 }
 
+function cancelCountdown() {
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+    }
+    countdown.value = 0;
+}
+
 onBeforeUnmount(() => {
     stopCamera();
 });
 
 function choose(index) {
+    cancelCountdown();
     selected.value = index;
     result.value = null;
     earnedXp.value = 0;
@@ -144,11 +174,37 @@ function captureFrame() {
     return canvas.toDataURL('image/jpeg', 0.85);
 }
 
-async function detect() {
+function startDetection() {
     promptError.value = '';
 
     if (!cameraActive.value) {
-        promptError.value = 'Silakan aktifkan kamera terlebih dahulu untuk mendeteksi gerakan tangan Anda melalui Live AI.';
+        promptError.value = 'Buka kamera terlebih dahulu agar Anda dapat mempraktikkan gerakan isyarat.';
+        return;
+    }
+
+    if (scanning.value || countdown.value > 0) return;
+
+    if (selectedTimer.value === 0) {
+        performDetection();
+        return;
+    }
+
+    countdown.value = selectedTimer.value;
+    countdownInterval = setInterval(() => {
+        countdown.value--;
+        if (countdown.value <= 0) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+            performDetection();
+        }
+    }, 1000);
+}
+
+async function performDetection() {
+    promptError.value = '';
+
+    if (!cameraActive.value) {
+        promptError.value = 'Kamera tidak aktif. Nyalakan kamera untuk mendeteksi isyarat tangan Anda.';
         return;
     }
 
@@ -158,7 +214,7 @@ async function detect() {
 
     const frameData = captureFrame();
     if (!frameData) {
-        promptError.value = 'Gagal mengambil frame dari kamera. Pastikan kamera menyala.';
+        promptError.value = 'Gagal mengambil gambar dari kamera. Pastikan kamera menyala dengan baik.';
         scanning.value = false;
         return;
     }
@@ -166,6 +222,7 @@ async function detect() {
     try {
         const res = await fetch('/api/practice/attempt', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
@@ -179,7 +236,8 @@ async function detect() {
         });
 
         if (!res.ok) {
-            throw new Error(`Server merespons dengan status ${res.status}`);
+            const errData = await res.json().catch(() => null);
+            throw new Error(errData?.message || `Respons server status ${res.status}`);
         }
 
         const data = await res.json();
@@ -190,7 +248,7 @@ async function detect() {
         detectionConfidence.value = confidence;
         detectionRecognized.value = recognized || '-';
         feedbackMessage.value = data.message || (success
-            ? `Bentuk isyarat ${target.value.letter} sesuai kaidah.`
+            ? `Bentuk isyarat ${target.value.letter} sesuai kaidah bahasa isyarat.`
             : `Bentuk tangan belum sesuai target ${target.value.letter}.`);
 
         earnedXp.value = Number(data.xp_earned || 0);
@@ -204,7 +262,7 @@ async function detect() {
         result.value = 'retry';
         detectionConfidence.value = 0;
         detectionRecognized.value = '-';
-        feedbackMessage.value = 'Gagal menghubungi Live AI Service: ' + e.message;
+        feedbackMessage.value = 'Koneksi ke sistem deteksi terganggu: ' + e.message;
     } finally {
         scanning.value = false;
     }
@@ -215,13 +273,13 @@ async function detect() {
     <AppLayout>
         <Head title="AI Practice Studio" />
 
-        <main class="practice-page practice-focused">
+        <main class="practice-page practice-focused font-sans">
             <canvas ref="canvasRef" style="display: none"></canvas>
 
             <header class="practice-page-heading">
-                <div class="heading-badge">Studio Deteksi Gesture · {{ activeSystem }}</div>
-                <h1>Latihan Mandiri AI Practice</h1>
-                <p>Terhubung langsung ke Live AI Service. Posisikan tangan di depan kamera untuk verifikasi real-time.</p>
+                <div class="heading-badge">Studio Isyarat Interaktif · {{ activeSystem }}</div>
+                <h1>Latihan Mandiri Bahasa Isyarat</h1>
+                <p>Posisikan tangan Anda di depan kamera dengan nyaman. Gunakan timer hitung mundur untuk mempersiapkan bentuk isyarat.</p>
             </header>
 
             <div v-if="promptError" class="prompt-alert-box" role="alert">
@@ -239,6 +297,7 @@ async function detect() {
                         <span class="session-system">{{ activeSystem }}</span>
                     </div>
 
+                    <!-- Target Selection Pills -->
                     <div class="practice-target-select">
                         <div>
                             <b>Pilih Target</b>
@@ -263,11 +322,14 @@ async function detect() {
                         </div>
                     </div>
 
-                    <div class="practice-studio" :class="{ 'is-scanning': scanning }">
+                    <!-- Main Camera Studio with Vector Animation and Timer -->
+                    <div class="practice-studio" :class="{ 'is-scanning': scanning, 'is-counting': countdown > 0 }">
                         <div class="studio-topline">
                             <span class="studio-status-indicator">
-                                <i class="studio-dot" :class="{ active: cameraActive }"></i>
-                                {{ cameraActive ? 'Kamera Aktif · Siap Deteksi AI' : 'Kamera Nonaktif' }}
+                                <i class="studio-dot" :class="{ active: cameraActive, countdown: countdown > 0 }"></i>
+                                <span v-if="countdown > 0">Bersiap... Mengambil dalam {{ countdown }} detik</span>
+                                <span v-else-if="scanning">Menganalisis Posisi Tangan...</span>
+                                <span v-else>{{ cameraActive ? 'Kamera Aktif · Posisikan Tangan' : 'Kamera Nonaktif' }}</span>
                             </span>
                             <button class="camera-toggle-btn" type="button" @click="toggleCamera">
                                 <component :is="cameraActive ? CameraOff : Camera" :size="13" />
@@ -276,6 +338,7 @@ async function detect() {
                         </div>
 
                         <div class="studio-viewport">
+                            <!-- Real Webcam Stream -->
                             <video
                                 v-show="cameraActive"
                                 ref="videoRef"
@@ -285,30 +348,98 @@ async function detect() {
                                 muted
                             ></video>
 
+                            <!-- Placeholder when camera is inactive -->
                             <div v-show="!cameraActive" class="hand-guide-box">
                                 <div class="guide-circle">
                                     <Hand :size="54" class="guide-hand-icon" />
                                     <span class="guide-letter">{{ target.letter }}</span>
                                 </div>
                                 <p class="guide-text">
-                                    Buka kamera untuk evaluasi langsung dengan AI Service (https://ai.signtech.tech).
+                                    Nyalakan kamera untuk melihat posisi tangan Anda dan memulai verifikasi isyarat.
                                 </p>
                             </div>
 
+                            <!-- Interactive Countdown Timer Overlay -->
+                            <div v-if="countdown > 0" class="countdown-overlay">
+                                <div class="countdown-circle">
+                                    <svg class="countdown-svg" viewBox="0 0 100 100">
+                                        <circle class="countdown-bg" cx="50" cy="50" r="42" />
+                                        <circle
+                                            class="countdown-progress"
+                                            cx="50"
+                                            cy="50"
+                                            r="42"
+                                            :style="{
+                                                strokeDashoffset: 264 - (264 * countdown) / selectedTimer,
+                                            }"
+                                        />
+                                    </svg>
+                                    <span class="countdown-number">{{ countdown }}</span>
+                                </div>
+                                <div class="countdown-banner">
+                                    <b>Tahan Posisi Tangan...</b>
+                                    <small>Foto akan diambil secara otomatis</small>
+                                </div>
+                                <button type="button" class="countdown-cancel-btn" @click="cancelCountdown">
+                                    <X :size="13" />
+                                    <span>Batal</span>
+                                </button>
+                            </div>
+
+                            <!-- Target Letter Badge in Viewport -->
                             <div class="target-overlay-badge">
                                 <small>Target</small>
                                 <b>{{ target.letter }}</b>
                             </div>
 
+                            <!-- Scanning Laser Animation Line -->
+                            <div v-if="scanning" class="scanning-laser-line"></div>
+
+                            <!-- Scanning Indicator Bar -->
                             <div v-if="scanning" class="scanning-indicator-bar">
-                                <RefreshCw :size="14" class="spin-icon" />
-                                <span>Live AI sedang memeriksa formasi tangan...</span>
+                                <RefreshCw :size="15" class="spin-icon" />
+                                <span>Memverifikasi kesesuaian isyarat tangan Anda...</span>
+                            </div>
+                        </div>
+
+                        <!-- Timer Duration Selector Bar -->
+                        <div class="timer-selector-bar">
+                            <div class="timer-selector-label">
+                                <Timer :size="15" class="text-secondary" />
+                                <span>Hitung Mundur Persiapan (Timer):</span>
+                            </div>
+                            <div class="timer-pill-group" role="radiogroup" aria-label="Pilih timer persiapan">
+                                <button
+                                    type="button"
+                                    class="timer-pill"
+                                    :class="{ active: selectedTimer === 0 }"
+                                    @click="selectedTimer = 0"
+                                >
+                                    Langsung
+                                </button>
+                                <button
+                                    type="button"
+                                    class="timer-pill"
+                                    :class="{ active: selectedTimer === 3 }"
+                                    @click="selectedTimer = 3"
+                                >
+                                    3 Detik (Rekomendasi)
+                                </button>
+                                <button
+                                    type="button"
+                                    class="timer-pill"
+                                    :class="{ active: selectedTimer === 5 }"
+                                    @click="selectedTimer = 5"
+                                >
+                                    5 Detik
+                                </button>
                             </div>
                         </div>
 
                         <p class="studio-hint">{{ target.hint }}</p>
                     </div>
 
+                    <!-- Detection Result Banner -->
                     <div v-if="result" class="studio-result" :class="{ retry: result === 'retry' }" role="status">
                         <div class="result-title">
                             <span class="result-icon-badge">
@@ -323,17 +454,27 @@ async function detect() {
                         </div>
                     </div>
 
+                    <!-- Control Buttons -->
                     <div class="practice-control-row">
-                        <button v-if="result === 'retry'" class="secondary-button" @click="detect">
-                            <RotateCcw :size="14" /> Coba Ulangi
+                        <button v-if="result === 'retry'" class="secondary-button" @click="startDetection">
+                            <RotateCcw :size="14" />
+                            <span>Coba Ulangi</span>
                         </button>
-                        <button class="primary-button" :disabled="scanning" @click="detect">
-                            <Camera :size="15" />
-                            <span>{{ scanning ? 'Menganalisis...' : 'Periksa Isyarat Saya' }}</span>
+                        <button
+                            class="primary-button timer-start-btn"
+                            :disabled="scanning || countdown > 0"
+                            @click="startDetection"
+                        >
+                            <Timer v-if="selectedTimer > 0" :size="16" />
+                            <Camera v-else :size="16" />
+                            <span>
+                                {{ scanning ? 'Sedang Menganalisis...' : countdown > 0 ? `Bersiap (${countdown}s)...` : selectedTimer > 0 ? `Mulai Deteksi (${selectedTimer} Detik)` : 'Deteksi Langsung' }}
+                            </span>
                         </button>
                     </div>
                 </section>
 
+                <!-- Sidebar Progress -->
                 <aside class="practice-progress-card card">
                     <div class="section-label">Kemajuan Sesi</div>
                     <div class="practice-progress-total">
@@ -365,6 +506,11 @@ async function detect() {
 </template>
 
 <style scoped>
+.practice-page {
+    font-family: 'Poppins', sans-serif;
+    padding-bottom: 40px;
+}
+
 .practice-page-heading {
     margin-bottom: 20px;
 }
@@ -410,7 +556,7 @@ async function detect() {
     border-radius: 16px;
     background: #14221d;
     color: #ffffff;
-    padding: 16px;
+    padding: 18px;
     margin-top: 16px;
 }
 
@@ -435,11 +581,23 @@ async function detect() {
     height: 8px;
     border-radius: 50%;
     background: #52685d;
+    transition: all 0.2s ease;
 }
 
 .studio-dot.active {
     background: #34B182;
     box-shadow: 0 0 8px #34B182;
+}
+
+.studio-dot.countdown {
+    background: #C29B40;
+    box-shadow: 0 0 10px #C29B40;
+    animation: pulse-dot 0.8s infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.4); opacity: 0.6; }
 }
 
 .camera-toggle-btn {
@@ -461,14 +619,15 @@ async function detect() {
 }
 
 .studio-viewport {
-    height: 260px;
-    border-radius: 12px;
-    background: #0d1714;
+    height: 300px;
+    border-radius: 14px;
+    background: #091210;
     position: relative;
     overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .webcam-video {
@@ -484,7 +643,7 @@ async function detect() {
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 20px;
+    padding: 24px;
 }
 
 .guide-circle {
@@ -512,11 +671,129 @@ async function detect() {
 }
 
 .guide-text {
-    font-size: 11px;
+    font-size: 12px;
     color: #97d2a3;
-    max-width: 280px;
+    max-width: 290px;
     line-height: 1.5;
     margin: 0;
+}
+
+/* Countdown Overlay */
+.countdown-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(14, 25, 21, 0.75);
+    backdrop-filter: blur(5px);
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    animation: fade-in 0.2s ease-out;
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.countdown-circle {
+    position: relative;
+    width: 90px;
+    height: 90px;
+    display: grid;
+    place-items: center;
+}
+
+.countdown-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.countdown-bg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.15);
+    stroke-width: 6;
+}
+
+.countdown-progress {
+    fill: none;
+    stroke: #C29B40;
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-dasharray: 264;
+    transition: stroke-dashoffset 0.9s linear;
+}
+
+.countdown-number {
+    position: absolute;
+    font-size: 38px;
+    font-weight: 900;
+    color: #ffffff;
+    animation: scale-bounce 0.95s infinite ease-out;
+}
+
+@keyframes scale-bounce {
+    0% { transform: scale(0.7); opacity: 0.6; }
+    30% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.9; }
+}
+
+.countdown-banner {
+    margin-top: 14px;
+}
+
+.countdown-banner b {
+    display: block;
+    font-size: 15px;
+    color: #ffffff;
+}
+
+.countdown-banner small {
+    display: block;
+    font-size: 11px;
+    color: #d5f3e5;
+    margin-top: 2px;
+}
+
+.countdown-cancel-btn {
+    margin-top: 16px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: 0.18s;
+}
+
+.countdown-cancel-btn:hover {
+    background: rgba(217, 83, 79, 0.3);
+    border-color: #d9534f;
+}
+
+/* Scanning Laser Effect */
+.scanning-laser-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #34B182 30%, #5FAB6F 70%, transparent);
+    box-shadow: 0 0 16px #34B182, 0 0 30px #5FAB6F;
+    z-index: 20;
+    animation: laser-sweep 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes laser-sweep {
+    0% { top: 8%; opacity: 0.3; }
+    50% { opacity: 1; }
+    100% { top: 92%; opacity: 0.3; }
 }
 
 .target-overlay-badge {
@@ -529,6 +806,7 @@ async function detect() {
     padding: 6px 12px;
     text-align: right;
     backdrop-filter: blur(4px);
+    z-index: 15;
 }
 
 .target-overlay-badge small {
@@ -560,6 +838,7 @@ async function detect() {
     font-weight: 600;
     color: #7cd3ae;
     backdrop-filter: blur(4px);
+    z-index: 25;
 }
 
 .spin-icon {
@@ -570,8 +849,58 @@ async function detect() {
     to { transform: rotate(360deg); }
 }
 
+/* Timer Duration Selector */
+.timer-selector-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin-top: 12px;
+}
+
+.timer-selector-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #ade6cc;
+}
+
+.timer-pill-group {
+    display: flex;
+    gap: 6px;
+}
+
+.timer-pill {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #cde6d9;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 9px;
+    border-radius: 6px;
+    transition: 0.16s;
+}
+
+.timer-pill:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.timer-pill.active {
+    background: #C29B40;
+    border-color: #C29B40;
+    color: #ffffff;
+    box-shadow: 0 0 8px rgba(194, 155, 64, 0.4);
+}
+
 .studio-hint {
-    margin: 12px 0 0;
+    margin: 10px 0 0;
     font-size: 11px;
     color: #ade6cc;
     line-height: 1.5;

@@ -138,6 +138,7 @@ class PracticeController extends Controller
         return Inertia::render('Practice', [
             'session' => $session,
             'passed' => $session->score >= PracticeService::PASS_SCORE,
+            'title' => 'Hasil Latihan',
         ]);
     }
 }

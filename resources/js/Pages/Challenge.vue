@@ -18,7 +18,10 @@ const claimStatusMessage = ref('');
 onMounted(async () => {
     if (challengeList.value.length === 0) {
         try {
-            const res = await fetch('/api/challenges');
+            const res = await fetch('/api/challenges', {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+            });
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data.challenges)) {
@@ -38,6 +41,7 @@ async function claim(ch) {
     try {
         const res = await fetch('/api/challenges/claim', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({ challenge_id: ch.id }),
         });
@@ -63,9 +67,9 @@ async function claim(ch) {
         <div class="info-page challenge-page">
             <header class="challenge-welcome">
                 <div class="challenge-welcome-copy">
-                    <div class="heading-badge">Misi Harian · SignTech Database</div>
+                    <div class="heading-badge">Challenge Harian · SignTech</div>
                     <h1>Tantangan Harian & Bonus XP</h1>
-                    <p>Selesaikan target latihan hari ini untuk menjaga streak dan mengumpulkan XP ekstra.</p>
+                    <p>Selesaikan target latihan hari ini untuk menjaga streak dan mengumpulkan XP ekstra. Streak Kamu Saat Ini: {{ streak }} hari.</p>
                 </div>
                 <div class="challenge-mascot" aria-hidden="true">
                     <div class="challenge-icon-circle">
@@ -116,7 +120,7 @@ async function claim(ch) {
                             </div>
                             <div>
                                 <b>Hadiah Misi</b>
-                                <small>+{{ ch.reward_xp }} XP Langsung ke Database</small>
+                                <small>+{{ ch.reward_xp }} XP Otomatis Ditambahkan</small>
                             </div>
                         </div>
 

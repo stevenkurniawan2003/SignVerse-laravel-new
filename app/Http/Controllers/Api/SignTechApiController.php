@@ -163,8 +163,15 @@ class SignTechApiController extends Controller
     public function materials(Request $request): JsonResponse
     {
         try {
+            $language = $request->query('language');
             $categories = Category::query()
-                ->with(['materials.lessons'])
+                ->with(['materials' => function ($q) use ($language) {
+                    if ($language) {
+                        $q->where('language', $language);
+                    }
+                    $q->with('lessons');
+                }])
+                ->when($language, fn ($q) => $q->whereHas('materials', fn ($m) => $m->where('language', $language)))
                 ->orderBy('order')
                 ->get();
 
@@ -473,6 +480,8 @@ class SignTechApiController extends Controller
 
             return response()->json([
                 'status' => 'success',
+                'title' => 'Challenge Harian',
+                'streak_label' => 'Streak Kamu Saat Ini',
                 'challenges' => $challenges,
                 'streak' => $streak['streak'],
                 'is_today' => $streak['is_today'],
@@ -556,6 +565,8 @@ class SignTechApiController extends Controller
 
             return response()->json([
                 'status' => 'success',
+                'title' => 'Pencapaian & Leaderboard',
+                'leaderboard_title' => 'Leaderboard',
                 'achievements' => $achievements,
                 'progress' => $progress,
                 'level' => $level,

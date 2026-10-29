@@ -43,7 +43,10 @@ const earnedXp = ref(0);
 onMounted(async () => {
     if (!currentLesson.value) {
         try {
-            const res = await fetch(`/api/lessons/${props.id}`);
+            const res = await fetch(`/api/lessons/${props.id}`, {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+            });
             if (res.ok) {
                 const data = await res.json();
                 currentLesson.value = data.lesson;
@@ -90,6 +93,7 @@ async function advance() {
         try {
             await fetch(`/api/lessons/${currentLesson.value?.id || props.id}/complete`, {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
@@ -124,6 +128,7 @@ async function verifyPractice() {
     try {
         const res = await fetch('/api/practice/attempt', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({
                 target_letter: targetGesture.value,

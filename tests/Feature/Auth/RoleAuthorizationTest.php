@@ -27,7 +27,7 @@ class RoleAuthorizationTest extends TestCase
         $response = $this->actingAs($student)->get(route('student.dashboard'));
 
         $response->assertOk();
-        $response->assertSee($student->name);
+        $response->assertSee($student->name, false);
     }
 
     public function test_guest_is_redirected_to_login_when_accessing_student_area(): void
@@ -60,7 +60,7 @@ class RoleAuthorizationTest extends TestCase
         $response = $this->actingAs($teacher)->get(route('teacher.dashboard'));
 
         $response->assertOk();
-        $response->assertSee($teacher->name);
+        $response->assertSee($teacher->name, false);
     }
 
     public function test_guest_is_redirected_to_login_when_accessing_teacher_area(): void

@@ -39,7 +39,10 @@ const weekDays = ref(props.weekActivity || []);
 onMounted(async () => {
     if (!props.summary) {
         try {
-            const res = await fetch('/api/dashboard');
+            const res = await fetch('/api/dashboard', {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+            });
             if (res.ok) {
                 const data = await res.json();
                 if (data.summary) summaryData.value = data.summary;
@@ -69,7 +72,7 @@ const masteryPercent = computed(() => {
         <div class="progress-page">
             <header class="progress-welcome">
                 <div>
-                    <div class="heading-badge">Statistik Perkembangan · SignTech Database</div>
+                    <div class="heading-badge">Statistik Perkembangan Belajar · SignTech</div>
                     <h1>Progress Belajar Mandiri</h1>
                     <p>Agregasi performa latihan, akurasi gesture, dan ketercapaian kompetensi bahasa isyarat.</p>
                 </div>
@@ -122,7 +125,7 @@ const masteryPercent = computed(() => {
                     </div>
                     <span class="stat-badge">{{ summaryData.sessions }} Total Sesi</span>
                 </div>
-                <p class="chart-desc">Jumlah sesi latihan yang tuntas direkam di basis data.</p>
+                <p class="chart-desc">Jumlah sesi latihan yang telah kamu selesaikan setiap harinya.</p>
 
                 <div class="chart-bars">
                     <div v-for="day in weekDays" :key="day.date" class="bar-col">

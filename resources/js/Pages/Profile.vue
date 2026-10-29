@@ -37,7 +37,7 @@ function submitProfile() {
     profileForm.patch('/profile', {
         preserveScroll: true,
         onSuccess: () => {
-            profileSuccess.value = 'Profil berhasil diperbarui di database.';
+            profileSuccess.value = 'Profil berhasil diperbarui.';
             setTimeout(() => {
                 profileSuccess.value = '';
             }, 3500);
@@ -65,9 +65,9 @@ function submitPassword() {
 
         <div class="profile-page">
             <header class="profile-page-heading">
-                <div class="heading-badge">Akun Belajar SignTech · Data Terverifikasi Database</div>
+                <div class="heading-badge">Akun Belajar SignTech · Profil Resmi Siswa</div>
                 <h1>Profil & Keamanan Akun</h1>
-                <p>Kelola identitas akun Anda, tinjau ringkasan gamifikasi nyata, dan perbarui kredensial keamanan.</p>
+                <p>Kelola identitas akun Anda, tinjau ringkasan gamifikasi, dan perbarui kredensial keamanan.</p>
             </header>
 
             <div class="profile-grid">
@@ -137,7 +137,7 @@ function submitPassword() {
                             <UserIcon :size="18" class="text-primary" />
                             <div>
                                 <h3>Informasi Profil</h3>
-                                <p>Perbarui nama akun dan alamat surel Anda langsung ke basis data.</p>
+                                <p>Perbarui nama akun dan alamat surel Anda.</p>
                             </div>
                         </div>
 

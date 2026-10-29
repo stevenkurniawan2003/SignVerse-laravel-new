@@ -29,7 +29,10 @@ const progressMap = ref(props.progress || {});
 onMounted(async () => {
     if (rawAchievements.value.length === 0) {
         try {
-            const res = await fetch('/api/achievements');
+            const res = await fetch('/api/achievements', {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+            });
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data.achievements)) {
@@ -84,9 +87,9 @@ const filteredBadges = computed(() => {
         <div class="achievement-page">
             <header class="achievement-welcome">
                 <div>
-                    <div class="heading-badge">Koleksi Prestasi · Basis Data SignTech</div>
+                    <div class="heading-badge">Koleksi Prestasi & Leaderboard · SignTech</div>
                     <h1>Pencapaian & Lencana Gamifikasi</h1>
-                    <p>Lencana resmi dibuka berdasarkan data latihan, akurasi, dan konsistensi belajarmu di database.</p>
+                    <p>Lencana prestasi terbuka seiring kemajuan latihan, akurasi, dan konsistensi belajarmu.</p>
                 </div>
                 <div class="unlocked-summary">
                     <b>{{ unlockedCount }} / {{ processedBadges.length }}</b>

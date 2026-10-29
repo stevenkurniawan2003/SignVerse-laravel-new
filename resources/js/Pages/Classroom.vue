@@ -38,7 +38,10 @@ const assignmentList = ref(props.assignments || []);
 onMounted(async () => {
     if (!props.students) {
         try {
-            const res = await fetch('/api/classroom');
+            const res = await fetch('/api/classroom', {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+            });
             if (res.ok) {
                 const data = await res.json();
                 if (data.overview) classOverview.value = data.overview;

@@ -102,24 +102,41 @@ Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name(
 
 // ── Area Student (Jembatan Inertia ke Vue) ───────────────────
 Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')->group(function () {
-    Route::get('/dashboard', function (Request $request, SignTechApiController $api) {
+    Route::get('/dashboard', function (Request $request, \App\Services\StudentStatsService $stats, SignTechApiController $api) {
+        $student = $stats->forUser($request->user());
+        $summary = $stats->dashboardSummary($student);
         $data = $api->dashboard($request)->getData(true);
-        return Inertia::render('Dashboard', ($data['status'] ?? '') === 'success' ? $data : []);
+        $payload = ($data['status'] ?? '') === 'success' ? $data : [];
+        $payload['summary'] = $summary;
+        $payload['title'] = 'Dashboard Siswa';
+        view()->share($payload);
+        return Inertia::render('Dashboard', $payload);
     })->name('dashboard');
 
     Route::get('/materials', function (Request $request, SignTechApiController $api) {
         $data = $api->materials($request)->getData(true);
-        return Inertia::render('Learn', ($data['status'] ?? '') === 'success' ? $data : []);
+        $payload = ($data['status'] ?? '') === 'success' ? $data : [];
+        $payload['title'] = 'Materi Belajar';
+        view()->share($payload);
+        return Inertia::render('Learn', $payload);
     })->name('materials.index');
 
     Route::get('/materials/{material}', function (Request $request, $id, SignTechApiController $api) {
         $data = $api->getLesson($request, $id)->getData(true);
-        return Inertia::render('Lesson', ($data['status'] ?? '') === 'success' ? $data : ['id' => (string) $id]);
+        $lesson = $data['lesson'] ?? null;
+        if (!$lesson) {
+            abort(404);
+        }
+        $payload = ($data['status'] ?? '') === 'success' ? $data : ['id' => (string) $id];
+        view()->share($payload);
+        return Inertia::render('Lesson', $payload);
     })->name('materials.show');
 
     Route::get('/practice', function (Request $request, SignTechApiController $api) {
         $data = $api->practiceTargets($request)->getData(true);
-        return Inertia::render('Practice', ($data['status'] ?? '') === 'success' ? $data : []);
+        $payload = ($data['status'] ?? '') === 'success' ? $data : [];
+        view()->share($payload);
+        return Inertia::render('Practice', $payload);
     })->name('practice.index');
 
     Route::get('/practice/start/{lesson}', [PracticeController::class, 'start'])->name('practice.start');
@@ -130,17 +147,28 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
 
     Route::get('/challenge', function (Request $request, SignTechApiController $api) {
         $data = $api->challenges($request)->getData(true);
-        return Inertia::render('Challenge', ($data['status'] ?? '') === 'success' ? $data : []);
+        $payload = ($data['status'] ?? '') === 'success' ? $data : [];
+        view()->share($payload);
+        return Inertia::render('Challenge', $payload);
     })->name('challenge');
 
-    Route::get('/progress', function (Request $request, SignTechApiController $api) {
-        $data = $api->dashboard($request)->getData(true);
-        return Inertia::render('Progress', ($data['status'] ?? '') === 'success' ? $data : []);
+    Route::get('/progress', function (Request $request, \App\Services\StudentStatsService $stats, SignTechApiController $api) {
+        $student = $stats->forUser($request->user());
+        $progress = $stats->progressByCategory($student);
+        $summary = $stats->dashboardSummary($student);
+        $payload = [
+            'summary' => $summary,
+            'progress' => $progress,
+        ];
+        view()->share($payload);
+        return Inertia::render('Progress', $payload);
     })->name('progress');
 
     Route::get('/achievements', function (Request $request, SignTechApiController $api) {
         $data = $api->achievements($request)->getData(true);
-        return Inertia::render('Achievement', ($data['status'] ?? '') === 'success' ? $data : []);
+        $payload = ($data['status'] ?? '') === 'success' ? $data : [];
+        view()->share($payload);
+        return Inertia::render('Achievement', $payload);
     })->name('achievements.index');
 
     Route::get('/assignments', [StudentAssignmentController::class, 'index'])->name('assignments.index');
@@ -152,18 +180,14 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
 Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')->group(function () {
     Route::get('/dashboard', function (Request $request, SignTechApiController $api) {
         $data = $api->classroom($request)->getData(true);
-        return Inertia::render('Classroom', ($data['status'] ?? '') === 'success' ? $data : []);
+        $payload = ($data['status'] ?? '') === 'success' ? $data : [];
+        $payload['title'] = 'Dashboard Guru';
+        view()->share($payload);
+        return Inertia::render('Classroom', $payload);
     })->name('dashboard');
 
-    Route::get('/students', function (Request $request, SignTechApiController $api) {
-        $data = $api->classroom($request)->getData(true);
-        return Inertia::render('Classroom', ($data['status'] ?? '') === 'success' ? $data : []);
-    })->name('students.index');
-
-    Route::get('/students/{student}', function (Request $request, $student, SignTechApiController $api) {
-        $data = $api->classroom($request)->getData(true);
-        return Inertia::render('Classroom', ($data['status'] ?? '') === 'success' ? $data : []);
-    })->name('students.show');
+    Route::get('/students', [TeacherStudentController::class, 'index'])->name('students.index');
+    Route::get('/students/{student}', [TeacherStudentController::class, 'show'])->name('students.show');
 
     Route::get('/assignments', [TeacherAssignmentController::class, 'index'])->name('assignments.index');
     Route::get('/assignments/create', [TeacherAssignmentController::class, 'create'])->name('assignments.create');

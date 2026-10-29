@@ -13,9 +13,9 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['"Plus Jakarta Sans"', ...defaultTheme.fontFamily.sans],
-                display: ['"Plus Jakarta Sans"', ...defaultTheme.fontFamily.sans],
-                heading: ['"Plus Jakarta Sans"', ...defaultTheme.fontFamily.sans],
+                sans: ['"Poppins"', ...defaultTheme.fontFamily.sans],
+                display: ['"Poppins"', ...defaultTheme.fontFamily.sans],
+                heading: ['"Poppins"', ...defaultTheme.fontFamily.sans],
             },
             colors: {
                 // Design tokens SignTech — #34B182, #C29B40, #5FAB6F
