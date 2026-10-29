@@ -129,13 +129,13 @@ class PracticeController extends Controller
     /**
      * Halaman hasil sesi.
      */
-    public function result(Request $request, PracticeSession $session): View
+    public function result(Request $request, PracticeSession $session): InertiaResponse
     {
         abort_unless($session->student_id === $request->user()->student?->id, 403);
 
         $session->load('lesson.material.category');
 
-        return view('student.practice.result', [
+        return Inertia::render('Practice', [
             'session' => $session,
             'passed' => $session->score >= PracticeService::PASS_SCORE,
         ]);

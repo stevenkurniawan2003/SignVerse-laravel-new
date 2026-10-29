@@ -122,22 +122,11 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
         return Inertia::render('Practice', ($data['status'] ?? '') === 'success' ? $data : []);
     })->name('practice.index');
 
-    Route::get('/practice/start/{lesson}', function (Request $request, $lesson, SignTechApiController $api) {
-        $data = $api->practiceTargets($request)->getData(true);
-        return Inertia::render('Practice', ($data['status'] ?? '') === 'success' ? $data : []);
-    })->name('practice.start');
-
-    Route::get('/practice/{session}', function (Request $request, $session, SignTechApiController $api) {
-        $data = $api->practiceTargets($request)->getData(true);
-        return Inertia::render('Practice', ($data['status'] ?? '') === 'success' ? $data : []);
-    })->name('practice.show');
-
+    Route::get('/practice/start/{lesson}', [PracticeController::class, 'start'])->name('practice.start');
+    Route::get('/practice/{session}', [PracticeController::class, 'show'])->name('practice.show');
     Route::post('/practice/{session}/attempt', [PracticeController::class, 'attempt'])->name('practice.attempt');
     Route::post('/practice/{session}/complete', [PracticeController::class, 'complete'])->name('practice.complete');
-    Route::get('/practice/{session}/result', function (Request $request, $session, SignTechApiController $api) {
-        $data = $api->practiceTargets($request)->getData(true);
-        return Inertia::render('Practice', ($data['status'] ?? '') === 'success' ? $data : []);
-    })->name('practice.result');
+    Route::get('/practice/{session}/result', [PracticeController::class, 'result'])->name('practice.result');
 
     Route::get('/challenge', function (Request $request, SignTechApiController $api) {
         $data = $api->challenges($request)->getData(true);
