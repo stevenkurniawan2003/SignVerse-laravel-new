@@ -223,6 +223,7 @@ class TeacherModuleTest extends TestCase
     {
         $teacher = $this->teacherUser();
         $student = $this->studentUser();
+        $student->user->update(['name' => 'Rina Putri']);
 
         PracticeSession::factory()->completed()->for($student)->create(['score' => 85]);
 
