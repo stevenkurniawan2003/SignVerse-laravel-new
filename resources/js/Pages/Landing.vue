@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
     Activity,
     ArrowRight,
@@ -156,6 +156,11 @@ const sampleGestures = {
         },
     ],
 };
+
+const page = usePage();
+const authUser = computed(() => page.props.auth?.user || null);
+const loginHref = computed(() => (authUser.value ? (authUser.value.role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard') : '/login'));
+const loginLabel = computed(() => (authUser.value ? 'Ke Dashboard' : 'Masuk Akun'));
 </script>
 
 <template>
@@ -187,10 +192,10 @@ const sampleGestures = {
                 <!-- Desktop Auth CTA -->
                 <div class="hidden md:flex items-center gap-3">
                     <Link
-                        href="/login"
+                        :href="loginHref"
                         class="btn-secondary px-4 py-2 text-xs"
                     >
-                        Masuk Akun
+                        {{ loginLabel }}
                     </Link>
                     <Link
                         href="/register"
@@ -220,7 +225,7 @@ const sampleGestures = {
                     <a href="#sistem" class="py-2 hover:text-primary" @click="mobileMenuOpen = false">SIBI & BISINDO</a>
                     <Link href="/learn" class="py-2 hover:text-primary" @click="mobileMenuOpen = false">Katalog Materi</Link>
                     <div class="mt-3 pt-3 border-t border-surface-border flex flex-col gap-2">
-                        <Link href="/login" class="btn-secondary w-full text-center" @click="mobileMenuOpen = false">Masuk Akun</Link>
+                        <Link :href="loginHref" class="btn-secondary w-full text-center" @click="mobileMenuOpen = false">{{ loginLabel }}</Link>
                         <Link href="/register" class="btn-primary w-full text-center" @click="mobileMenuOpen = false">Daftar Siswa Baru</Link>
                     </div>
                 </nav>

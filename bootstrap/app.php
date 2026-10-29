@@ -26,6 +26,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => EnsureRole::class,
         ]);
+
+        // User yang sudah login dan membuka /login atau /register diarahkan ke dashboard sesuai role.
+        $middleware->redirectUsersTo(fn (Request $request) => $request->user()->dashboardRoute());
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -27,7 +27,6 @@ const showPassword = ref(false);
 const form = useForm({
     email: '',
     password: '',
-    remember: false,
 });
 
 function submit() {
@@ -140,18 +139,6 @@ function quickFill(email, password) {
                         <p v-if="form.errors.password" class="mt-1.5 text-xs text-red-600 font-medium">
                             {{ form.errors.password }}
                         </p>
-                    </div>
-
-                    <!-- Remember Me -->
-                    <div class="flex items-center justify-between pt-1">
-                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
-                            <input
-                                v-model="form.remember"
-                                type="checkbox"
-                                class="h-4 w-4 rounded border-[#d5e2dc] text-[#34B182] focus:ring-[#34B182] accent-[#34B182]"
-                            />
-                            <span class="text-xs text-[#52685d]">Ingat saya di perangkat ini</span>
-                        </label>
                     </div>
 
                     <!-- Submit Button -->
