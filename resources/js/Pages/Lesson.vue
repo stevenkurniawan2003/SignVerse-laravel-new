@@ -93,6 +93,7 @@ async function advance() {
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
+                    'X-CSRF-TOKEN': window.csrfToken,
                 },
             });
             router.reload({ only: ['auth'] });
@@ -124,7 +125,7 @@ async function verifyPractice() {
     try {
         const res = await fetch('/api/practice/attempt', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': window.csrfToken },
             body: JSON.stringify({
                 target_letter: targetGesture.value,
                 system: String(currentMaterial.value?.language || 'sibi').toLowerCase(),

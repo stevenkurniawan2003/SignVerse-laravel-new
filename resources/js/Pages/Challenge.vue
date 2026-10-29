@@ -38,7 +38,7 @@ async function claim(ch) {
     try {
         const res = await fetch('/api/challenges/claim', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': window.csrfToken },
             body: JSON.stringify({ challenge_id: ch.id }),
         });
         if (res.ok) {

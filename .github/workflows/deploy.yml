@@ -1,0 +1,92 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test (PHPUnit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, bcmath, intl, zip
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependency
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          npm ci --include=optional
+
+      - name: Build aset frontend
+        run: npm run build
+
+      - name: Siapkan .env
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Jalankan test
+        run: php artisan test
+
+  build:
+    name: Build image Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image (verifikasi Dockerfile)
+        run: docker build -t signverse-laravel:ci .
+
+  deploy:
+    name: Deploy ke VM
+    # Setelah semua test hijau, ganti menjadi: needs: [test, build]
+    needs: [build]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Pull & rebuild container di VM via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_PORT || 22 }}
+          command_timeout: 20m
+          script: |
+            set -e
+            cd /opt/signverse-laravel
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose --env-file .env.docker up -d --build --remove-orphans
+            docker image prune -f
+
+            echo "Menunggu aplikasi siap..."
+            for i in $(seq 1 30); do
+              if [ "$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q app)")" = "healthy" ]; then
+                echo "Deploy berhasil, container healthy."
+                exit 0
+              fi
+              sleep 5
+            done
+
+            echo "Container tidak healthy setelah 150 detik. Log terakhir:"
+            docker compose logs --tail=100 app
+            exit 1
