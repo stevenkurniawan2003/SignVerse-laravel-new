@@ -6,6 +6,7 @@
 
 @config "../../tailwind.config.js";
 @import "./signteach.css";
+@import "./student.css";
 
 /* ── Dasar ──────────────────────────────────────────────────── */
 @layer base {

@@ -64,7 +64,6 @@ const processedBadges = computed(() => {
         return {
             ...badge,
             icon: iconMap[badge.key] || Award,
-            color: badge.unlocked ? '#34B182' : '#C29B40',
             current: p.current,
             target: p.target,
             percent,
@@ -73,6 +72,12 @@ const processedBadges = computed(() => {
 });
 
 const unlockedCount = computed(() => processedBadges.value.filter((b) => b.unlocked).length);
+const filterOptions = computed(() => [
+    { value: 'all', label: 'Semua', count: processedBadges.value.length },
+    { value: 'unlocked', label: 'Terbuka', count: unlockedCount.value },
+    { value: 'locked', label: 'Terkunci', count: processedBadges.value.length - unlockedCount.value },
+]);
+
 const filteredBadges = computed(() => {
     if (filter.value === 'unlocked') return processedBadges.value.filter((b) => b.unlocked);
     if (filter.value === 'locked') return processedBadges.value.filter((b) => !b.unlocked);
@@ -84,167 +89,136 @@ const filteredBadges = computed(() => {
     <AppLayout>
         <Head title="Pencapaian & Badge" />
 
-        <div class="achievement-page">
-            <header class="achievement-welcome">
-                <div>
-                    <div class="heading-badge">Koleksi Prestasi & Leaderboard · SignTech</div>
-                    <h1>Pencapaian & Lencana Gamifikasi</h1>
-                    <p>Lencana prestasi terbuka seiring kemajuan latihan, akurasi, dan konsistensi belajarmu.</p>
+        <div class="st-page">
+            <header class="st-page-header st-page-header--tinted">
+                <div class="st-page-header-main">
+                    <span class="st-badge st-badge--primary">Koleksi Prestasi</span>
+                    <h1>Pencapaian & Lencana</h1>
+                    <p>Lencana terbuka seiring kemajuan latihan, akurasi, dan konsistensi belajarmu.</p>
                 </div>
-                <div class="unlocked-summary">
-                    <b>{{ unlockedCount }} / {{ processedBadges.length }}</b>
-                    <small>Lencana Terbuka</small>
+                <div class="st-page-header-aside st-summary-box">
+                    <span class="st-icon st-icon--gold"><Trophy :size="22" /></span>
+                    <div>
+                        <b>{{ unlockedCount }} / {{ processedBadges.length }}</b>
+                        <small>lencana terbuka</small>
+                    </div>
                 </div>
             </header>
 
-            <div class="filter-row">
-                <button :class="{ active: filter === 'all' }" @click="filter = 'all'">Semua ({{ processedBadges.length }})</button>
-                <button :class="{ active: filter === 'unlocked' }" @click="filter = 'unlocked'">Terbuka ({{ unlockedCount }})</button>
-                <button :class="{ active: filter === 'locked' }" @click="filter = 'locked'">Terkunci ({{ processedBadges.length - unlockedCount }})</button>
-            </div>
-
-            <div class="badge-grid">
-                <div
-                    v-for="badge in filteredBadges"
-                    :key="badge.key"
-                    class="badge-card card"
-                    :class="{ unlocked: badge.unlocked }"
-                >
-                    <div
-                        class="badge-icon-tile"
-                        :style="{ backgroundColor: badge.unlocked ? '#eefaf4' : '#f8faf9', color: badge.unlocked ? '#34B182' : '#859c90' }"
-                    >
-                        <component :is="badge.icon" :size="24" />
+            <section class="st-section">
+                <div class="collection-head">
+                    <div>
+                        <span class="st-eyebrow">Koleksi</span>
+                        <h2 class="st-panel-title">Daftar Lencana</h2>
                     </div>
-
-                    <div class="badge-info">
-                        <h3>{{ badge.name }}</h3>
-                        <p>{{ badge.description }}</p>
-
-                        <div class="badge-progress-line">
-                            <div class="progress-track">
-                                <i :style="{ width: `${badge.percent}%`, backgroundColor: badge.unlocked ? '#34B182' : '#C29B40' }"></i>
-                            </div>
-                            <span>{{ badge.unlocked ? 'Tercapai' : `${badge.current}/${badge.target}` }}</span>
-                        </div>
+                    <div class="st-seg" role="group" aria-label="Filter lencana">
+                        <button
+                            v-for="option in filterOptions"
+                            :key="option.value"
+                            type="button"
+                            :class="{ 'is-active': filter === option.value }"
+                            :aria-pressed="filter === option.value"
+                            @click="filter = option.value"
+                        >
+                            {{ option.label }} ({{ option.count }})
+                        </button>
                     </div>
                 </div>
-            </div>
+
+                <div v-if="filteredBadges.length > 0" class="st-grid-2">
+                    <article
+                        v-for="badge in filteredBadges"
+                        :key="badge.key"
+                        class="st-panel achievement-card"
+                        :class="{ 'is-locked': !badge.unlocked }"
+                    >
+                        <span class="st-icon st-icon--lg" :class="badge.unlocked ? 'st-icon--primary' : 'st-icon--neutral'">
+                            <component :is="badge.icon" :size="24" />
+                        </span>
+
+                        <div class="badge-info">
+                            <div class="badge-info-head">
+                                <h3>{{ badge.name }}</h3>
+                                <span v-if="badge.unlocked" class="st-badge st-badge--primary">
+                                    <Check :size="12" /> Tercapai
+                                </span>
+                                <span v-else class="st-badge st-badge--neutral">
+                                    <LockKeyhole :size="12" /> Terkunci
+                                </span>
+                            </div>
+                            <p>{{ badge.description }}</p>
+
+                            <div class="badge-progress">
+                                <div class="st-track" :class="{ 'st-track--gold': !badge.unlocked }">
+                                    <i :style="{ width: `${badge.percent}%` }"></i>
+                                </div>
+                                <span>{{ badge.current }}/{{ badge.target }}</span>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+                <div v-else class="st-empty">Belum ada lencana pada kategori ini.</div>
+            </section>
         </div>
     </AppLayout>
 </template>
 
 <style scoped>
-.achievement-welcome {
-    background: #eefaf4;
-    border: 1px solid #d5f3e5;
-    border-radius: 18px;
-    padding: 24px 28px;
+.collection-head {
     display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
+    gap: 12px;
 }
-.heading-badge {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    color: #1e7253;
-    background: #d5f3e5;
-    padding: 3px 10px;
-    border-radius: 6px;
-    margin-bottom: 8px;
-}
-.unlocked-summary {
-    background: #ffffff;
-    border: 1px solid #d5f3e5;
-    border-radius: 12px;
-    padding: 12px 18px;
-    text-align: center;
-}
-.unlocked-summary b {
-    display: block;
-    font-size: 18px;
-    font-weight: 800;
-    color: #34B182;
-}
-.unlocked-summary small {
-    font-size: 10px;
-    color: #859c90;
-}
-.filter-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 20px;
-}
-.filter-row button {
-    border: 1px solid #e2ede6;
-    background: #ffffff;
-    padding: 6px 14px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 700;
-    color: #52685d;
-    cursor: pointer;
-    transition: 0.16s;
-}
-.filter-row button.active {
-    background: #34B182;
-    border-color: #34B182;
-    color: #ffffff;
-}
-.badge-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
-}
-.badge-card {
-    display: flex;
+
+.achievement-card {
+    flex-direction: row;
     align-items: flex-start;
     gap: 14px;
     padding: 18px;
 }
-.badge-card:not(.unlocked) {
-    opacity: 0.7;
+
+.achievement-card.is-locked {
+    background: var(--st-surface);
 }
-.badge-icon-tile {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-}
+
 .badge-info {
     flex: 1;
+    min-width: 0;
 }
+
+.badge-info-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+}
+
 .badge-info h3 {
-    font-size: 14px;
+    margin: 0;
+    font-size: 15px;
     font-weight: 800;
-    color: #14221d;
-    margin: 0 0 4px;
+    color: var(--st-ink);
 }
+
 .badge-info p {
-    font-size: 11px;
-    color: #859c90;
-    margin: 0 0 10px;
-    line-height: 1.4;
+    margin: 4px 0 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--st-muted);
 }
-.badge-progress-line {
+
+.badge-progress {
     display: flex;
     align-items: center;
     gap: 10px;
 }
-.badge-progress-line .progress-track {
-    flex: 1;
-    margin: 0;
-}
-.badge-progress-line span {
-    font-size: 10px;
+
+.badge-progress span {
+    font-size: 12px;
     font-weight: 700;
-    color: #52685d;
-}
-@media (max-width: 760px) {
-    .badge-grid { grid-template-columns: 1fr; }
+    color: var(--st-text);
+    white-space: nowrap;
 }
 </style>

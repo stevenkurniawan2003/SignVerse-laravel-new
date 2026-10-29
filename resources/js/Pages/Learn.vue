@@ -3,12 +3,10 @@ import { computed, onMounted, ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import {
     ArrowRight,
-    Award,
     BookOpen,
     Check,
     Clock3,
     Hand,
-    LockKeyhole,
     MessageSquare,
     Target,
     X,
@@ -44,13 +42,6 @@ onMounted(async () => {
     }
 });
 
-const totalLessonsCount = computed(() => {
-    return categoryList.value.reduce((acc, cat) => {
-        const matCount = cat.materials ? cat.materials.reduce((mAcc, m) => mAcc + (m.lessons ? m.lessons.length : 0), 0) : 0;
-        return acc + matCount;
-    }, 0);
-});
-
 const categoryIcons = {
     alphabet: BookOpen,
     number: Target,
@@ -58,132 +49,144 @@ const categoryIcons = {
     phrase: MessageSquare,
 };
 
-const categoryAccents = {
-    alphabet: '#34B182',
-    number: '#C29B40',
-    word: '#5FAB6F',
-    phrase: '#34B182',
+const categoryTones = {
+    alphabet: 'st-icon--primary',
+    number: 'st-icon--gold',
+    word: 'st-icon--green',
+    phrase: 'st-icon--mint',
 };
 
 function getCategoryIcon(slug) {
     return categoryIcons[slug] || Hand;
 }
 
-function getCategoryAccent(slug) {
-    return categoryAccents[slug] || '#34B182';
+function getCategoryTone(slug) {
+    return categoryTones[slug] || 'st-icon--primary';
 }
 
 function isLessonCompleted(lesson) {
     return completedIds.value.has(Number(lesson.id));
 }
+
+function lessonCountOf(category) {
+    return (category.materials || []).reduce((acc, m) => acc + (m.lessons ? m.lessons.length : 0), 0);
+}
+
+function completedCountOf(category) {
+    return (category.materials || []).reduce(
+        (acc, m) => acc + (m.lessons || []).filter((lesson) => isLessonCompleted(lesson)).length,
+        0
+    );
+}
+
+function openLesson(lesson, material) {
+    selectedLesson.value = { ...lesson, materialTitle: material.title, language: material.language };
+}
+
+const totalLessonsCount = computed(() => categoryList.value.reduce((acc, cat) => acc + lessonCountOf(cat), 0));
+const totalCompletedCount = computed(() => categoryList.value.reduce((acc, cat) => acc + completedCountOf(cat), 0));
 </script>
 
 <template>
     <AppLayout>
         <Head title="Katalog Materi Belajar" />
 
-        <div class="learn-page">
-            <header class="learn-header">
-                <div class="heading-badge">Kurikulum Terstruktur · SignTech</div>
-                <h1>Katalog Materi Pembelajaran</h1>
-                <p>Materi pembelajaran interaktif kurikulum bahasa isyarat Indonesia.</p>
+        <div class="st-page">
+            <header class="st-page-header st-page-header--tinted">
+                <div class="st-page-header-main">
+                    <span class="st-badge st-badge--primary">Kurikulum Terstruktur</span>
+                    <h1>Materi Belajar</h1>
+                    <p>Pilih materi, pelajari bentuk isyaratnya, lalu praktikkan langsung dengan kamera.</p>
+                </div>
+                <div class="st-page-header-aside st-summary-box">
+                    <span class="st-icon st-icon--primary"><BookOpen :size="22" /></span>
+                    <div>
+                        <b>{{ totalCompletedCount }} / {{ totalLessonsCount }}</b>
+                        <small>modul selesai · {{ categoryList.length }} kategori</small>
+                    </div>
+                </div>
             </header>
 
-            <div class="path-section">
-                <div class="path-intro">
-                    <div>
-                        <div class="section-label">Alur Pembelajaran</div>
-                        <h2>Jalur Kurikulum Berjenjang</h2>
+            <div v-if="categoryList.length === 0" class="st-empty">
+                Materi belum tersedia. Silakan muat ulang halaman beberapa saat lagi.
+            </div>
+
+            <section
+                v-for="(cat, cIndex) in categoryList"
+                :key="cat.id"
+                class="st-panel"
+            >
+                <div class="st-panel-head chapter-head">
+                    <div class="chapter-title">
+                        <span class="st-icon st-icon--lg" :class="getCategoryTone(cat.slug)">
+                            <component :is="getCategoryIcon(cat.slug)" :size="22" />
+                        </span>
+                        <div>
+                            <span class="st-eyebrow">Bab {{ cIndex + 1 }}</span>
+                            <h2 class="st-panel-title">{{ cat.name }}</h2>
+                            <p v-if="cat.description" class="st-panel-desc">{{ cat.description }}</p>
+                        </div>
                     </div>
-                    <span class="path-count">{{ categoryList.length }} Kategori · {{ totalLessonsCount }} Modul</span>
+                    <span class="st-badge st-badge--neutral">{{ completedCountOf(cat) }} / {{ lessonCountOf(cat) }} selesai</span>
                 </div>
 
                 <div
-                    v-for="(cat, cIndex) in categoryList"
-                    :key="cat.id"
-                    class="path-chapter"
+                    v-for="mat in cat.materials || []"
+                    :key="mat.id"
+                    class="material-group"
                 >
-                    <div class="chapter-header">
-                        <span
-                            class="chapter-icon"
-                            :style="{ backgroundColor: `${getCategoryAccent(cat.slug)}18`, color: getCategoryAccent(cat.slug) }"
-                        >
-                            <component :is="getCategoryIcon(cat.slug)" :size="20" />
-                        </span>
-                        <div>
-                            <span class="eyebrow">BAB {{ cIndex + 1 }} · {{ cat.slug.toUpperCase() }}</span>
-                            <h3>{{ cat.name }}</h3>
-                            <p>{{ cat.description }}</p>
-                        </div>
+                    <div class="material-meta">
+                        <b>{{ mat.title }}</b>
+                        <span class="st-badge st-badge--gold">{{ String(mat.language).toUpperCase() }}</span>
                     </div>
 
-                    <div
-                        v-for="mat in cat.materials || []"
-                        :key="mat.id"
-                        class="material-group"
-                    >
-                        <div class="material-meta">
-                            <b>{{ mat.title }}</b>
-                            <span class="mat-lang-tag">{{ String(mat.language).toUpperCase() }}</span>
-                        </div>
-
-                        <div class="node-track">
-                            <div
-                                v-for="(lesson, index) in mat.lessons || []"
-                                :key="lesson.id"
-                                class="path-node-row"
-                                :class="index % 2 === 0 ? 'left' : 'right'"
-                            >
-                                <button
-                                    type="button"
-                                    class="lesson-node"
-                                    :class="{ completed: isLessonCompleted(lesson) }"
-                                    :aria-label="`Buka materi ${lesson.title}`"
-                                    @click="selectedLesson = { ...lesson, materialTitle: mat.title, language: mat.language }"
-                                >
-                                    <Check v-if="isLessonCompleted(lesson)" :size="22" />
-                                    <Hand v-else :size="20" />
-                                </button>
-
-                                <button
-                                    type="button"
-                                    class="node-copy"
-                                    :class="{ completed: isLessonCompleted(lesson) }"
-                                    @click="selectedLesson = { ...lesson, materialTitle: mat.title, language: mat.language }"
-                                >
-                                    <span class="node-title">{{ lesson.title }}</span>
-                                    <small>+{{ lesson.xp_reward }} XP · {{ isLessonCompleted(lesson) ? 'Selesai' : 'Siap Dipelajari' }}</small>
-                                </button>
-                            </div>
-                        </div>
+                    <div class="lesson-grid">
+                        <button
+                            v-for="lesson in mat.lessons || []"
+                            :key="lesson.id"
+                            type="button"
+                            class="lesson-tile"
+                            :class="{ 'is-done': isLessonCompleted(lesson) }"
+                            :aria-label="`Buka materi ${lesson.title}`"
+                            @click="openLesson(lesson, mat)"
+                        >
+                            <span class="lesson-tile-icon">
+                                <Check v-if="isLessonCompleted(lesson)" :size="18" />
+                                <Hand v-else :size="18" />
+                            </span>
+                            <span class="lesson-tile-copy">
+                                <b>{{ lesson.title }}</b>
+                                <small>{{ isLessonCompleted(lesson) ? 'Selesai' : `+${lesson.xp_reward} XP` }}</small>
+                            </span>
+                        </button>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Modal Lesson Detail -->
+            <!-- Modal detail materi -->
             <div v-if="selectedLesson" class="modal-backdrop" @click.self="selectedLesson = null">
-                <div class="lesson-modal" role="dialog" aria-modal="true">
-                    <button class="modal-close" aria-label="Tutup modal" @click="selectedLesson = null">
+                <div class="lesson-modal" role="dialog" aria-modal="true" aria-labelledby="lesson-modal-title">
+                    <button type="button" class="modal-close" aria-label="Tutup" @click="selectedLesson = null">
                         <X :size="18" />
                     </button>
                     <div class="modal-badge-row">
-                        <span class="badge badge-primary">{{ String(selectedLesson.language || 'SIBI').toUpperCase() }}</span>
-                        <span class="badge badge-gold">+{{ selectedLesson.xp_reward || 10 }} XP</span>
+                        <span class="st-badge st-badge--primary">{{ String(selectedLesson.language || 'SIBI').toUpperCase() }}</span>
+                        <span class="st-badge st-badge--gold">+{{ selectedLesson.xp_reward || 10 }} XP</span>
                     </div>
-                    <h2>Isyarat {{ selectedLesson.title }}</h2>
-                    <p>{{ selectedLesson.materialTitle }} — Latih dan peragakan bentuk isyarat ini di studio deteksi AI.</p>
+                    <h2 id="lesson-modal-title">Isyarat {{ selectedLesson.title }}</h2>
+                    <p>{{ selectedLesson.materialTitle }} — pelajari dan peragakan bentuk isyarat ini dengan bantuan deteksi AI.</p>
 
                     <div class="modal-meta">
-                        <span><Clock3 :size="14" /> 5 Menit Sesi</span>
-                        <span><Target :size="14" /> Deteksi AI</span>
+                        <span><Clock3 :size="16" /> ± 5 menit</span>
+                        <span><Target :size="16" /> Deteksi AI</span>
                     </div>
 
                     <Link
                         :href="`/lesson/${selectedLesson.id}`"
-                        class="primary-button modal-start"
+                        class="st-btn st-btn--primary st-btn--block"
                         @click="selectedLesson = null"
                     >
-                        <span>Mulai Pelajaran Sekarang</span>
+                        <span>Mulai Pelajaran</span>
                         <ArrowRight :size="16" />
                     </Link>
                 </div>
@@ -193,53 +196,115 @@ function isLessonCompleted(lesson) {
 </template>
 
 <style scoped>
-.learn-page {
-    padding-bottom: 36px;
+.chapter-head {
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--st-line-soft);
 }
 
-.heading-badge {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    color: #1e7253;
-    background: #eefaf4;
-    padding: 4px 10px;
-    border-radius: 8px;
-    margin-bottom: 8px;
+.chapter-title {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
 }
 
-.material-group {
-    background: #fbfdfc;
-    border: 1px solid #eef3f0;
-    border-radius: 14px;
-    padding: 16px;
-    margin-top: 14px;
+.material-group + .material-group {
+    margin-top: 18px;
 }
 
 .material-meta {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 13px;
-    font-weight: 700;
-    color: #14221d;
+    gap: 10px;
     margin-bottom: 12px;
+    font-size: 14px;
+    color: var(--st-ink);
 }
 
-.mat-lang-tag {
-    font-size: 10px;
-    font-weight: 800;
-    color: #C29B40;
-    background: #fdf9ef;
-    border: 1px solid #f1deaf;
-    padding: 2px 8px;
-    border-radius: 6px;
+.lesson-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.lesson-tile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 56px;
+    padding: 10px 12px;
+    text-align: left;
+    cursor: pointer;
+    background: #fff;
+    border: 1px solid var(--st-line);
+    border-radius: 12px;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.lesson-tile:hover {
+    border-color: var(--st-primary);
+    transform: translateY(-1px);
+}
+
+.lesson-tile-icon {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    color: var(--st-primary);
+    background: var(--st-primary-soft);
+    border-radius: 50%;
+}
+
+.lesson-tile-copy {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.lesson-tile-copy b {
+    overflow: hidden;
+    font-size: 14px;
+    color: var(--st-ink);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lesson-tile-copy small {
+    font-size: 12px;
+    color: var(--st-muted);
+}
+
+.lesson-tile.is-done {
+    background: var(--st-primary-soft);
+    border-color: var(--st-primary-line);
+}
+
+.lesson-tile.is-done .lesson-tile-icon {
+    color: #fff;
+    background: var(--st-primary);
+}
+
+.lesson-tile.is-done .lesson-tile-copy small {
+    font-weight: 700;
+    color: var(--st-primary-dark);
 }
 
 .modal-badge-row {
     display: flex;
     justify-content: center;
     gap: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
+}
+
+.modal-meta svg {
+    color: var(--st-primary);
+}
+
+@media (max-width: 760px) {
+    .chapter-head {
+        flex-direction: column;
+    }
 }
 </style>

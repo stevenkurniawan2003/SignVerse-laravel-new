@@ -3,15 +3,11 @@ import { computed, onMounted, ref } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     ArrowRight,
-    Award,
     Camera,
-    Check,
     CheckCircle,
     Flame,
     Hand,
-    RotateCcw,
     Star,
-    Target,
     Trophy,
     X,
 } from '@lucide/vue';
@@ -166,7 +162,7 @@ async function verifyPractice() {
             </div>
         </header>
 
-        <section v-if="done" class="result-screen card">
+        <section v-if="done" class="st-panel result-screen">
             <div class="result-medal">
                 <Trophy :size="56" class="text-secondary" />
             </div>
@@ -191,17 +187,17 @@ async function verifyPractice() {
                 </div>
             </div>
 
-            <Link href="/learn" class="primary-button">
+            <Link href="/learn" class="st-btn st-btn--primary st-btn--block">
                 <span>Kembali ke Kurikulum</span>
                 <ArrowRight :size="16" />
             </Link>
         </section>
 
-        <section v-else-if="currentLesson" class="exercise-card card">
+        <section v-else-if="currentLesson" class="st-panel exercise-card">
             <div class="exercise-kicker">
                 <span class="activity-badge"><Hand :size="14" /></span>
                 <span>{{ String(currentMaterial?.language || 'SIBI').toUpperCase() }} · {{ currentMaterial?.title || 'Kurikulum' }}</span>
-                <span class="exercise-xp">+{{ currentLesson.xp_reward || 10 }} XP</span>
+                <span class="st-badge st-badge--gold exercise-xp">+{{ currentLesson.xp_reward || 10 }} XP</span>
             </div>
 
             <!-- Step 1: Info Gesture -->
@@ -212,7 +208,7 @@ async function verifyPractice() {
                     <span class="gesture-letter">{{ currentLesson.title }}</span>
                 </div>
                 <p class="exercise-detail">Peragakan bentuk jemari untuk isyarat <strong>{{ currentLesson.title }}</strong> sesuai kaidah {{ String(currentMaterial?.language || 'SIBI').toUpperCase() }}.</p>
-                <button type="button" class="primary-button exercise-submit" @click="advance">
+                <button type="button" class="st-btn st-btn--primary st-btn--block exercise-submit" @click="advance">
                     <span>Saya Siap Berlatih</span>
                     <ArrowRight :size="16" />
                 </button>
@@ -243,16 +239,16 @@ async function verifyPractice() {
                     </button>
                 </div>
 
-                <div v-if="!checked" class="mt-4">
-                    <button type="button" class="primary-button exercise-submit" :disabled="!choice" @click="verifyAnswer">
+                <div v-if="!checked" class="step-actions">
+                    <button type="button" class="st-btn st-btn--primary st-btn--block exercise-submit" :disabled="!choice" @click="verifyAnswer">
                         Periksa Jawaban
                     </button>
                 </div>
-                <div v-else class="mt-4">
+                <div v-else class="step-actions">
                     <div class="answer-feedback" :class="choice === targetGesture ? 'good' : 'bad'">
                         {{ choice === targetGesture ? 'Jawaban Benar! Formasi tangan sangat tepat.' : `Kurang tepat. Bentuk ini adalah ${targetGesture}.` }}
                     </div>
-                    <button type="button" class="primary-button exercise-submit mt-3" @click="advance">
+                    <button type="button" class="st-btn st-btn--primary st-btn--block exercise-submit" @click="advance">
                         <span>Lanjut ke Tahap Berikutnya</span>
                         <ArrowRight :size="16" />
                     </button>
@@ -280,14 +276,21 @@ async function verifyPractice() {
                 </div>
 
                 <div class="practice-actions">
-                    <Link href="/practice" class="secondary-button text-center">
-                        <Camera :size="14" /> Buka Studio Kamera
+                    <Link href="/practice" class="st-btn st-btn--secondary">
+                        <Camera :size="16" /> Buka Studio Kamera
                     </Link>
-                    <button type="button" class="primary-button" :disabled="scanning" @click="advance">
+                    <button type="button" class="st-btn st-btn--primary" :disabled="scanning" @click="advance">
                         <span>Selesaikan Modul</span>
                         <ArrowRight :size="16" />
                     </button>
                 </div>
+            </div>
+        </section>
+
+        <section v-else class="st-panel exercise-card">
+            <div class="st-empty">
+                <span>Materi tidak ditemukan atau sedang dimuat.</span>
+                <Link href="/learn" class="st-btn st-btn--outline">Kembali ke Materi</Link>
             </div>
         </section>
     </div>
@@ -306,8 +309,8 @@ async function verifyPractice() {
     margin-bottom: 24px;
 }
 .exit-lesson {
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     border-radius: 10px;
     background: #ffffff;
     border: 1px solid #e2ede6;
@@ -329,7 +332,7 @@ async function verifyPractice() {
     transition: width 0.3s ease;
 }
 .step-count {
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 700;
     color: #52685d;
 }
@@ -337,24 +340,26 @@ async function verifyPractice() {
     padding: 28px;
     border-radius: 20px;
 }
+.step-actions {
+    margin-top: 18px;
+}
+.step-actions .answer-feedback {
+    margin: 0 0 12px;
+}
 .exercise-kicker {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
-    color: #859c90;
-    margin-bottom: 12px;
+    color: var(--st-muted);
+    margin-bottom: 14px;
 }
 .exercise-xp {
     margin-left: auto;
-    background: #fdf9ef;
-    color: #C29B40;
-    padding: 3px 8px;
-    border-radius: 6px;
 }
 .exercise-card h1 {
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 800;
     color: #14221d;
     margin: 0 0 16px;
@@ -379,7 +384,7 @@ async function verifyPractice() {
     color: #34B182;
 }
 .exercise-detail {
-    font-size: 13px;
+    font-size: 15px;
     color: #52685d;
     line-height: 1.6;
     margin-bottom: 20px;
@@ -398,7 +403,8 @@ async function verifyPractice() {
     background: #ffffff;
     border: 1.5px solid #e2ede6;
     border-radius: 12px;
-    font-size: 13px;
+    min-height: 52px;
+    font-size: 15px;
     font-weight: 700;
     color: #14221d;
     cursor: pointer;
@@ -435,7 +441,7 @@ async function verifyPractice() {
     padding: 10px 14px;
     border-radius: 10px;
     margin-bottom: 14px;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 700;
     color: #1e7253;
 }
@@ -455,7 +461,7 @@ async function verifyPractice() {
     gap: 8px;
 }
 .camera-label {
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.5px;
     color: #ade6cc;
@@ -485,6 +491,24 @@ async function verifyPractice() {
     gap: 12px;
     margin: 24px 0;
 }
+.result-screen h1 {
+    margin: 0 0 8px;
+    font-size: 24px;
+    font-weight: 800;
+}
+.result-screen > p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--st-text);
+}
+.reward-grid b {
+    font-size: 18px;
+}
+.reward-grid small {
+    font-size: 12px;
+    color: var(--st-muted);
+}
 .reward-grid > div {
     background: #f8faf9;
     border: 1px solid #eef3f0;
@@ -494,5 +518,14 @@ async function verifyPractice() {
     flex-direction: column;
     align-items: center;
     gap: 4px;
+}
+@media (max-width: 520px) {
+    .answer-grid,
+    .practice-actions {
+        grid-template-columns: 1fr;
+    }
+    .exercise-card {
+        padding: 20px;
+    }
 }
 </style>

@@ -6,10 +6,8 @@ import {
     CheckCircle,
     Flame,
     KeyRound,
-    Mail,
     Save,
     Shield,
-    Sparkles,
     Star,
     User as UserIcon,
 } from '@lucide/vue';
@@ -63,85 +61,65 @@ function submitPassword() {
     <AppLayout>
         <Head title="Profil Akun" />
 
-        <div class="profile-page">
-            <header class="profile-page-heading">
-                <div class="heading-badge">Akun Belajar SignTech · Profil Resmi Siswa</div>
-                <h1>Profil & Keamanan Akun</h1>
-                <p>Kelola identitas akun Anda, tinjau ringkasan gamifikasi, dan perbarui kredensial keamanan.</p>
+        <div class="st-page">
+            <header class="st-page-header st-page-header--tinted">
+                <div class="st-page-header-main">
+                    <span class="st-badge st-badge--primary">Akun Saya</span>
+                    <h1>Profil & Keamanan</h1>
+                    <p>Kelola identitas akun, lihat ringkasan belajarmu, dan perbarui kata sandi.</p>
+                </div>
             </header>
 
             <div class="profile-grid">
-                <!-- Kolom Kiri: Kartu Identitas & Statistik Database -->
-                <div class="profile-left-col">
-                    <section class="card profile-overview-card">
-                        <div class="overview-hero">
-                            <div class="avatar-bubble">
-                                {{ student.initials || user.name?.charAt(0)?.toUpperCase() || 'U' }}
-                            </div>
-                            <div class="overview-info">
-                                <h2>{{ user.name }}</h2>
-                                <span class="role-badge">{{ String(user.role || 'student').toUpperCase() }}</span>
-                                <p class="email-text">{{ user.email }}</p>
+                <!-- Identitas & ringkasan -->
+                <section class="st-panel profile-card">
+                    <div class="identity-block">
+                        <div class="avatar-bubble">
+                            {{ user.initials || user.name?.charAt(0)?.toUpperCase() || 'U' }}
+                        </div>
+                        <h2>{{ user.name }}</h2>
+                        <span class="st-badge st-badge--gold">{{ user.role === 'teacher' ? 'Guru' : 'Siswa' }}</span>
+                        <p>{{ user.email }}</p>
+                    </div>
+
+                    <ul class="profile-stats">
+                        <li>
+                            <span class="st-icon st-icon--sm st-icon--primary"><Star :size="16" /></span>
+                            <small>Total XP</small>
+                            <b>{{ student.total_xp || 0 }} XP</b>
+                        </li>
+                        <li>
+                            <span class="st-icon st-icon--sm st-icon--gold"><Flame :size="16" /></span>
+                            <small>Streak harian</small>
+                            <b>{{ student.current_streak || 0 }} hari</b>
+                        </li>
+                        <li>
+                            <span class="st-icon st-icon--sm st-icon--green"><Award :size="16" /></span>
+                            <small>Level</small>
+                            <b>{{ student.level?.name || 'Beginner' }}</b>
+                        </li>
+                        <li>
+                            <span class="st-icon st-icon--sm st-icon--neutral"><Shield :size="16" /></span>
+                            <small>Streak terpanjang</small>
+                            <b>{{ student.longest_streak || 0 }} hari</b>
+                        </li>
+                    </ul>
+                </section>
+
+                <div class="profile-forms">
+                    <!-- Form profil -->
+                    <section class="st-panel">
+                        <div class="st-panel-head form-head">
+                            <div class="form-title">
+                                <span class="st-icon st-icon--primary"><UserIcon :size="18" /></span>
+                                <div>
+                                    <h2 class="st-panel-title">Informasi Profil</h2>
+                                    <p class="st-panel-desc">Perbarui nama dan alamat email akunmu.</p>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="stats-overview-list">
-                            <div class="stat-overview-row">
-                                <div class="stat-icon-circle emerald">
-                                    <Star :size="16" />
-                                </div>
-                                <div class="stat-copy">
-                                    <small>Total Pengalaman</small>
-                                    <b>{{ student.total_xp || 0 }} XP</b>
-                                </div>
-                            </div>
-
-                            <div class="stat-overview-row">
-                                <div class="stat-icon-circle gold">
-                                    <Flame :size="16" />
-                                </div>
-                                <div class="stat-copy">
-                                    <small>Streak Harian</small>
-                                    <b>{{ student.current_streak || 0 }} Hari Aktif</b>
-                                </div>
-                            </div>
-
-                            <div class="stat-overview-row">
-                                <div class="stat-icon-circle accent">
-                                    <Award :size="16" />
-                                </div>
-                                <div class="stat-copy">
-                                    <small>Peringkat Level</small>
-                                    <b>{{ student.level_name || 'Beginner' }}</b>
-                                </div>
-                            </div>
-
-                            <div class="stat-overview-row">
-                                <div class="stat-icon-circle gray">
-                                    <Shield :size="16" />
-                                </div>
-                                <div class="stat-copy">
-                                    <small>Streak Terpanjang</small>
-                                    <b>{{ student.longest_streak || 0 }} Hari</b>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-                </div>
-
-                <!-- Kolom Kanan: Form Ubah Profil & Password -->
-                <div class="profile-right-col">
-                    <!-- Form Ubah Data Profil -->
-                    <section class="card form-card">
-                        <div class="card-section-title">
-                            <UserIcon :size="18" class="text-primary" />
-                            <div>
-                                <h3>Informasi Profil</h3>
-                                <p>Perbarui nama akun dan alamat surel Anda.</p>
-                            </div>
-                        </div>
-
-                        <div v-if="profileSuccess" class="alert-success-box" role="status">
+                        <div v-if="profileSuccess" class="st-alert st-alert--success form-alert" role="status">
                             <CheckCircle :size="16" />
                             <span>{{ profileSuccess }}</span>
                         </div>
@@ -155,12 +133,11 @@ function submitPassword() {
                                     type="text"
                                     required
                                     maxlength="60"
+                                    autocomplete="name"
                                     placeholder="Masukkan nama lengkap"
                                     :class="{ 'has-error': profileForm.errors.name }"
                                 />
-                                <span v-if="profileForm.errors.name" class="field-error">
-                                    {{ profileForm.errors.name }}
-                                </span>
+                                <span v-if="profileForm.errors.name" class="field-error">{{ profileForm.errors.name }}</span>
                             </div>
 
                             <div class="form-group">
@@ -170,38 +147,35 @@ function submitPassword() {
                                     v-model="profileForm.email"
                                     type="email"
                                     required
+                                    autocomplete="email"
                                     placeholder="nama@email.com"
                                     :class="{ 'has-error': profileForm.errors.email }"
                                 />
-                                <span v-if="profileForm.errors.email" class="field-error">
-                                    {{ profileForm.errors.email }}
-                                </span>
+                                <span v-if="profileForm.errors.email" class="field-error">{{ profileForm.errors.email }}</span>
                             </div>
 
-                            <div class="form-action-row">
-                                <button
-                                    type="submit"
-                                    class="primary-button"
-                                    :disabled="profileForm.processing"
-                                >
-                                    <Save :size="15" />
+                            <div class="form-actions">
+                                <button type="submit" class="st-btn st-btn--primary" :disabled="profileForm.processing">
+                                    <Save :size="16" />
                                     <span>{{ profileForm.processing ? 'Menyimpan...' : 'Simpan Perubahan' }}</span>
                                 </button>
                             </div>
                         </form>
                     </section>
 
-                    <!-- Form Ganti Kata Sandi -->
-                    <section class="card form-card">
-                        <div class="card-section-title">
-                            <KeyRound :size="18" class="text-secondary" />
-                            <div>
-                                <h3>Perbarui Kata Sandi</h3>
-                                <p>Gunakan kombinasi karakter yang aman untuk menjaga akun Anda.</p>
+                    <!-- Form kata sandi -->
+                    <section class="st-panel">
+                        <div class="st-panel-head form-head">
+                            <div class="form-title">
+                                <span class="st-icon st-icon--gold"><KeyRound :size="18" /></span>
+                                <div>
+                                    <h2 class="st-panel-title">Ubah Kata Sandi</h2>
+                                    <p class="st-panel-desc">Gunakan kata sandi yang kuat agar akunmu tetap aman.</p>
+                                </div>
                             </div>
                         </div>
 
-                        <div v-if="passwordSuccess" class="alert-success-box" role="status">
+                        <div v-if="passwordSuccess" class="st-alert st-alert--success form-alert" role="status">
                             <CheckCircle :size="16" />
                             <span>{{ passwordSuccess }}</span>
                         </div>
@@ -214,51 +188,46 @@ function submitPassword() {
                                     v-model="passwordForm.current_password"
                                     type="password"
                                     required
+                                    autocomplete="current-password"
                                     placeholder="Masukkan kata sandi saat ini"
                                     :class="{ 'has-error': passwordForm.errors.current_password }"
                                 />
-                                <span v-if="passwordForm.errors.current_password" class="field-error">
-                                    {{ passwordForm.errors.current_password }}
-                                </span>
+                                <span v-if="passwordForm.errors.current_password" class="field-error">{{ passwordForm.errors.current_password }}</span>
                             </div>
 
-                            <div class="form-group">
-                                <label for="new_password">Kata Sandi Baru</label>
-                                <input
-                                    id="new_password"
-                                    v-model="passwordForm.password"
-                                    type="password"
-                                    required
-                                    placeholder="Minimal 8 karakter"
-                                    :class="{ 'has-error': passwordForm.errors.password }"
-                                />
-                                <span v-if="passwordForm.errors.password" class="field-error">
-                                    {{ passwordForm.errors.password }}
-                                </span>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="new_password">Kata Sandi Baru</label>
+                                    <input
+                                        id="new_password"
+                                        v-model="passwordForm.password"
+                                        type="password"
+                                        required
+                                        autocomplete="new-password"
+                                        placeholder="Minimal 8 karakter"
+                                        :class="{ 'has-error': passwordForm.errors.password }"
+                                    />
+                                    <span v-if="passwordForm.errors.password" class="field-error">{{ passwordForm.errors.password }}</span>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="confirm_password">Konfirmasi Kata Sandi</label>
+                                    <input
+                                        id="confirm_password"
+                                        v-model="passwordForm.password_confirmation"
+                                        type="password"
+                                        required
+                                        autocomplete="new-password"
+                                        placeholder="Ulangi kata sandi baru"
+                                        :class="{ 'has-error': passwordForm.errors.password_confirmation }"
+                                    />
+                                    <span v-if="passwordForm.errors.password_confirmation" class="field-error">{{ passwordForm.errors.password_confirmation }}</span>
+                                </div>
                             </div>
 
-                            <div class="form-group">
-                                <label for="confirm_password">Konfirmasi Kata Sandi Baru</label>
-                                <input
-                                    id="confirm_password"
-                                    v-model="passwordForm.password_confirmation"
-                                    type="password"
-                                    required
-                                    placeholder="Ulangi kata sandi baru"
-                                    :class="{ 'has-error': passwordForm.errors.password_confirmation }"
-                                />
-                                <span v-if="passwordForm.errors.password_confirmation" class="field-error">
-                                    {{ passwordForm.errors.password_confirmation }}
-                                </span>
-                            </div>
-
-                            <div class="form-action-row">
-                                <button
-                                    type="submit"
-                                    class="secondary-button"
-                                    :disabled="passwordForm.processing"
-                                >
-                                    <KeyRound :size="15" />
+                            <div class="form-actions">
+                                <button type="submit" class="st-btn st-btn--secondary" :disabled="passwordForm.processing">
+                                    <KeyRound :size="16" />
                                     <span>{{ passwordForm.processing ? 'Memproses...' : 'Perbarui Kata Sandi' }}</span>
                                 </button>
                             </div>
@@ -271,201 +240,115 @@ function submitPassword() {
 </template>
 
 <style scoped>
-.profile-page {
-    padding-bottom: 40px;
-}
-
-.profile-page-heading {
-    margin-bottom: 24px;
-}
-
-.heading-badge {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    color: #1e7253;
-    background: #eefaf4;
-    padding: 4px 10px;
-    border-radius: 8px;
-    margin-bottom: 8px;
-}
-
 .profile-grid {
     display: grid;
-    grid-template-columns: 320px 1fr;
-    gap: 24px;
+    grid-template-columns: 300px minmax(0, 1fr);
+    gap: 20px;
     align-items: start;
 }
 
-@media (max-width: 900px) {
-    .profile-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-.profile-overview-card {
-    padding: 24px;
-}
-
-.overview-hero {
+.identity-block {
     display: flex;
     flex-direction: column;
     align-items: center;
-    text-align: center;
+    gap: 6px;
     padding-bottom: 20px;
-    border-bottom: 1px solid #eef3f0;
+    text-align: center;
+    border-bottom: 1px solid var(--st-line-soft);
 }
 
 .avatar-bubble {
-    width: 72px;
-    height: 72px;
-    border-radius: 50%;
-    background: #eefaf4;
-    color: #34B182;
-    border: 2px solid #bcecd6;
     display: grid;
     place-items: center;
-    font-size: 26px;
+    width: 76px;
+    height: 76px;
+    margin-bottom: 6px;
+    font-size: 28px;
     font-weight: 800;
-    margin-bottom: 12px;
+    color: var(--st-primary-dark);
+    background: var(--st-primary-soft);
+    border: 2px solid var(--st-primary-line);
+    border-radius: 50%;
 }
 
-.overview-info h2 {
+.identity-block h2 {
+    margin: 0;
     font-size: 18px;
     font-weight: 800;
-    color: #14221d;
-    margin: 0 0 4px;
+    color: var(--st-ink);
 }
 
-.role-badge {
-    display: inline-block;
-    font-size: 10px;
-    font-weight: 800;
-    color: #C29B40;
-    background: #fdf9ef;
-    border: 1px solid #f1deaf;
-    padding: 2px 8px;
-    border-radius: 6px;
-    letter-spacing: 0.5px;
-    margin-bottom: 6px;
-}
-
-.email-text {
-    font-size: 12px;
-    color: #6d8277;
-    margin: 0;
-}
-
-.stats-overview-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-top: 20px;
-}
-
-.stat-overview-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    background: #fbfdfc;
-    border: 1px solid #eef3f0;
-    border-radius: 10px;
-}
-
-.stat-icon-circle {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-}
-
-.stat-icon-circle.emerald {
-    background: #eefaf4;
-    color: #34B182;
-}
-
-.stat-icon-circle.gold {
-    background: #fdf9ef;
-    color: #C29B40;
-}
-
-.stat-icon-circle.accent {
-    background: #eef7f0;
-    color: #5FAB6F;
-}
-
-.stat-icon-circle.gray {
-    background: #f1f5f3;
-    color: #64748b;
-}
-
-.stat-copy {
-    display: flex;
-    flex-direction: column;
-}
-
-.stat-copy small {
-    font-size: 11px;
-    color: #7b9186;
-}
-
-.stat-copy b {
+.identity-block p {
+    margin: 2px 0 0;
     font-size: 13px;
-    color: #14221d;
+    color: var(--st-muted);
+    word-break: break-all;
 }
 
-.profile-right-col {
+.profile-stats {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 10px;
+    margin: 18px 0 0;
+    padding: 0;
+    list-style: none;
 }
 
-.form-card {
-    padding: 24px 28px;
+.profile-stats li {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--st-surface);
+    border: 1px solid var(--st-line-soft);
+    border-radius: 12px;
 }
 
-.card-section-title {
+.profile-stats small {
+    font-size: 13px;
+    color: var(--st-muted);
+}
+
+.profile-stats b {
+    font-size: 14px;
+    color: var(--st-ink);
+}
+
+.profile-forms {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-head {
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--st-line-soft);
+}
+
+.form-title {
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #eef3f0;
-    margin-bottom: 20px;
 }
 
-.card-section-title h3 {
-    font-size: 16px;
-    font-weight: 800;
-    color: #14221d;
-    margin: 0 0 2px;
+.form-title .st-panel-title {
+    margin-top: 0;
 }
 
-.card-section-title p {
-    font-size: 12px;
-    color: #6d8277;
-    margin: 0;
-}
-
-.alert-success-box {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: #eefaf4;
-    border: 1px solid #bcecd6;
-    color: #1e7253;
-    padding: 10px 14px;
-    border-radius: 10px;
-    font-size: 13px;
-    font-weight: 600;
+.form-alert {
     margin-bottom: 16px;
 }
 
 .account-form {
     display: flex;
     flex-direction: column;
+    gap: 16px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
 }
 
@@ -476,41 +359,58 @@ function submitPassword() {
 }
 
 .form-group label {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
-    color: #2b3d34;
+    color: var(--st-ink);
 }
 
 .form-group input {
-    border: 1px solid #d5e2dc;
-    background: #ffffff;
-    border-radius: 10px;
+    min-height: 44px;
     padding: 10px 14px;
-    font-size: 13px;
-    color: #14221d;
     font-family: inherit;
+    font-size: 14px;
+    color: var(--st-ink);
+    background: #fff;
+    border: 1px solid #d5e2dc;
+    border-radius: 10px;
     outline: none;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .form-group input:focus {
-    border-color: #34B182;
+    border-color: var(--st-primary);
     box-shadow: 0 0 0 3px rgba(52, 177, 130, 0.15);
 }
 
 .form-group input.has-error {
-    border-color: #e53e3e;
+    border-color: var(--st-danger);
 }
 
 .field-error {
-    font-size: 11px;
-    color: #e53e3e;
+    font-size: 12px;
     font-weight: 600;
+    color: var(--st-danger);
 }
 
-.form-action-row {
+.form-actions {
     display: flex;
     justify-content: flex-end;
-    margin-top: 6px;
+}
+
+@media (max-width: 1000px) {
+    .profile-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .form-actions .st-btn {
+        width: 100%;
+    }
 }
 </style>
+

@@ -65,10 +65,21 @@ const mobileNav = [
 ];
 
 function activeLink(to) {
-    const url = page.url;
-    if (to === '/dashboard') return url === '/' || url === '/dashboard';
-    return url === to || (to === '/learn' && url.startsWith('/lesson/'));
+    const path = page.url.split('?')[0];
+    if (to === '/dashboard') return path === '/' || path === '/dashboard';
+    return path === to || (to === '/learn' && path.startsWith('/lesson/'));
 }
+
+// Tujuh hari terakhir (berakhir hari ini); hari yang termasuk streak aktif ditandai
+const streakWeek = computed(() => {
+    const names = ['M', 'S', 'S', 'R', 'K', 'J', 'S'];
+    const activeDays = Math.min(7, currentStreak.value);
+    return Array.from({ length: 7 }, (_, index) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (6 - index));
+        return { label: names[d.getDay()], done: index >= 7 - activeDays, isToday: index === 6 };
+    });
+});
 </script>
 
 <template>
@@ -107,7 +118,6 @@ function activeLink(to) {
                 >
                     <component :is="item.icon" :size="18" />
                     <span>{{ item.label }}</span>
-                    <span v-if="item.to === '/dashboard'" class="nav-dot"></span>
                 </Link>
             </nav>
 
@@ -197,11 +207,11 @@ function activeLink(to) {
                 <p>Pertahankan ritme harianmu untuk mempercepat penguasaan isyarat.</p>
                 <div class="week-dots">
                     <span
-                        v-for="(day, index) in ['S', 'S', 'R', 'K', 'J', 'S', 'M']"
+                        v-for="(day, index) in streakWeek"
                         :key="index"
-                        :class="{ 'day-done': index < (currentStreak % 7 || 7) }"
+                        :class="{ 'day-done': day.done, 'day-today': day.isToday }"
                     >
-                        {{ day }}
+                        {{ day.label }}
                     </span>
                 </div>
             </section>
@@ -216,8 +226,8 @@ function activeLink(to) {
                     <ArrowRight :size="14" class="muted-icon" />
                 </div>
                 <b>Selesaikan Misi Harian</b>
-                <p class="text-xs text-muted mt-1">Latih gesture untuk mendapatkan bonus XP di database.</p>
-                <small class="text-secondary font-bold mt-2 block">+20 XP Bonus Harian</small>
+                <p>Latih gesture hari ini untuk mendapatkan bonus XP.</p>
+                <small class="quest-reward">+20 XP bonus harian</small>
             </Link>
 
             <!-- Level Card -->
@@ -239,7 +249,7 @@ function activeLink(to) {
                     ></i>
                 </div>
                 <small>
-                    {{ level.next_xp ? `${level.next_xp - totalXp} XP lagi menuju level berikutnya` : 'Peringkat tertinggi tercapai!' }}
+                    {{ level.next_xp ? `${Math.max(0, level.next_xp - totalXp)} XP lagi menuju level berikutnya` : 'Peringkat tertinggi tercapai!' }}
                 </small>
             </section>
         </aside>
@@ -306,7 +316,7 @@ function activeLink(to) {
 
 .brand small {
     display: block;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     color: #859c90;
     margin-top: 2px;
@@ -326,9 +336,10 @@ function activeLink(to) {
     background: #fdf2f2;
     border: 1px solid #fbd5d5;
     color: #d9534f;
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 11px;
+    min-height: 40px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 13px;
     font-weight: 700;
     cursor: pointer;
     transition: 0.18s;
@@ -350,11 +361,31 @@ function activeLink(to) {
     width: 100%;
     background: #34B182;
     color: #ffffff;
+    min-height: 40px;
     padding: 8px 14px;
     border-radius: 10px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
     text-decoration: none;
+}
+
+.quest-card p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #6b8176;
+}
+
+.quest-reward {
+    display: block;
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #94711f;
+}
+
+.week-dots .day-today {
+    box-shadow: 0 0 0 2px #34b182;
 }
 
 .accent-progress {
@@ -403,7 +434,4 @@ function activeLink(to) {
     font-weight: 700;
 }
 
-.nav-dot {
-    background: #34B182 !important;
-}
 </style>

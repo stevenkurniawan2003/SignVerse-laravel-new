@@ -5,10 +5,8 @@ import {
     Camera,
     CameraOff,
     Check,
-    Clock,
     Hand,
     Info,
-    Play,
     RefreshCw,
     RotateCcw,
     Timer,
@@ -274,35 +272,48 @@ async function performDetection() {
     <AppLayout>
         <Head title="AI Practice Studio" />
 
-        <main class="practice-page practice-focused font-sans">
+        <div class="st-page practice-page practice-focused">
             <canvas ref="canvasRef" style="display: none"></canvas>
 
-            <header class="practice-page-heading">
-                <div class="heading-badge">Studio Isyarat Interaktif · {{ activeSystem }}</div>
-                <h1>Latihan Mandiri Bahasa Isyarat</h1>
-                <p>Posisikan tangan Anda di depan kamera dengan nyaman. Gunakan timer hitung mundur untuk mempersiapkan bentuk isyarat.</p>
+            <header class="st-page-header st-page-header--tinted">
+                <div class="st-page-header-main">
+                    <span class="st-badge st-badge--primary">AI Practice Studio · {{ activeSystem }}</span>
+                    <h1>Latihan Mandiri Bahasa Isyarat</h1>
+                    <p>Posisikan tangan di depan kamera dengan nyaman, lalu gunakan timer hitung mundur untuk menyiapkan bentuk isyarat.</p>
+                </div>
+                <div class="st-page-header-aside st-summary-box">
+                    <span class="st-icon st-icon--primary"><Hand :size="22" /></span>
+                    <div>
+                        <b>{{ practicedCount }} / {{ targetList.length }}</b>
+                        <small>target tuntas</small>
+                    </div>
+                </div>
             </header>
 
-            <div v-if="promptError" class="prompt-alert-box" role="alert">
-                <Info :size="16" />
+            <div v-if="promptError" class="st-alert st-alert--warning" role="alert">
+                <Info :size="18" />
                 <span>{{ promptError }}</span>
+            </div>
+            <div v-if="cameraError" class="st-alert st-alert--danger" role="alert">
+                <CameraOff :size="18" />
+                <span>{{ cameraError }}</span>
             </div>
 
             <div class="practice-dashboard-grid">
-                <section class="practice-console card">
-                    <div class="practice-console-heading">
+                <section class="st-panel practice-console">
+                    <div class="st-panel-head">
                         <div>
-                            <div class="section-label">Sesi Isyarat</div>
-                            <h2>Latihan Bentuk Tangan</h2>
+                            <span class="st-eyebrow">Sesi Isyarat</span>
+                            <h2 class="st-panel-title">Latihan Bentuk Tangan</h2>
                         </div>
-                        <span class="session-system">{{ activeSystem }}</span>
+                        <span class="st-badge st-badge--primary">{{ activeSystem }}</span>
                     </div>
 
                     <!-- Target Selection Pills -->
                     <div class="practice-target-select">
                         <div>
                             <b>Pilih Target</b>
-                            <small>Alfabet Bahasa Isyarat</small>
+                            <small>Alfabet bahasa isyarat</small>
                         </div>
                         <div class="target-pills" role="group" aria-label="Pilih target huruf">
                             <button
@@ -333,7 +344,7 @@ async function performDetection() {
                                 <span v-else>{{ cameraActive ? 'Kamera Aktif · Posisikan Tangan' : 'Kamera Nonaktif' }}</span>
                             </span>
                             <button class="camera-toggle-btn" type="button" @click="toggleCamera">
-                                <component :is="cameraActive ? CameraOff : Camera" :size="13" />
+                                <component :is="cameraActive ? CameraOff : Camera" :size="16" />
                                 <span>{{ cameraActive ? 'Matikan Kamera' : 'Buka Kamera' }}</span>
                             </button>
                         </div>
@@ -424,7 +435,7 @@ async function performDetection() {
                                     :class="{ active: selectedTimer === 3 }"
                                     @click="selectedTimer = 3"
                                 >
-                                    3 Detik (Rekomendasi)
+                                    3 Detik
                                 </button>
                                 <button
                                     type="button"
@@ -457,12 +468,13 @@ async function performDetection() {
 
                     <!-- Control Buttons -->
                     <div class="practice-control-row">
-                        <button v-if="result === 'retry'" class="secondary-button" @click="startDetection">
-                            <RotateCcw :size="14" />
+                        <button v-if="result === 'retry'" type="button" class="st-btn st-btn--secondary" @click="startDetection">
+                            <RotateCcw :size="16" />
                             <span>Coba Ulangi</span>
                         </button>
                         <button
-                            class="primary-button timer-start-btn"
+                            type="button"
+                            class="st-btn st-btn--primary"
                             :disabled="scanning || countdown > 0"
                             @click="startDetection"
                         >
@@ -476,76 +488,218 @@ async function performDetection() {
                 </section>
 
                 <!-- Sidebar Progress -->
-                <aside class="practice-progress-card card">
-                    <div class="section-label">Kemajuan Sesi</div>
-                    <div class="practice-progress-total">
+                <aside class="st-panel practice-progress-card">
+                    <span class="st-eyebrow">Kemajuan Sesi</span>
+                    <div class="progress-total">
                         <b>{{ practicedCount }}</b>
-                        <span> dari {{ targetList.length }} tuntas</span>
+                        <span>dari {{ targetList.length }} tuntas</span>
                     </div>
 
-                    <div class="progress-track">
+                    <div class="st-track">
                         <i :style="{ width: `${(practicedCount / (targetList.length || 1)) * 100}%` }"></i>
                     </div>
 
-                    <div class="practice-letter-list">
-                        <div
+                    <ul class="letter-list">
+                        <li
                             v-for="item in targetList"
                             :key="item.letter"
-                            :class="{ complete: isPracticed(item.letter) }"
+                            :class="{ 'is-done': isPracticed(item.letter) }"
                         >
-                            <span>{{ item.name }}</span>
-                            <small>
-                                {{ isPracticed(item.letter) ? 'Tuntas' : 'Belum selesai' }}
-                            </small>
-                            <Check v-if="isPracticed(item.letter)" :size="14" />
-                        </div>
-                    </div>
+                            <span class="letter-chip">{{ item.letter }}</span>
+                            <span class="letter-name">{{ item.name }}</span>
+                            <Check v-if="isPracticed(item.letter)" :size="16" />
+                            <small v-else>Belum</small>
+                        </li>
+                    </ul>
                 </aside>
             </div>
-        </main>
+        </div>
     </AppLayout>
 </template>
 
 <style scoped>
-.practice-page {
-    font-family: 'Poppins', sans-serif;
-    padding-bottom: 40px;
+.practice-focused .practice-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: 20px;
+    margin-top: 0;
 }
 
-.practice-page-heading {
-    margin-bottom: 20px;
+.practice-console .st-panel-head {
+    margin-bottom: 0;
 }
 
-.heading-badge {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    color: #1e7253;
-    background: #eefaf4;
-    padding: 4px 10px;
-    border-radius: 8px;
-    margin-bottom: 8px;
+.practice-target-select {
+    align-items: center;
+    gap: 14px;
+    margin: 16px 0 0;
+    padding: 14px;
+    border-color: var(--st-line);
 }
 
-.prompt-alert-box {
+.practice-target-select b {
+    font-size: 14px;
+    color: var(--st-ink);
+}
+
+.practice-target-select small {
+    font-size: 12px;
+    color: var(--st-muted);
+}
+
+.target-pills {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.target-pill {
+    min-width: 44px;
+    height: 44px;
+    color: var(--st-text);
+    cursor: pointer;
+}
+
+.target-pill.practiced {
+    color: var(--st-primary-dark);
+    border-color: var(--st-primary-line);
+}
+
+.practice-control-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.practice-control-row .st-btn {
+    flex: 1;
+    min-height: 48px;
+    font-size: 15px;
+}
+
+.studio-result {
+    margin-top: 14px;
+    padding: 14px 16px;
+    border-radius: 12px;
+}
+
+.studio-result .result-title b {
+    font-size: 14px;
+}
+
+.studio-result .result-title small {
+    font-size: 13px;
+    color: var(--st-text);
+}
+
+.studio-result .result-title strong {
+    font-size: 14px;
+    color: var(--st-gold-dark);
+}
+
+/* Kartu kemajuan */
+.practice-progress-card {
+    position: sticky;
+    top: 16px;
+    gap: 10px;
+}
+
+.progress-total {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--st-muted);
+}
+
+.progress-total b {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--st-ink);
+}
+
+.letter-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 420px;
+    margin: 6px 0 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.letter-list li {
     display: flex;
     align-items: center;
     gap: 10px;
-    background: #fff8e6;
-    border: 1px solid #C29B40;
-    color: #8c6a1e;
-    padding: 10px 14px;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--st-text);
+    background: var(--st-surface);
     border-radius: 10px;
-    font-size: 12px;
-    font-weight: 600;
-    margin-bottom: 16px;
 }
 
-.section-label {
-    font-size: 11px;
-    font-weight: 700;
-    color: #52685d;
-    margin-bottom: 4px;
+.letter-list li.is-done {
+    color: var(--st-primary-dark);
+    background: var(--st-primary-soft);
+}
+
+.letter-list li svg {
+    color: var(--st-primary);
+}
+
+.letter-list small {
+    font-size: 12px;
+    color: var(--st-muted);
+}
+
+.letter-chip {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    font-weight: 800;
+    background: #fff;
+    border: 1px solid var(--st-line);
+    border-radius: 8px;
+}
+
+.letter-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+    .practice-focused .practice-dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .practice-progress-card {
+        position: static;
+    }
+
+    .letter-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        max-height: none;
+    }
+}
+
+@media (max-width: 760px) {
+    .practice-target-select {
+        display: grid;
+    }
+
+    .target-pills {
+        justify-content: flex-start;
+    }
+
+    .practice-control-row {
+        flex-direction: column;
+    }
 }
 
 .letter-badge {
@@ -565,7 +719,8 @@ async function performDetection() {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 11px;
+    gap: 10px;
+    font-size: 13px;
     font-weight: 600;
     color: #ade6cc;
     margin-bottom: 12px;
@@ -608,10 +763,11 @@ async function performDetection() {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: #ffffff;
-    padding: 5px 10px;
-    border-radius: 8px;
-    font-size: 11px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 13px;
     font-weight: 700;
+    white-space: nowrap;
     transition: 0.18s;
 }
 
@@ -620,7 +776,7 @@ async function performDetection() {
 }
 
 .studio-viewport {
-    height: 300px;
+    height: 340px;
     border-radius: 14px;
     background: #091210;
     position: relative;
@@ -672,7 +828,7 @@ async function performDetection() {
 }
 
 .guide-text {
-    font-size: 12px;
+    font-size: 14px;
     color: #97d2a3;
     max-width: 290px;
     line-height: 1.5;
@@ -754,7 +910,7 @@ async function performDetection() {
 
 .countdown-banner small {
     display: block;
-    font-size: 11px;
+    font-size: 13px;
     color: #d5f3e5;
     margin-top: 2px;
 }
@@ -764,9 +920,9 @@ async function performDetection() {
     background: rgba(255, 255, 255, 0.12);
     border: 1px solid rgba(255, 255, 255, 0.25);
     color: #ffffff;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
-    padding: 5px 12px;
+    padding: 8px 14px;
     border-radius: 8px;
     display: inline-flex;
     align-items: center;
@@ -812,7 +968,7 @@ async function performDetection() {
 
 .target-overlay-badge small {
     display: block;
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     color: #ade6cc;
 }
@@ -835,7 +991,7 @@ async function performDetection() {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 600;
     color: #7cd3ae;
     backdrop-filter: blur(4px);
@@ -868,13 +1024,14 @@ async function performDetection() {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 600;
     color: #ade6cc;
 }
 
 .timer-pill-group {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
 }
 
@@ -882,10 +1039,11 @@ async function performDetection() {
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.15);
     color: #cde6d9;
-    font-size: 10px;
+    font-size: 13px;
     font-weight: 700;
-    padding: 4px 9px;
-    border-radius: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
     transition: 0.16s;
 }
 
@@ -901,8 +1059,8 @@ async function performDetection() {
 }
 
 .studio-hint {
-    margin: 10px 0 0;
-    font-size: 11px;
+    margin: 12px 0 0;
+    font-size: 13px;
     color: #ade6cc;
     line-height: 1.5;
 }

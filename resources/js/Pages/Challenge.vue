@@ -1,7 +1,7 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowRight, Award, CircleCheck, Star, Target, Trophy } from '@lucide/vue';
+import { ArrowRight, Award, CircleCheck, Flame, Star, Target, Trophy } from '@lucide/vue';
 import AppLayout from '../Layouts/AppLayout.vue';
 
 const props = defineProps({
@@ -14,6 +14,11 @@ const challengeList = ref(Array.isArray(props.challenges) && props.challenges.le
 const rewardsList = ref(Array.isArray(props.rewards) ? props.rewards : []);
 const claimingId = ref(null);
 const claimStatusMessage = ref('');
+const claimFailed = ref(false);
+
+function challengePercent(ch) {
+    return Math.min(100, Math.round(((ch.progress || 0) / (ch.target || 1)) * 100));
+}
 
 onMounted(async () => {
     if (challengeList.value.length === 0) {
@@ -38,6 +43,7 @@ onMounted(async () => {
 async function claim(ch) {
     if (claimingId.value || ch.completed) return;
     claimingId.value = ch.id;
+    claimFailed.value = false;
     try {
         const res = await fetch('/api/challenges/claim', {
             method: 'POST',
@@ -55,8 +61,12 @@ async function claim(ch) {
             ch.progress = ch.target;
             claimStatusMessage.value = data.message || `Selamat! Bonus +${ch.reward_xp} XP berhasil diklaim.`;
             router.reload({ only: ['auth'] });
+        } else {
+            claimFailed.value = true;
+            claimStatusMessage.value = 'Reward belum bisa diklaim. Coba lagi sebentar.';
         }
     } catch {
+        claimFailed.value = true;
         claimStatusMessage.value = 'Gagal mengklaim reward. Periksa koneksi jaringan.';
     } finally {
         claimingId.value = null;
@@ -68,214 +78,130 @@ async function claim(ch) {
     <AppLayout>
         <Head title="Challenge Harian" />
 
-        <div class="info-page challenge-page">
-            <header class="challenge-welcome">
-                <div class="challenge-welcome-copy">
-                    <div class="heading-badge">Challenge Harian · SignTech</div>
+        <div class="st-page">
+            <header class="st-page-header st-page-header--tinted">
+                <div class="st-page-header-main">
+                    <span class="st-badge st-badge--primary">Challenge Harian</span>
                     <h1>Tantangan Harian & Bonus XP</h1>
-                    <p>Selesaikan target latihan hari ini untuk menjaga streak dan mengumpulkan XP ekstra. Streak Kamu Saat Ini: {{ streak }} hari.</p>
+                    <p>Selesaikan target latihan hari ini untuk menjaga streak dan mengumpulkan XP tambahan.</p>
                 </div>
-                <div class="challenge-mascot" aria-hidden="true">
-                    <div class="challenge-icon-circle">
-                        <Target :size="32" class="text-primary" />
+                <div class="st-page-header-aside st-summary-box">
+                    <span class="st-icon st-icon--gold"><Flame :size="22" /></span>
+                    <div>
+                        <b>{{ streak }} hari</b>
+                        <small>streak saat ini</small>
                     </div>
                 </div>
             </header>
 
-            <div v-if="claimStatusMessage" class="claim-alert-box">
-                <CircleCheck :size="16" />
+            <div v-if="claimStatusMessage" class="st-alert" :class="claimFailed ? 'st-alert--danger' : 'st-alert--success'" role="status">
+                <CircleCheck :size="18" />
                 <span>{{ claimStatusMessage }}</span>
             </div>
 
-            <!-- List of Challenges from Database -->
-            <div class="challenge-cards-stack">
-                <section
-                    v-for="ch in challengeList"
-                    :key="ch.id"
-                    class="challenge-large card"
-                >
-                    <div class="challenge-card-heading">
-                        <div class="challenge-big-icon">
-                            <Target :size="26" />
+            <div v-if="challengeList.length > 0" class="challenge-stack">
+                <section v-for="ch in challengeList" :key="ch.id" class="st-panel">
+                    <div class="challenge-head">
+                        <span class="st-icon st-icon--lg st-icon--primary"><Target :size="24" /></span>
+                        <div class="challenge-copy">
+                            <span class="st-eyebrow">Tantangan Harian</span>
+                            <h2 class="st-panel-title">{{ ch.title }}</h2>
+                            <p class="st-panel-desc">{{ ch.description }}</p>
                         </div>
-                        <div>
-                            <span class="eyebrow">TANTANGAN HARIAN #{{ ch.id }}</span>
-                            <h2>{{ ch.title }}</h2>
-                            <p>{{ ch.description }}</p>
-                        </div>
-                        <span class="challenge-stamp">+{{ ch.reward_xp }} XP</span>
-                    </div>
-
-                    <div class="challenge-progress-label">
-                        <b>{{ ch.progress }} dari {{ ch.target }} tuntas</b>
-                        <span>
-                            {{ ch.progress >= ch.target ? 'Target terpenuhi!' : `Tersisa ${Math.max(0, ch.target - ch.progress)} lagi` }}
+                        <span class="st-badge st-badge--gold">
+                            <Star :size="13" /> +{{ ch.reward_xp }} XP
                         </span>
                     </div>
 
-                    <div class="progress-track big-track">
-                        <i :style="{ width: `${Math.min(100, Math.round(((ch.progress || 0) / (ch.target || 1)) * 100))}%` }"></i>
+                    <div class="st-progress-meta">
+                        <b>{{ ch.progress }} dari {{ ch.target }} tuntas</b>
+                        <span>{{ ch.progress >= ch.target ? 'Target terpenuhi!' : `Tersisa ${Math.max(0, ch.target - ch.progress)} lagi` }}</span>
+                    </div>
+                    <div class="st-track st-track--lg">
+                        <i :style="{ width: `${challengePercent(ch)}%` }"></i>
                     </div>
 
-                    <div class="challenge-bottom-row">
-                        <div class="challenge-reward">
-                            <div class="challenge-reward-icon-box">
-                                <Award :size="20" class="text-secondary" />
-                            </div>
-                            <div>
-                                <b>Hadiah Misi</b>
-                                <small>+{{ ch.reward_xp }} XP Otomatis Ditambahkan</small>
-                            </div>
+                    <div class="st-panel-foot challenge-foot">
+                        <div class="reward-note">
+                            <span class="st-icon st-icon--sm st-icon--gold"><Award :size="16" /></span>
+                            <span>Hadiah <b>+{{ ch.reward_xp }} XP</b> setelah diklaim</span>
                         </div>
 
                         <button
                             v-if="ch.progress >= ch.target && !ch.completed"
                             type="button"
-                            class="primary-button"
+                            class="st-btn st-btn--gold"
                             :disabled="claimingId === ch.id"
                             @click="claim(ch)"
                         >
                             <Trophy :size="16" />
-                            <span>{{ claimingId === ch.id ? 'Mengklaim...' : `Klaim +${ch.reward_xp} XP Sekarang` }}</span>
+                            <span>{{ claimingId === ch.id ? 'Mengklaim...' : `Klaim +${ch.reward_xp} XP` }}</span>
                         </button>
 
-                        <div v-else-if="ch.completed" class="challenge-completed-pill">
-                            <CircleCheck :size="16" />
-                            <span>Hadiah Berhasil Diklaim</span>
-                        </div>
+                        <span v-else-if="ch.completed" class="st-badge st-badge--primary claimed-badge">
+                            <CircleCheck :size="15" /> Hadiah sudah diklaim
+                        </span>
 
-                        <Link v-else href="/practice" class="primary-button">
+                        <Link v-else href="/practice" class="st-btn st-btn--primary">
                             <span>Lanjutkan di AI Practice</span>
                             <ArrowRight :size="16" />
                         </Link>
                     </div>
                 </section>
             </div>
+            <div v-else class="st-empty">Belum ada tantangan untuk hari ini. Coba lagi besok!</div>
         </div>
     </AppLayout>
 </template>
 
 <style scoped>
-.challenge-welcome {
-    background: #eefaf4;
-    border: 1px solid #d5f3e5;
-    border-radius: 18px;
-    padding: 24px 28px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
-}
-.heading-badge {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    color: #1e7253;
-    background: #d5f3e5;
-    padding: 3px 10px;
-    border-radius: 6px;
-    margin-bottom: 8px;
-}
-.challenge-welcome h1 {
-    font-size: 24px;
-    font-weight: 800;
-    color: #14221d;
-    margin: 0 0 6px;
-}
-.challenge-welcome p {
-    font-size: 13px;
-    color: #52685d;
-    margin: 0;
-}
-.challenge-icon-circle {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: #ffffff;
-    display: grid;
-    place-items: center;
-    box-shadow: 0 4px 12px rgba(52, 177, 130, 0.12);
-}
-.claim-alert-box {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: #eefaf4;
-    border: 1px solid #34B182;
-    color: #1e7253;
-    padding: 12px 18px;
-    border-radius: 12px;
-    font-size: 13px;
-    font-weight: 700;
-    margin-bottom: 18px;
-}
-.challenge-cards-stack {
+.challenge-stack {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
 }
-.challenge-card-heading {
+
+.challenge-head {
     display: flex;
     align-items: flex-start;
     gap: 14px;
     margin-bottom: 20px;
 }
-.challenge-big-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    background: #eefaf4;
-    color: #34B182;
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
+
+.challenge-copy {
+    flex: 1;
+    min-width: 0;
 }
-.challenge-stamp {
-    margin-left: auto;
-    font-size: 13px;
-    font-weight: 800;
-    color: #C29B40;
-    background: #fdf9ef;
-    border: 1px solid #f1deaf;
-    padding: 4px 12px;
-    border-radius: 8px;
+
+.challenge-foot {
+    flex-wrap: wrap;
+    margin-top: 18px;
 }
-.challenge-progress-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    margin-bottom: 6px;
-}
-.challenge-bottom-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 20px;
-    padding-top: 16px;
-    border-top: 1px solid #f1f5f3;
-}
-.challenge-reward {
+
+.reward-note {
     display: flex;
     align-items: center;
     gap: 10px;
+    font-size: 13px;
+    color: var(--st-muted);
 }
-.challenge-reward-icon-box {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: #fdf9ef;
-    display: grid;
-    place-items: center;
+
+.reward-note b {
+    color: var(--st-gold-dark);
 }
-.challenge-completed-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #eefaf4;
-    color: #1e7253;
-    font-size: 12px;
-    font-weight: 700;
+
+.claimed-badge {
     padding: 8px 14px;
-    border-radius: 10px;
+    font-size: 13px;
+}
+
+@media (max-width: 760px) {
+    .challenge-head {
+        flex-wrap: wrap;
+    }
+
+    .challenge-foot .st-btn {
+        width: 100%;
+    }
 }
 </style>
