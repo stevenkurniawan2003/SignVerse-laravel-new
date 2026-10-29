@@ -9,7 +9,8 @@ use App\Services\PracticeService;
 use App\Services\StudentStatsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 /**
  * AI Practice (phase 4): pilih lesson → sesi latihan (kamera + attempt
@@ -68,13 +69,13 @@ class PracticeController extends Controller
     /**
      * Halaman latihan aktif: kamera + tombol ambil attempt + akhiri sesi.
      */
-    public function show(Request $request, PracticeSession $session): View
+    public function show(Request $request, PracticeSession $session): InertiaResponse
     {
         abort_unless($session->student_id === $request->user()->student?->id, 403);
 
         $session->load('lesson.material.category');
 
-        return view('student.practice.show', [
+        return Inertia::render('Practice', [
             'session' => $session,
             'results' => $session->gestureResults()->latest('id')->limit(10)->get(),
         ]);
