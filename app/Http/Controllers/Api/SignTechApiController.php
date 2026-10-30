@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\ChallengeService;
 use App\Services\Contracts\GestureRecognitionService;
 use App\Services\GamificationService;
+use App\Services\PracticeService;
 use App\Services\StudentStatsService;
 use App\Services\TeacherStatsService;
 use Carbon\Carbon;
@@ -28,6 +29,7 @@ class SignTechApiController extends Controller
         private StudentStatsService $studentStats,
         private TeacherStatsService $teacherStats,
         private GestureRecognitionService $recognizer,
+        private PracticeService $practice,
     ) {}
 
     /**
@@ -243,6 +245,7 @@ class SignTechApiController extends Controller
                 'category' => $lesson->material?->category,
                 'relatedLessons' => $relatedLessons,
                 'is_completed' => $isCompleted,
+                'ai_supported' => PracticeService::isAiSupported($lesson),
             ]);
         } catch (Throwable $e) {
             return response()->json([
@@ -253,7 +256,9 @@ class SignTechApiController extends Controller
     }
 
     /**
-     * Complete a lesson directly in database.
+     * Status penyelesaian lesson. Lesson hanya dianggap selesai bila siswa
+     * sudah lulus peragaan kamera (dinilai AI lewat attemptPractice) —
+     * endpoint ini tidak pernah membuat skor/XP sendiri.
      */
     public function completeLesson(Request $request, string|int $id): JsonResponse
     {
@@ -262,53 +267,33 @@ class SignTechApiController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthenticated.'], 401);
         }
 
-        $lesson = Lesson::find($id);
+        $lesson = Lesson::with('material')->find($id);
         if (!$lesson) {
-            $clean = preg_replace('/^bisindo-/', '', (string) $id);
-            $lesson = Lesson::where('title', $clean)
-                ->orWhere('gesture_label', strtolower($clean))
-                ->first();
+            return response()->json(['status' => 'error', 'message' => 'Pelajaran tidak ditemukan.'], 404);
         }
 
-        if (!$lesson) {
-            $lesson = Lesson::first();
+        $bestSession = $student->practiceSessions()
+            ->where('lesson_id', $lesson->id)
+            ->where('status', PracticeSession::STATUS_COMPLETED)
+            ->where('score', '>=', PracticeService::PASS_SCORE)
+            ->orderByDesc('score')
+            ->first();
+
+        if (!$bestSession) {
+            return response()->json([
+                'status' => 'error',
+                'completed' => false,
+                'message' => "Peragakan isyarat {$lesson->title} di depan kamera sampai dinyatakan benar oleh AI untuk menyelesaikan pelajaran ini.",
+            ], 422);
         }
-
-        $xpReward = $lesson?->xp_reward ?? 10;
-
-        $session = PracticeSession::create([
-            'student_id' => $student->id,
-            'lesson_id' => $lesson?->id ?? 1,
-            'language' => $lesson?->material?->language ?? 'sibi',
-            'score' => 100,
-            'xp_earned' => $xpReward,
-            'attempts' => 1,
-            'status' => PracticeSession::STATUS_COMPLETED,
-            'started_at' => now()->subMinutes(2),
-            'completed_at' => now(),
-        ]);
-
-        $today = today();
-        if (!$student->last_activity_date?->isSameDay($today)) {
-            $continues = $student->last_activity_date?->isSameDay($today->subDay());
-            $newStreak = $continues ? $student->current_streak + 1 : 1;
-            $student->update([
-                'current_streak' => $newStreak,
-                'longest_streak' => max($student->longest_streak, $newStreak),
-                'last_activity_date' => $today,
-            ]);
-        }
-
-        $categorySlug = $lesson?->material?->category?->slug ?? 'alphabet';
-        ChallengeService::bumpChallenge($student->user_id, $categorySlug);
-        GamificationService::evaluateBadges($student->user_id);
 
         return response()->json([
             'status' => 'success',
+            'completed' => true,
             'message' => 'Pelajaran berhasil diselesaikan.',
-            'xp_earned' => $xpReward,
+            'best_score' => (int) $bestSession->score,
             'total_xp' => $student->totalXp(),
-            'streak' => GamificationService::streakInfo($student->user_id)['streak'],
+            'streak' => (int) $student->current_streak,
         ]);
     }
 
@@ -318,21 +303,24 @@ class SignTechApiController extends Controller
     public function practiceTargets(Request $request): JsonResponse
     {
         try {
+            // Urut per kategori → materi → urutan lesson, sehingga tiap sistem
+            // isyarat tampil rapi A–Z lalu 1–10 (frontend memfilter per sistem).
             $lessons = Lesson::query()
+                ->select('lessons.*')
                 ->with('material.category')
-                ->whereHas('material.category', fn ($q) => $q->where('slug', 'alphabet'))
-                ->orderBy('order')
+                ->join('materials', 'materials.id', '=', 'lessons.material_id')
+                ->join('categories', 'categories.id', '=', 'materials.category_id')
+                ->whereIn('categories.slug', PracticeService::AI_SUPPORTED_CATEGORIES)
+                ->orderBy('categories.order')
+                ->orderBy('materials.id')
+                ->orderBy('lessons.order')
                 ->get();
-
-            if ($lessons->isEmpty()) {
-                $lessons = Lesson::with('material.category')->take(10)->get();
-            }
 
             $student = $this->resolveStudent($request);
             $completedLessonIds = $student
                 ? $student->practiceSessions()
                     ->where('status', PracticeSession::STATUS_COMPLETED)
-                    ->where('score', '>=', 60)
+                    ->where('score', '>=', PracticeService::PASS_SCORE)
                     ->pluck('lesson_id')
                     ->unique()
                     ->values()
@@ -342,15 +330,22 @@ class SignTechApiController extends Controller
             return response()->json([
                 'status' => 'success',
                 'completedLessonIds' => $completedLessonIds,
-                'targets' => $lessons->map(fn ($l) => [
-                    'id' => $l->id,
-                    'letter' => $l->title,
-                    'name' => "Huruf {$l->title}",
-                    'hint' => "Peragakan isyarat huruf {$l->title} sesuai kaidah bahasa isyarat.",
-                    'language' => $l->material?->language ?? 'sibi',
-                    'category' => $l->material?->category?->name ?? 'Alfabet',
-                    'practiced' => in_array($l->id, $completedLessonIds),
-                ]),
+                'targets' => $lessons->map(function (Lesson $l) use ($completedLessonIds) {
+                    $isNumber = $l->material?->category?->slug === 'number';
+                    $kind = $isNumber ? 'Angka' : 'Huruf';
+
+                    return [
+                        'id' => $l->id,
+                        'letter' => $l->title,
+                        'name' => "{$kind} {$l->title}",
+                        'hint' => "Peragakan isyarat {$kind} {$l->title}, tahan posisi tangan sampai foto diambil.",
+                        'language' => $l->material?->language ?? 'sibi',
+                        'category' => $l->material?->category?->name ?? 'Alfabet',
+                        'category_slug' => $l->material?->category?->slug ?? 'alphabet',
+                        'xp_reward' => (int) $l->xp_reward,
+                        'practiced' => in_array($l->id, $completedLessonIds),
+                    ];
+                }),
             ]);
         } catch (Throwable $e) {
             return response()->json([
@@ -365,97 +360,86 @@ class SignTechApiController extends Controller
      */
     public function attemptPractice(Request $request): JsonResponse
     {
-        $letter = strtoupper(trim((string) $request->input('target_letter', 'A')));
-        $system = strtolower(trim((string) $request->input('system', 'sibi')));
-        $imageData = $request->input('image') ?? $request->input('frame');
-        $mirrored = (bool) $request->input('mirrored', false);
+        $lesson = $this->resolvePracticeLesson($request);
+        if (!$lesson) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Target latihan tidak ditemukan untuk sistem isyarat yang dipilih.',
+            ], 422);
+        }
 
-        // Evaluasi gesture langsung via Live AI Service (https://ai.signtech.tech)
-        $recognition = $this->recognizer->recognize($letter, $imageData, $system, $mirrored);
-        $isCorrect = (bool) ($recognition['correct'] ?? false);
+        if (!PracticeService::isAiSupported($lesson)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => "Isyarat {$lesson->title} belum bisa dinilai AI. Saat ini AI hanya mengenali isyarat huruf alfabet.",
+            ], 422);
+        }
+
+        $imageData = $request->input('image') ?? $request->input('frame');
+        $mirrored = $request->boolean('mirrored');
+
+        // Evaluasi gesture via Live AI Service (https://ai.signtech.tech)
+        $recognition = $this->recognizer->recognize($lesson->title, $imageData, $lesson->material->language, $mirrored);
         $confidence = (int) ($recognition['confidence'] ?? 0);
-        $recognized = $recognition['recognized'];
+        $recognized = $recognition['recognized'] ?? null;
         $message = $recognition['message'] ?? '';
-        $detectionStatus = $recognition['detection_status'] ?? 'unknown';
+
+        if ($recognized !== null && ($recognition['correct'] ?? false) && $confidence < PracticeService::PASS_SCORE) {
+            $message = "Bentuk tangan mirip isyarat {$lesson->title}, tetapi belum cukup jelas (akurasi {$confidence}%, minimal "
+                .PracticeService::PASS_SCORE.'%). Tahan posisi tangan lebih stabil lalu coba lagi.';
+        }
 
         $student = $this->resolveStudent($request);
-        $xpEarned = 0;
-        $totalXp = 0;
-        $streak = 0;
+        $outcome = $student
+            ? $this->practice->recordVerifiedAttempt($student, $lesson, $recognition)
+            : null;
 
-        if ($student) {
-            try {
-                // Temukan lesson yang sesuai dengan target huruf di DB
-                $lesson = Lesson::query()
-                    ->where('title', $letter)
-                    ->orWhere('gesture_label', strtolower($letter))
-                    ->first()
-                    ?? Lesson::first();
-
-                $xpEarned = $isCorrect ? ($lesson?->xp_reward ?? 10) : 0;
-
-                // Simpan PracticeSession nyata
-                $session = PracticeSession::create([
-                    'student_id' => $student->id,
-                    'lesson_id' => $lesson?->id ?? 1,
-                    'language' => in_array($system, ['sibi', 'bisindo'], true) ? $system : 'sibi',
-                    'score' => $isCorrect ? 100 : max(0, $confidence),
-                    'xp_earned' => $xpEarned,
-                    'attempts' => 1,
-                    'status' => PracticeSession::STATUS_COMPLETED,
-                    'started_at' => now()->subSeconds(2),
-                    'completed_at' => now(),
-                ]);
-
-                // Simpan GestureResult nyata
-                $session->gestureResults()->create([
-                    'lesson_id' => $lesson?->id ?? 1,
-                    'expected_gesture' => strtolower($letter),
-                    'recognized_gesture' => $recognized ? strtolower($recognized) : 'none',
-                    'confidence' => $confidence,
-                    'correct' => $isCorrect,
-                ]);
-
-                if ($isCorrect) {
-                    // Update streak nyata di database
-                    $today = today();
-                    if (!$student->last_activity_date?->isSameDay($today)) {
-                        $continues = $student->last_activity_date?->isSameDay($today->subDay());
-                        $newStreak = $continues ? $student->current_streak + 1 : 1;
-                        $student->update([
-                            'current_streak' => $newStreak,
-                            'longest_streak' => max($student->longest_streak, $newStreak),
-                            'last_activity_date' => $today,
-                        ]);
-                    }
-
-                    // Tambah progres tantangan harian di DB
-                    $categorySlug = $lesson?->material?->category?->slug ?? 'alphabet';
-                    ChallengeService::bumpChallenge($student->user_id, $categorySlug);
-
-                    // Evaluasi perolehan badge gamifikasi
-                    GamificationService::evaluateBadges($student->user_id);
-                }
-
-                $totalXp = $student->totalXp();
-                $streak = GamificationService::streakInfo($student->user_id)['streak'];
-            } catch (Throwable $e) {
-                // DB exception logged gracefully
-            }
-        }
+        $passed = $outcome['passed'] ?? ($recognized !== null && ($recognition['correct'] ?? false) && $confidence >= PracticeService::PASS_SCORE);
 
         return response()->json([
             'status' => 'success',
-            'correct' => $isCorrect,
+            'lesson_id' => $lesson->id,
+            'correct' => $passed,
+            'evaluated' => $recognized !== null,
             'recognized' => $recognized,
             'confidence' => $confidence,
-            'detection_status' => $detectionStatus,
+            'pass_score' => PracticeService::PASS_SCORE,
+            'detection_status' => $recognition['detection_status'] ?? 'unknown',
             'message' => $message,
-            'xp_earned' => $xpEarned,
-            'total_xp' => $totalXp,
-            'streak' => $streak,
+            'score' => $outcome['score'] ?? 0,
+            'xp_earned' => $outcome['xp_earned'] ?? 0,
+            'already_mastered' => $outcome['already_mastered'] ?? false,
+            'total_xp' => $outcome['total_xp'] ?? 0,
+            'level' => $outcome['level'] ?? null,
+            'leveled_up' => $outcome['leveled_up'] ?? false,
+            'new_badges' => $outcome['new_badges'] ?? [],
+            'challenge_completed' => $outcome['challenge_completed'] ?? false,
+            'streak' => $outcome['streak'] ?? 0,
             'source' => $recognition['source'] ?? 'signtech_ai_service',
         ]);
+    }
+
+    /**
+     * Lesson target latihan: utamakan lesson_id, atau cocokkan judul
+     * (huruf/angka) pada sistem isyarat yang dipilih — tanpa fallback ke
+     * lesson lain agar penilaian tidak salah sasaran.
+     */
+    private function resolvePracticeLesson(Request $request): ?Lesson
+    {
+        if ($request->filled('lesson_id')) {
+            return Lesson::with('material.category')->find((int) $request->input('lesson_id'));
+        }
+
+        $title = strtoupper(trim((string) $request->input('target_letter', '')));
+        $system = strtolower(trim((string) $request->input('system', 'sibi')));
+        if ($title === '' || !in_array($system, [PracticeSession::LANGUAGE_SIBI, PracticeSession::LANGUAGE_BISINDO], true)) {
+            return null;
+        }
+
+        return Lesson::with('material.category')
+            ->where('title', $title)
+            ->whereHas('material', fn ($q) => $q->where('language', $system))
+            ->first();
     }
 
     /**
@@ -518,11 +502,27 @@ class SignTechApiController extends Controller
             ], 404);
         }
 
+        $progress = DB::table('challenge_progress')
+            ->where('user_id', $student->user_id)
+            ->where('challenge_id', $challengeId)
+            ->first();
+
+        if ((int) ($progress->progress ?? 0) < (int) $challenge->target) {
+            $remaining = (int) $challenge->target - (int) ($progress->progress ?? 0);
+
+            return response()->json([
+                'status' => 'error',
+                'claimed' => false,
+                'message' => "Tantangan belum selesai. Peragakan {$remaining} isyarat lagi dengan benar untuk mendapatkan bonus XP.",
+            ], 422);
+        }
+
         try {
-            DB::table('challenge_progress')->updateOrInsert(
-                ['user_id' => $student->user_id, 'challenge_id' => $challengeId],
-                ['completed' => 1, 'progress' => $challenge->target, 'completed_at' => now(), 'updated_at' => now()]
-            );
+            DB::table('challenge_progress')
+                ->where('user_id', $student->user_id)
+                ->where('challenge_id', $challengeId)
+                ->where('completed', 0)
+                ->update(['completed' => 1, 'completed_at' => now()]);
 
             GamificationService::evaluateBadges($student->user_id);
             $totalXp = $student->totalXp();

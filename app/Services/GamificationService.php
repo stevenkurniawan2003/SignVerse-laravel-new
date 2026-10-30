@@ -20,6 +20,9 @@ use Illuminate\Support\Facades\DB;
  */
 class GamificationService
 {
+    /** Hanya latihan yang lulus yang dihitung untuk streak & badge. */
+    private const PASS_SCORE = PracticeService::PASS_SCORE;
+
     /** [threshold_xp, nama_level] */
     private const LEVELS = [
         [0, 'Beginner'],
@@ -92,6 +95,8 @@ class GamificationService
         $days = DB::table('practice_sessions as s')
             ->join('students as st', 'st.id', '=', 's.student_id')
             ->where('st.user_id', $userId)
+            ->where('s.status', 'completed')
+            ->where('s.score', '>=', self::PASS_SCORE)
             ->selectRaw('DATE(s.created_at) as d')
             ->distinct()
             ->orderByDesc('d')
@@ -169,6 +174,7 @@ class GamificationService
             ->join('categories as c', 'c.id', '=', 'm.category_id')
             ->where('s.student_id', self::studentId($userId))
             ->where('s.status', 'completed')
+            ->where('s.score', '>=', self::PASS_SCORE)
             ->groupBy('c.slug')
             ->selectRaw('c.slug as category, COUNT(*) as n, AVG(s.score) as acc')
             ->get();
@@ -187,7 +193,8 @@ class GamificationService
         $checks = [
             'first_practice' => DB::table('practice_sessions')
                 ->where('student_id', self::studentId($userId))
-                ->where('status', 'completed')->count() >= 1,
+                ->where('status', 'completed')
+                ->where('score', '>=', self::PASS_SCORE)->count() >= 1,
             'master_alfabet' => self::ruleMet($catStats, 'master_alfabet'),
             'master_angka' => self::ruleMet($catStats, 'master_angka'),
             'sibi_explorer' => self::countSign($userId, 'sibi') >= 5,
@@ -222,6 +229,7 @@ class GamificationService
             ->join('materials as m', 'm.id', '=', 'l.material_id')
             ->where('s.student_id', self::studentId($userId))
             ->where('s.status', 'completed')
+            ->where('s.score', '>=', self::PASS_SCORE)
             ->where('m.language', $language)
             ->count();
     }
@@ -235,7 +243,8 @@ class GamificationService
         $current = [
             'first_practice' => (int) DB::table('practice_sessions')
                 ->where('student_id', self::studentId($userId))
-                ->where('status', 'completed')->count(),
+                ->where('status', 'completed')
+                ->where('score', '>=', self::PASS_SCORE)->count(),
             'streak_7' => self::streakInfo($userId)['streak'],
             'challenger' => (int) DB::table('challenge_progress')
                 ->where('user_id', $userId)->where('completed', 1)->count(),
@@ -252,6 +261,7 @@ class GamificationService
             ->join('categories as c', 'c.id', '=', 'm.category_id')
             ->where('s.student_id', self::studentId($userId))
             ->where('s.status', 'completed')
+            ->where('s.score', '>=', self::PASS_SCORE)
             ->groupBy('c.slug', 'm.language')
             ->selectRaw('c.slug as category, m.language as lang, COUNT(*) as n')
             ->get();

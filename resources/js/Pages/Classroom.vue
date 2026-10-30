@@ -242,14 +242,16 @@ const filteredStudents = computed(() => {
 
 .split-section {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
     gap: 16px;
 }
 
 .card-header {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
+    gap: 10px;
     margin-bottom: 14px;
 }
 
@@ -284,6 +286,8 @@ const filteredStudents = computed(() => {
 }
 
 .search-box input {
+    min-width: 0;
+    width: 100%;
     border: none;
     background: transparent;
     font-size: 11px;
@@ -385,7 +389,15 @@ const filteredStudents = computed(() => {
 
 @media (max-width: 900px) {
     .overview-grid { grid-template-columns: repeat(2, 1fr); }
-    .split-section { grid-template-columns: 1fr; }
+    .split-section { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 480px) {
+    .search-box { flex: 1 1 100%; }
+}
+
+@media (max-width: 360px) {
+    .overview-grid { grid-template-columns: minmax(0, 1fr); }
 }
 </style>
 

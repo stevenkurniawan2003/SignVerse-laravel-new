@@ -23,6 +23,12 @@ class ChallengeService
         'phrase' => 'kosakata',
     ];
 
+    /**
+     * Kategori challenge yang bisa diselesaikan lewat peragaan yang dinilai AI.
+     * AI baru mengenali huruf alfabet; angka & kosakata belum bisa diverifikasi.
+     */
+    public const ACTIVE_CATEGORIES = ['alfabet'];
+
     /** Ambil daftar tantangan pada tanggal tertentu (default hari ini). */
     public static function todayChallenges(?string $date = null): Collection
     {
@@ -30,6 +36,7 @@ class ChallengeService
 
         return DB::table('challenges')
             ->where('challenge_date', $d)
+            ->whereIn('category', self::ACTIVE_CATEGORIES)
             ->orderBy('id')
             ->get();
     }
@@ -42,8 +49,7 @@ class ChallengeService
     {
         $today = now()->toDateString();
         $rows = [
-            [$today, 'Praktik 5 huruf', 'Lakukan 5 latihan huruf alfabet hari ini.', 'alfabet', 5],
-            [$today, 'Praktik 3 kosakata', 'Lakukan 3 latihan kata kosakata hari ini.', 'kosakata', 3],
+            [$today, 'Praktik 5 huruf', 'Peragakan 5 isyarat huruf dengan benar hari ini.', 'alfabet', 5],
         ];
 
         foreach ($rows as [$date, $title, $description, $category, $target]) {
@@ -69,6 +75,7 @@ class ChallengeService
                     ->where('cp.user_id', '=', $userId);
             })
             ->where('c.challenge_date', $d)
+            ->whereIn('c.category', self::ACTIVE_CATEGORIES)
             ->orderBy('c.id')
             ->select([
                 'c.*',

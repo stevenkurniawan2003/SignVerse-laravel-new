@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import {
     ArrowRight,
@@ -40,6 +40,13 @@ function changeSystem(e) {
     window.dispatchEvent(new CustomEvent('signtech:system-changed', { detail: e.target.value }));
 }
 
+// Layar sempit: label sistem dipersingkat agar topbar tidak terpotong
+const compactQuery = window.matchMedia('(max-width: 1400px)');
+const isCompact = ref(compactQuery.matches);
+const updateCompact = (e) => (isCompact.value = e.matches);
+compactQuery.addEventListener('change', updateCompact);
+onBeforeUnmount(() => compactQuery.removeEventListener('change', updateCompact));
+
 const nav = computed(() => {
     const list = [
         { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -64,10 +71,21 @@ const mobileNav = [
     { to: '/profile', label: 'Profil', icon: UserRound },
 ];
 
+// Halaman yang sama juga tersedia di bawah prefix role (/student/*, /teacher/*)
+const linkAliases = {
+    '/dashboard': ['/', '/student/dashboard', '/teacher/dashboard'],
+    '/learn': ['/lesson/', '/student/materials'],
+    '/practice': ['/student/practice'],
+    '/challenge': ['/student/challenge'],
+    '/achievement': ['/student/achievements'],
+    '/progress': ['/student/progress'],
+    '/classroom': ['/teacher/students'],
+};
+
 function activeLink(to) {
     const path = page.url.split('?')[0];
-    if (to === '/dashboard') return path === '/' || path === '/dashboard';
-    return path === to || (to === '/learn' && path.startsWith('/lesson/'));
+    if (path === to) return true;
+    return (linkAliases[to] || []).some((alias) => (alias === '/' ? path === '/' : path === alias || path.startsWith(alias.endsWith('/') ? alias : `${alias}/`)));
 }
 
 // Tujuh hari terakhir (berakhir hari ini); hari yang termasuk streak aktif ditandai
@@ -126,8 +144,8 @@ const streakWeek = computed(() => {
                     <Link href="/profile" class="mini-user" @click="menuOpen = false">
                         <div class="avatar">{{ userInitials }}</div>
                         <div class="min-w-0 flex-1">
-                            <b>{{ displayName }}</b>
-                            <small>{{ authUser.email }}</small>
+                            <b :title="displayName">{{ displayName }}</b>
+                            <small :title="authUser.email">{{ authUser.email }}</small>
                         </div>
                     </Link>
                     <Link
@@ -161,8 +179,8 @@ const streakWeek = computed(() => {
                         :value="currentSystem"
                         @change="changeSystem"
                     >
-                        <option value="SIBI">SIBI (Sistem Isyarat Bahasa Indonesia)</option>
-                        <option value="BISINDO">BISINDO (Bahasa Isyarat Indonesia)</option>
+                        <option value="SIBI">{{ isCompact ? 'SIBI' : 'SIBI (Sistem Isyarat Bahasa Indonesia)' }}</option>
+                        <option value="BISINDO">{{ isCompact ? 'BISINDO' : 'BISINDO (Bahasa Isyarat Indonesia)' }}</option>
                     </select>
                 </label>
 
@@ -273,6 +291,7 @@ const streakWeek = computed(() => {
 <style scoped>
 .brand {
     height: 64px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: 12px;

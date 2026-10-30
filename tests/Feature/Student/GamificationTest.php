@@ -112,10 +112,10 @@ class GamificationTest extends TestCase
     {
         $user = $this->studentUser();
 
-        PracticeSession::factory()->for($user->student)->create(['created_at' => today()]);
-        PracticeSession::factory()->for($user->student)->create(['created_at' => today()->subDay()]);
-        PracticeSession::factory()->for($user->student)->create(['created_at' => today()->subDays(2)]);
-        PracticeSession::factory()->for($user->student)->create(['created_at' => today()->subDays(9)]);
+        PracticeSession::factory()->for($user->student)->create(['score' => 90, 'created_at' => today()]);
+        PracticeSession::factory()->for($user->student)->create(['score' => 90, 'created_at' => today()->subDay()]);
+        PracticeSession::factory()->for($user->student)->create(['score' => 90, 'created_at' => today()->subDays(2)]);
+        PracticeSession::factory()->for($user->student)->create(['score' => 90, 'created_at' => today()->subDays(9)]);
 
         $info = GamificationService::streakInfo($user->id);
 
@@ -250,7 +250,7 @@ class GamificationTest extends TestCase
         $first = ChallengeService::ensureTodayChallenges();
         $second = ChallengeService::ensureTodayChallenges();
 
-        $this->assertSame(2, Challenge::count());
+        $this->assertSame(1, Challenge::count());
         $this->assertSame($first->pluck('id')->all(), $second->pluck('id')->all());
     }
 
@@ -260,25 +260,25 @@ class GamificationTest extends TestCase
         $user = $this->studentUser();
         ChallengeService::ensureTodayChallenges();
 
-        $completed = ChallengeService::challengeStatus($user->id)->where('category', 'kosakata')->first();
+        $completed = ChallengeService::challengeStatus($user->id)->where('category', 'alfabet')->first();
         $this->assertSame(0, (int) $completed->progress);
 
-        // 2 latihan pertama: progres naik, belum selesai.
-        for ($i = 0; $i < 2; $i++) {
-            $this->assertFalse(ChallengeService::bumpChallenge($user->id, 'word'));
+        // 4 latihan pertama: progres naik, belum selesai.
+        for ($i = 0; $i < 4; $i++) {
+            $this->assertFalse(ChallengeService::bumpChallenge($user->id, 'alphabet'));
         }
 
-        // Latihan ke-3 → challenge kosakata tamat (target 3), unlocked.
-        $this->assertTrue(ChallengeService::bumpChallenge($user->id, 'word'));
+        // Latihan ke-5 → challenge huruf tamat (target 5), unlocked.
+        $this->assertTrue(ChallengeService::bumpChallenge($user->id, 'alphabet'));
 
-        $completed = ChallengeService::challengeStatus($user->id)->where('category', 'kosakata')->first();
+        $completed = ChallengeService::challengeStatus($user->id)->where('category', 'alfabet')->first();
         $this->assertSame(1, (int) $completed->completed);
         $this->assertNotNull($completed->completed_at);
 
         // Bump berulang tidak menambah progress melewati target.
-        ChallengeService::bumpChallenge($user->id, 'word');
-        ChallengeService::bumpChallenge($user->id, 'word');
-        $this->assertSame(1, (int) ChallengeService::challengeStatus($user->id)->where('category', 'kosakata')->first()->completed);
+        ChallengeService::bumpChallenge($user->id, 'alphabet');
+        ChallengeService::bumpChallenge($user->id, 'alphabet');
+        $this->assertSame(1, (int) ChallengeService::challengeStatus($user->id)->where('category', 'alfabet')->first()->completed);
 
         // Completed → reward 20 XP masuk agregat + tercatat di riwayat reward.
         $this->assertGreaterThanOrEqual(20, GamificationService::totalXp($user->id));

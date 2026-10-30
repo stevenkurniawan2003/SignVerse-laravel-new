@@ -27,6 +27,18 @@ class PracticeService
 {
     public const PASS_SCORE = 60;
 
+    /**
+     * Kategori yang bisa dinilai AI Service. Model hanya mengenali pose huruf
+     * alfabet statis (lihat docs/API_CONTRACT.md di repo sibi-bisindo-mediapipe);
+     * isyarat angka belum punya kelas sehingga tidak bisa diverifikasi.
+     */
+    public const AI_SUPPORTED_CATEGORIES = ['alphabet'];
+
+    public static function isAiSupported(Lesson $lesson): bool
+    {
+        return in_array($lesson->material?->category?->slug, self::AI_SUPPORTED_CATEGORIES, true);
+    }
+
     public function __construct(
         private GestureRecognitionService $recognizer,
     ) {}
@@ -137,6 +149,117 @@ class PracticeService
                 'new_badges' => $newBadges,
             ];
         });
+    }
+
+    /**
+     * Catat satu peragaan isyarat yang sudah dievaluasi AI, lalu jalankan
+     * gamifikasi (XP, streak, challenge harian, badge, level).
+     *
+     * Aturan:
+     *   - kamera tidak menangkap tangan / AI tidak terjangkau → tidak dicatat
+     *   - lulus bila label AI sama dengan target DAN confidence >= PASS_SCORE
+     *   - skor = confidence bila label benar, 0 bila label salah
+     *   - XP pelajaran hanya diberikan saat pertama kali lulus (anti-farming);
+     *     peragaan ulang tetap menambah progres challenge & badge
+     *
+     * @param  array{recognized: ?string, confidence: int, correct: bool}  $recognition
+     * @return array{recorded: bool, passed: bool, score: int, xp_earned: int, already_mastered: bool, total_xp: int, level: array<string, mixed>, leveled_up: bool, new_badges: string[], challenge_completed: bool, streak: int}
+     */
+    public function recordVerifiedAttempt(Student $student, Lesson $lesson, array $recognition): array
+    {
+        $userId = $student->user_id;
+        $xpBefore = $student->totalXp();
+        $levelBefore = GamificationService::levelFromXp($xpBefore);
+
+        if (($recognition['recognized'] ?? null) === null) {
+            return [
+                'recorded' => false,
+                'passed' => false,
+                'score' => 0,
+                'xp_earned' => 0,
+                'already_mastered' => $this->hasMastered($student, $lesson),
+                'total_xp' => $xpBefore,
+                'level' => $levelBefore,
+                'leveled_up' => false,
+                'new_badges' => [],
+                'challenge_completed' => false,
+                'streak' => (int) $student->current_streak,
+            ];
+        }
+
+        $confidence = (int) ($recognition['confidence'] ?? 0);
+        $isCorrectLabel = (bool) ($recognition['correct'] ?? false);
+        $passed = $isCorrectLabel && $confidence >= self::PASS_SCORE;
+        $score = $isCorrectLabel ? $confidence : 0;
+        $alreadyMastered = $this->hasMastered($student, $lesson);
+        $xp = $passed && ! $alreadyMastered ? (int) $lesson->xp_reward : 0;
+
+        return DB::transaction(function () use ($student, $lesson, $recognition, $userId, $levelBefore, $passed, $score, $alreadyMastered, $xp) {
+            $session = PracticeSession::create([
+                'student_id' => $student->id,
+                'lesson_id' => $lesson->id,
+                'language' => $lesson->material->language,
+                'status' => PracticeSession::STATUS_COMPLETED,
+                'score' => $score,
+                'xp_earned' => $xp,
+                'attempts' => 1,
+                'started_at' => now(),
+                'completed_at' => now(),
+            ]);
+
+            $session->gestureResults()->create([
+                'lesson_id' => $lesson->id,
+                'expected_gesture' => $lesson->gesture_label,
+                'recognized_gesture' => strtolower((string) $recognition['recognized']),
+                'confidence' => (int) ($recognition['confidence'] ?? 0),
+                'correct' => $passed,
+            ]);
+
+            $newBadges = [];
+            $challengeCompleted = false;
+
+            if ($passed) {
+                $this->updateStreak($student);
+
+                $challengeCompleted = ChallengeService::bumpChallenge($userId, $lesson->material->category->slug);
+
+                $badgesBefore = GamificationService::unlockedKeys($userId);
+                GamificationService::evaluateBadges($userId);
+                $newBadges = GamificationService::badgeNames(array_values(array_diff(
+                    GamificationService::unlockedKeys($userId),
+                    $badgesBefore,
+                )));
+            }
+
+            $totalXp = $student->totalXp();
+            $level = GamificationService::levelFromXp($totalXp);
+
+            return [
+                'recorded' => true,
+                'passed' => $passed,
+                'score' => $score,
+                'xp_earned' => $xp,
+                'already_mastered' => $alreadyMastered,
+                'total_xp' => $totalXp,
+                'level' => $level,
+                'leveled_up' => $level['name'] !== $levelBefore['name'],
+                'new_badges' => $newBadges,
+                'challenge_completed' => $challengeCompleted,
+                'streak' => (int) $student->refresh()->current_streak,
+            ];
+        });
+    }
+
+    /**
+     * Apakah student sudah pernah lulus peragaan lesson ini.
+     */
+    public function hasMastered(Student $student, Lesson $lesson): bool
+    {
+        return $student->practiceSessions()
+            ->where('lesson_id', $lesson->id)
+            ->where('status', PracticeSession::STATUS_COMPLETED)
+            ->where('score', '>=', self::PASS_SCORE)
+            ->exists();
     }
 
     /**

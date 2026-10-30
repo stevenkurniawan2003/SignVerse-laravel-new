@@ -183,7 +183,9 @@ class PracticeModuleTest extends TestCase
     public function test_practice_index_lists_lessons(): void
     {
         $user = $this->studentUser();
-        $lesson = $this->lesson();
+        $lesson = Lesson::factory()
+            ->for(Material::factory()->for(\App\Models\Category::factory()->state(['slug' => 'alphabet'])))
+            ->create(['title' => 'K']);
 
         $this->actingAs($user)->get(route('student.practice.index'))
             ->assertOk()

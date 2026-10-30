@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
+    ArrowRight,
+    Award,
     Camera,
     CameraOff,
     Check,
@@ -9,7 +11,9 @@ import {
     Info,
     RefreshCw,
     RotateCcw,
+    Star,
     Timer,
+    Trophy,
     X,
 } from '@lucide/vue';
 import AppLayout from '../Layouts/AppLayout.vue';
@@ -19,9 +23,7 @@ const props = defineProps({
     completedLessonIds: { type: Array, default: () => [] },
 });
 
-const targetList = ref(Array.isArray(props.targets) && props.targets.length > 0 ? props.targets : []);
-const selected = ref(0);
-const activeSystem = ref('SIBI');
+const allTargets = ref(Array.isArray(props.targets) ? props.targets : []);
 const scanning = ref(false);
 const result = ref(null);
 const earnedXp = ref(0);
@@ -29,19 +31,44 @@ const detectionConfidence = ref(0);
 const detectionRecognized = ref('');
 const feedbackMessage = ref('');
 const promptError = ref('');
+const reward = ref(null);
+
+// Statistik sesi latihan yang sedang berjalan (sejak halaman dibuka)
+const sessionStats = ref({ attempts: 0, passed: 0, xp: 0 });
 
 // Timer & Countdown system for SLB learners
 const selectedTimer = ref(3); // Options: 0s, 3s, 5s
 const countdown = ref(0);
 let countdownInterval = null;
 
-// Initialize completed letters from database props
-const completedLetters = ref(
-    new Set(
-        targetList.value
-            .filter((item) => Boolean(item.practiced))
-            .map((item) => item.letter)
-    )
+// Lesson yang sudah lulus peragaan (dari database), dilacak per lesson id
+const masteredIds = ref(new Set(allTargets.value.filter((item) => item.practiced).map((item) => item.id)));
+
+// Sistem isyarat mengikuti pilihan SIBI/BISINDO di topbar
+function readSystem() {
+    try {
+        return localStorage.getItem('signtech_system') === 'BISINDO' ? 'BISINDO' : 'SIBI';
+    } catch {
+        return 'SIBI';
+    }
+}
+
+const activeSystem = ref(readSystem());
+const activeCategory = ref('alphabet');
+const selectedId = ref(null);
+
+const categoryLabels = { alphabet: 'Huruf', number: 'Angka' };
+
+const systemTargets = computed(() =>
+    allTargets.value.filter((item) => item.language === activeSystem.value.toLowerCase())
+);
+
+const categoryTabs = computed(() =>
+    Object.keys(categoryLabels).filter((slug) => systemTargets.value.some((item) => item.category_slug === slug))
+);
+
+const targetList = computed(() =>
+    systemTargets.value.filter((item) => item.category_slug === activeCategory.value)
 );
 
 // Webcam management
@@ -51,22 +78,76 @@ const cameraActive = ref(false);
 const cameraError = ref('');
 let mediaStream = null;
 
-const target = computed(() => targetList.value[selected.value] || {
-    letter: 'A',
-    name: 'Huruf A',
-    hint: 'Posisikan tangan di depan kamera untuk verifikasi bentuk isyarat.',
-});
-
-function isPracticed(letter) {
-    return completedLetters.value.has(letter);
-}
-
-const practicedCount = computed(
-    () => targetList.value.filter((item) => isPracticed(item.letter)).length
+const target = computed(() =>
+    targetList.value.find((item) => item.id === selectedId.value) || targetList.value[0] || null
 );
 
+const targetKind = computed(() => categoryLabels[target.value?.category_slug] || 'Isyarat');
+
+// Keterbatasan model AI: huruf BISINDO D/F/P sering tertukar pada webcam
+const confusableNote = computed(() =>
+    activeSystem.value === 'BISINDO' && ['D', 'F', 'P'].includes(target.value?.letter)
+        ? 'AI kadang tertukar antara huruf D, F, dan P BISINDO. Pastikan kedua tangan terlihat jelas dan pencahayaan cukup.'
+        : ''
+);
+
+function isPracticed(item) {
+    return masteredIds.value.has(item.id);
+}
+
+const practicedCount = computed(() => targetList.value.filter(isPracticed).length);
+const systemPracticedCount = computed(() => systemTargets.value.filter(isPracticed).length);
+
+// Target berikutnya yang belum dikuasai (melingkar), atau target setelahnya
+const nextTarget = computed(() => {
+    const list = targetList.value;
+    const index = list.findIndex((item) => item.id === target.value?.id);
+    for (let step = 1; step <= list.length; step++) {
+        const candidate = list[(index + step) % list.length];
+        if (!isPracticed(candidate)) {
+            return candidate;
+        }
+    }
+    return list[(index + 1) % list.length] || null;
+});
+
+function resetFeedback() {
+    result.value = null;
+    reward.value = null;
+    earnedXp.value = 0;
+    detectionConfidence.value = 0;
+    detectionRecognized.value = '';
+    feedbackMessage.value = '';
+    promptError.value = '';
+}
+
+// Pilih target pertama yang belum dikuasai saat daftar berganti
+function selectFirstOpenTarget() {
+    const list = targetList.value;
+    selectedId.value = (list.find((item) => !isPracticed(item)) || list[0])?.id ?? null;
+}
+
+function chooseCategory(slug) {
+    cancelCountdown();
+    activeCategory.value = slug;
+    resetFeedback();
+    selectFirstOpenTarget();
+}
+
+function onSystemChanged(event) {
+    cancelCountdown();
+    activeSystem.value = event.detail === 'BISINDO' ? 'BISINDO' : 'SIBI';
+    if (!categoryTabs.value.includes(activeCategory.value)) {
+        activeCategory.value = categoryTabs.value[0] || 'alphabet';
+    }
+    resetFeedback();
+    selectFirstOpenTarget();
+}
+
 onMounted(async () => {
-    if (targetList.value.length === 0) {
+    window.addEventListener('signtech:system-changed', onSystemChanged);
+
+    if (allTargets.value.length === 0) {
         try {
             const res = await fetch('/api/practice/targets', {
                 credentials: 'same-origin',
@@ -74,19 +155,18 @@ onMounted(async () => {
             });
             if (res.ok) {
                 const data = await res.json();
-                if (Array.isArray(data.targets) && data.targets.length > 0) {
-                    targetList.value = data.targets;
-                    data.targets.forEach((item) => {
-                        if (item.practiced) {
-                            completedLetters.value.add(item.letter);
-                        }
-                    });
-                }
+                allTargets.value = Array.isArray(data.targets) ? data.targets : [];
+                masteredIds.value = new Set(allTargets.value.filter((item) => item.practiced).map((item) => item.id));
             }
         } catch {
             // handled
         }
     }
+
+    if (!categoryTabs.value.includes(activeCategory.value)) {
+        activeCategory.value = categoryTabs.value[0] || 'alphabet';
+    }
+    selectFirstOpenTarget();
 });
 
 async function toggleCamera() {
@@ -143,18 +223,15 @@ function cancelCountdown() {
 }
 
 onBeforeUnmount(() => {
+    window.removeEventListener('signtech:system-changed', onSystemChanged);
     stopCamera();
 });
 
-function choose(index) {
+function choose(item) {
+    if (!item) return;
     cancelCountdown();
-    selected.value = index;
-    result.value = null;
-    earnedXp.value = 0;
-    detectionConfidence.value = 0;
-    detectionRecognized.value = '';
-    feedbackMessage.value = '';
-    promptError.value = '';
+    selectedId.value = item.id;
+    resetFeedback();
 }
 
 function captureFrame() {
@@ -174,6 +251,11 @@ function captureFrame() {
 
 function startDetection() {
     promptError.value = '';
+
+    if (!target.value) {
+        promptError.value = 'Belum ada target latihan untuk sistem isyarat ini.';
+        return;
+    }
 
     if (!cameraActive.value) {
         promptError.value = 'Buka kamera terlebih dahulu agar Anda dapat mempraktikkan gerakan isyarat.';
@@ -227,8 +309,7 @@ async function performDetection() {
                 'X-CSRF-TOKEN': window.csrfToken,
             },
             body: JSON.stringify({
-                target_letter: target.value.letter,
-                system: activeSystem.value.toLowerCase(),
+                lesson_id: target.value.id,
                 image: frameData,
                 mirrored: true,
             }),
@@ -252,19 +333,38 @@ async function performDetection() {
 
         earnedXp.value = Number(data.xp_earned || 0);
         result.value = success ? 'success' : 'retry';
+        reward.value = {
+            alreadyMastered: Boolean(data.already_mastered),
+            newBadges: Array.isArray(data.new_badges) ? data.new_badges : [],
+            leveledUp: Boolean(data.leveled_up),
+            levelName: data.level?.name || '',
+            challengeCompleted: Boolean(data.challenge_completed),
+        };
+
+        // Hanya peragaan yang benar-benar dinilai AI yang dihitung sebagai percobaan
+        if (data.evaluated) {
+            sessionStats.value.attempts += 1;
+        }
 
         if (success) {
-            completedLetters.value.add(target.value.letter);
+            sessionStats.value.passed += 1;
+            sessionStats.value.xp += earnedXp.value;
+            masteredIds.value = new Set([...masteredIds.value, target.value.id]);
             router.reload({ only: ['auth'] });
         }
     } catch (e) {
         result.value = 'retry';
+        reward.value = null;
         detectionConfidence.value = 0;
         detectionRecognized.value = '-';
         feedbackMessage.value = 'Koneksi ke sistem deteksi terganggu: ' + e.message;
     } finally {
         scanning.value = false;
     }
+}
+
+function goToNextTarget() {
+    choose(nextTarget.value);
 }
 </script>
 
@@ -284,8 +384,8 @@ async function performDetection() {
                 <div class="st-page-header-aside st-summary-box">
                     <span class="st-icon st-icon--primary"><Hand :size="22" /></span>
                     <div>
-                        <b>{{ practicedCount }} / {{ targetList.length }}</b>
-                        <small>target tuntas</small>
+                        <b>{{ systemPracticedCount }} / {{ systemTargets.length }}</b>
+                        <small>isyarat {{ activeSystem }} dikuasai</small>
                     </div>
                 </div>
             </header>
@@ -309,28 +409,49 @@ async function performDetection() {
                         <span class="st-badge st-badge--primary">{{ activeSystem }}</span>
                     </div>
 
-                    <!-- Target Selection Pills -->
+                    <!-- Target Selection -->
                     <div class="practice-target-select">
-                        <div>
-                            <b>Pilih Target</b>
-                            <small>Alfabet bahasa isyarat</small>
+                        <div class="target-select-head">
+                            <div>
+                                <b>Pilih {{ targetKind }} yang Ingin Diperagakan</b>
+                                <small>{{ activeSystem }} · {{ practicedCount }} dari {{ targetList.length }} sudah dikuasai</small>
+                            </div>
+                            <div v-if="categoryTabs.length > 1" class="category-tabs" role="tablist" aria-label="Pilih kategori latihan">
+                                <button
+                                    v-for="slug in categoryTabs"
+                                    :key="slug"
+                                    type="button"
+                                    role="tab"
+                                    :aria-selected="activeCategory === slug"
+                                    :class="{ active: activeCategory === slug }"
+                                    @click="chooseCategory(slug)"
+                                >
+                                    {{ categoryLabels[slug] }}
+                                </button>
+                            </div>
                         </div>
-                        <div class="target-pills" role="group" aria-label="Pilih target huruf">
+
+                        <div v-if="targetList.length" class="target-grid" role="group" :aria-label="`Pilih target ${targetKind.toLowerCase()}`">
                             <button
-                                v-for="(item, index) in targetList"
-                                :key="item.letter"
+                                v-for="item in targetList"
+                                :key="item.id"
                                 type="button"
-                                class="target-pill"
-                                :class="{
-                                    selected: selected === index,
-                                    practiced: isPracticed(item.letter),
-                                }"
-                                :aria-pressed="selected === index"
-                                @click="choose(index)"
+                                class="target-cell"
+                                :class="{ selected: target?.id === item.id, practiced: isPracticed(item) }"
+                                :aria-pressed="target?.id === item.id"
+                                :aria-label="`${item.name}${isPracticed(item) ? ' (sudah dikuasai)' : ''}`"
+                                @click="choose(item)"
                             >
-                                <span class="letter-badge">{{ item.letter }}</span>
-                                <Check v-if="isPracticed(item.letter)" :size="12" />
+                                <span>{{ item.letter }}</span>
+                                <Check v-if="isPracticed(item)" :size="11" class="target-check" />
                             </button>
+                        </div>
+                        <p v-else class="target-empty">Belum ada materi latihan untuk sistem {{ activeSystem }}.</p>
+
+                        <div class="target-legend">
+                            <span><i class="legend-dot selected"></i> Sedang dipilih</span>
+                            <span><i class="legend-dot practiced"></i> Sudah dikuasai</span>
+                            <span class="legend-note">Ganti SIBI/BISINDO lewat pilihan di bagian atas.</span>
                         </div>
                     </div>
 
@@ -364,7 +485,7 @@ async function performDetection() {
                             <div v-show="!cameraActive" class="hand-guide-box">
                                 <div class="guide-circle">
                                     <Hand :size="54" class="guide-hand-icon" />
-                                    <span class="guide-letter">{{ target.letter }}</span>
+                                    <span class="guide-letter">{{ target?.letter || '-' }}</span>
                                 </div>
                                 <p class="guide-text">
                                     Nyalakan kamera untuk melihat posisi tangan Anda dan memulai verifikasi isyarat.
@@ -401,7 +522,7 @@ async function performDetection() {
                             <!-- Target Letter Badge in Viewport -->
                             <div class="target-overlay-badge">
                                 <small>Target</small>
-                                <b>{{ target.letter }}</b>
+                                <b>{{ target?.letter || '-' }}</b>
                             </div>
 
                             <!-- Scanning Laser Animation Line -->
@@ -448,7 +569,8 @@ async function performDetection() {
                             </div>
                         </div>
 
-                        <p class="studio-hint">{{ target.hint }}</p>
+                        <p class="studio-hint">{{ target?.hint || 'Pilih target latihan terlebih dahulu.' }}</p>
+                        <p v-if="confusableNote" class="studio-hint studio-hint--warning">{{ confusableNote }}</p>
                     </div>
 
                     <!-- Detection Result Banner -->
@@ -464,24 +586,48 @@ async function performDetection() {
                             </div>
                             <strong v-if="result === 'success' && earnedXp > 0">+{{ earnedXp }} XP</strong>
                         </div>
+
+                        <ul v-if="result === 'success' && reward" class="reward-list">
+                            <li v-if="earnedXp === 0 && reward.alreadyMastered">
+                                <Star :size="14" />
+                                <span>Isyarat ini sudah kamu kuasai sebelumnya, jadi XP tidak bertambah lagi. Coba isyarat lain untuk XP baru.</span>
+                            </li>
+                            <li v-if="reward.challengeCompleted">
+                                <Trophy :size="14" />
+                                <span>Tantangan harian selesai! Bonus XP tantangan sudah ditambahkan.</span>
+                            </li>
+                            <li v-for="badge in reward.newBadges" :key="badge">
+                                <Award :size="14" />
+                                <span>Lencana baru terbuka: <b>{{ badge }}</b></span>
+                            </li>
+                            <li v-if="reward.leveledUp">
+                                <Trophy :size="14" />
+                                <span>Naik level! Sekarang kamu <b>{{ reward.levelName }}</b>.</span>
+                            </li>
+                        </ul>
                     </div>
 
                     <!-- Control Buttons -->
                     <div class="practice-control-row">
-                        <button v-if="result === 'retry'" type="button" class="st-btn st-btn--secondary" @click="startDetection">
-                            <RotateCcw :size="16" />
-                            <span>Coba Ulangi</span>
+                        <button
+                            v-if="result === 'success' && nextTarget && nextTarget.id !== target?.id"
+                            type="button"
+                            class="st-btn st-btn--secondary"
+                            @click="goToNextTarget"
+                        >
+                            <span>Lanjut ke {{ nextTarget.name }}</span>
+                            <ArrowRight :size="16" />
                         </button>
                         <button
                             type="button"
                             class="st-btn st-btn--primary"
-                            :disabled="scanning || countdown > 0"
+                            :disabled="scanning || countdown > 0 || !target"
                             @click="startDetection"
                         >
                             <Timer v-if="selectedTimer > 0" :size="16" />
                             <Camera v-else :size="16" />
                             <span>
-                                {{ scanning ? 'Sedang Menganalisis...' : countdown > 0 ? `Bersiap (${countdown}s)...` : selectedTimer > 0 ? `Mulai Deteksi (${selectedTimer} Detik)` : 'Deteksi Langsung' }}
+                                {{ scanning ? 'Sedang Menganalisis...' : countdown > 0 ? `Bersiap (${countdown}s)...` : result === 'retry' ? 'Coba Lagi' : selectedTimer > 0 ? `Mulai Deteksi (${selectedTimer} Detik)` : 'Deteksi Langsung' }}
                             </span>
                         </button>
                     </div>
@@ -489,28 +635,40 @@ async function performDetection() {
 
                 <!-- Sidebar Progress -->
                 <aside class="st-panel practice-progress-card">
-                    <span class="st-eyebrow">Kemajuan Sesi</span>
+                    <span class="st-eyebrow">Kemajuan {{ targetKind }} {{ activeSystem }}</span>
                     <div class="progress-total">
                         <b>{{ practicedCount }}</b>
-                        <span>dari {{ targetList.length }} tuntas</span>
+                        <span>dari {{ targetList.length }} dikuasai</span>
                     </div>
 
                     <div class="st-track">
                         <i :style="{ width: `${(practicedCount / (targetList.length || 1)) * 100}%` }"></i>
                     </div>
 
-                    <ul class="letter-list">
-                        <li
-                            v-for="item in targetList"
-                            :key="item.letter"
-                            :class="{ 'is-done': isPracticed(item.letter) }"
-                        >
-                            <span class="letter-chip">{{ item.letter }}</span>
-                            <span class="letter-name">{{ item.name }}</span>
-                            <Check v-if="isPracticed(item.letter)" :size="16" />
-                            <small v-else>Belum</small>
-                        </li>
-                    </ul>
+                    <span class="st-eyebrow session-eyebrow">Sesi Ini</span>
+                    <dl class="session-stats">
+                        <div>
+                            <dt>Percobaan</dt>
+                            <dd>{{ sessionStats.attempts }}</dd>
+                        </div>
+                        <div>
+                            <dt>Berhasil</dt>
+                            <dd>{{ sessionStats.passed }}</dd>
+                        </div>
+                        <div>
+                            <dt>XP didapat</dt>
+                            <dd>+{{ sessionStats.xp }}</dd>
+                        </div>
+                    </dl>
+
+                    <div class="scoring-rules">
+                        <b>Cara penilaian</b>
+                        <ul>
+                            <li>AI harus mengenali isyarat yang sama dengan target.</li>
+                            <li>Akurasi minimal 60% agar dinyatakan berhasil.</li>
+                            <li>XP diberikan saat pertama kali berhasil menguasai sebuah isyarat.</li>
+                        </ul>
+                    </div>
                 </aside>
             </div>
         </div>
@@ -529,38 +687,145 @@ async function performDetection() {
 }
 
 .practice-target-select {
-    align-items: center;
-    gap: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 12px;
     margin: 16px 0 0;
     padding: 14px;
-    border-color: var(--st-line);
+    border: 1px solid var(--st-line);
+    border-radius: 14px;
 }
 
-.practice-target-select b {
+.practice-target-select .target-select-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.target-select-head b {
+    display: block;
     font-size: 14px;
     color: var(--st-ink);
 }
 
-.practice-target-select small {
+.target-select-head small {
     font-size: 12px;
     color: var(--st-muted);
 }
 
-.target-pills {
-    flex-wrap: wrap;
-    justify-content: flex-end;
+.category-tabs {
+    display: inline-flex;
+    gap: 4px;
+    padding: 3px;
+    background: var(--st-surface);
+    border: 1px solid var(--st-line);
+    border-radius: 10px;
 }
 
-.target-pill {
-    min-width: 44px;
-    height: 44px;
-    color: var(--st-text);
+.category-tabs button {
+    min-height: 34px;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--st-muted);
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
     cursor: pointer;
 }
 
-.target-pill.practiced {
-    color: var(--st-primary-dark);
+.category-tabs button.active {
+    color: #fff;
+    background: var(--st-primary);
+}
+
+.target-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+    gap: 6px;
+}
+
+.target-cell {
+    position: relative;
+    display: grid;
+    place-items: center;
+    height: 44px;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--st-text);
+    background: #fff;
+    border: 1px solid var(--st-line);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.15s;
+}
+
+.target-cell:hover {
     border-color: var(--st-primary-line);
+}
+
+.target-cell.practiced {
+    color: var(--st-primary-dark);
+    background: var(--st-primary-soft);
+    border-color: var(--st-primary-line);
+}
+
+.target-cell.selected {
+    color: #fff;
+    background: var(--st-primary);
+    border-color: var(--st-primary);
+    box-shadow: 0 0 0 3px var(--st-primary-soft);
+}
+
+.target-check {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+}
+
+.target-empty {
+    margin: 0;
+    font-size: 13px;
+    color: var(--st-muted);
+}
+
+.target-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    font-size: 12px;
+    color: var(--st-muted);
+}
+
+.target-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 4px;
+    border: 1px solid var(--st-primary-line);
+}
+
+.legend-dot.selected {
+    background: var(--st-primary);
+    border-color: var(--st-primary);
+}
+
+.legend-dot.practiced {
+    background: var(--st-primary-soft);
+}
+
+.legend-note {
+    margin-left: auto;
 }
 
 .practice-control-row {
@@ -616,60 +881,80 @@ async function performDetection() {
     color: var(--st-ink);
 }
 
-.letter-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    max-height: 420px;
-    margin: 6px 0 0;
-    padding: 0;
-    overflow-y: auto;
-    list-style: none;
+.session-eyebrow {
+    margin-top: 10px;
 }
 
-.letter-list li {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    font-size: 13px;
-    color: var(--st-text);
+.session-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin: 0;
+}
+
+.session-stats div {
+    padding: 10px 6px;
+    text-align: center;
     background: var(--st-surface);
     border-radius: 10px;
 }
 
-.letter-list li.is-done {
-    color: var(--st-primary-dark);
-    background: var(--st-primary-soft);
-}
-
-.letter-list li svg {
-    color: var(--st-primary);
-}
-
-.letter-list small {
-    font-size: 12px;
+.session-stats dt {
+    font-size: 11px;
     color: var(--st-muted);
 }
 
-.letter-chip {
-    display: grid;
-    flex-shrink: 0;
-    place-items: center;
-    width: 28px;
-    height: 28px;
+.session-stats dd {
+    margin: 2px 0 0;
+    font-size: 18px;
     font-weight: 800;
-    background: #fff;
-    border: 1px solid var(--st-line);
-    border-radius: 8px;
+    color: var(--st-ink);
 }
 
-.letter-name {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.scoring-rules {
+    margin-top: 6px;
+    padding: 12px;
+    font-size: 12px;
+    color: var(--st-text);
+    background: var(--st-primary-soft);
+    border-radius: 12px;
+}
+
+.scoring-rules b {
+    font-size: 13px;
+    color: var(--st-primary-dark);
+}
+
+.scoring-rules ul {
+    margin: 6px 0 0;
+    padding-left: 16px;
+    line-height: 1.5;
+    list-style: disc;
+}
+
+.reward-list {
+    display: grid;
+    gap: 6px;
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.reward-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--st-text);
+    background: #fff;
+    border-radius: 10px;
+}
+
+.reward-list svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--st-gold-dark);
 }
 
 @media (max-width: 1100px) {
@@ -680,31 +965,16 @@ async function performDetection() {
     .practice-progress-card {
         position: static;
     }
-
-    .letter-list {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        max-height: none;
-    }
 }
 
 @media (max-width: 760px) {
-    .practice-target-select {
-        display: grid;
-    }
-
-    .target-pills {
-        justify-content: flex-start;
-    }
-
     .practice-control-row {
         flex-direction: column;
     }
-}
 
-.letter-badge {
-    font-weight: 800;
-    font-size: 13px;
+    .legend-note {
+        margin-left: 0;
+    }
 }
 
 .practice-studio {
@@ -1065,10 +1335,9 @@ async function performDetection() {
     line-height: 1.5;
 }
 
-.target-pill.selected {
-    border-color: #34B182 !important;
-    background: #eefaf4 !important;
-    color: #1e7253 !important;
+.studio-hint--warning {
+    margin-top: 6px;
+    color: #f3d38a;
 }
 
 .result-icon-badge {
