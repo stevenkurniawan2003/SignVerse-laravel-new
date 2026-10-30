@@ -282,6 +282,10 @@ async function verifyDemonstration() {
                     <CheckCircle :size="15" />
                     <span>Kuis dijawab benar {{ wrong === 0 ? 'pada percobaan pertama' : `setelah ${wrong} kali salah` }}, peragaan berhasil pada percobaan ke-{{ attemptCount }}.</span>
                 </li>
+                <li v-for="task in attempt?.assignments_completed || []" :key="task.title">
+                    <CheckCircle :size="15" />
+                    <span>Tugas guru selesai: <b>{{ task.title }}</b> (+{{ task.xp_earned }} XP)</span>
+                </li>
                 <li v-if="attempt?.challenge_completed">
                     <Trophy :size="15" />
                     <span>Tantangan harian selesai! Bonus XP tantangan sudah ditambahkan.</span>

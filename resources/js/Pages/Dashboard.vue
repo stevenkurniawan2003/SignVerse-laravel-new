@@ -1,14 +1,17 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
     Activity,
+    ArrowDown,
     ArrowRight,
+    ArrowUp,
     Award,
     BookOpen,
     Camera,
     CheckCircle,
     ChevronRight,
+    Crown,
     Flame,
     Hand,
     MessageSquare,
@@ -26,6 +29,89 @@ const props = defineProps({
     challenges: { type: Array, default: () => [] },
     weekActivity: { type: Array, default: () => [] },
     user: { type: Object, default: () => null },
+    leaderboard: { type: Object, default: () => ({ entries: [], me: null, total: 0 }) },
+});
+
+/*
+ * Leaderboard XP realtime: polling /api/leaderboard tiap 5 detik selama tab
+ * terlihat. Perubahan peringkat ditandai panah naik/turun sesaat.
+ */
+const LEADERBOARD_POLL_MS = 5000;
+const board = ref(props.leaderboard || { entries: [], me: null, total: 0 });
+const rankChanges = ref({});
+const lastUpdated = ref(Date.now());
+const now = ref(Date.now());
+const boardError = ref(false);
+let pollTimer = null;
+let clockTimer = null;
+
+const boardEntries = computed(() => board.value?.entries || []);
+const myEntry = computed(() => board.value?.me || null);
+const meOutsideTop = computed(() => myEntry.value && !boardEntries.value.some((entry) => entry.is_me));
+
+// XP yang dibutuhkan untuk menyalip siswa satu peringkat di atas
+const xpToNextRank = computed(() => {
+    const me = myEntry.value;
+    if (!me || me.rank === 1) return null;
+    const all = [...boardEntries.value, me];
+    const above = all.filter((entry) => entry.xp > me.xp).sort((a, b) => a.xp - b.xp)[0];
+    return above ? { name: above.name, xp: above.xp - me.xp + 1 } : null;
+});
+
+const updatedLabel = computed(() => {
+    const seconds = Math.max(0, Math.round((now.value - lastUpdated.value) / 1000));
+    return seconds < 3 ? 'baru saja' : `${seconds} detik lalu`;
+});
+
+function applyBoard(next) {
+    const previousRanks = Object.fromEntries(
+        [...boardEntries.value, myEntry.value].filter(Boolean).map((entry) => [entry.user_id, entry.rank])
+    );
+    const changes = {};
+    [...(next.entries || []), next.me].filter(Boolean).forEach((entry) => {
+        const before = previousRanks[entry.user_id];
+        if (before && before !== entry.rank) {
+            changes[entry.user_id] = before > entry.rank ? 'up' : 'down';
+        }
+    });
+
+    board.value = next;
+    if (Object.keys(changes).length) {
+        rankChanges.value = changes;
+        setTimeout(() => (rankChanges.value = {}), 4000);
+    }
+}
+
+async function refreshLeaderboard() {
+    if (document.hidden) return;
+    try {
+        const res = await fetch('/api/leaderboard', {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        applyBoard(await res.json());
+        lastUpdated.value = Date.now();
+        boardError.value = false;
+    } catch {
+        boardError.value = true;
+    }
+}
+
+function onVisibilityChange() {
+    if (!document.hidden) refreshLeaderboard();
+}
+
+onMounted(() => {
+    pollTimer = setInterval(refreshLeaderboard, LEADERBOARD_POLL_MS);
+    clockTimer = setInterval(() => (now.value = Date.now()), 1000);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+});
+
+onBeforeUnmount(() => {
+    clearInterval(pollTimer);
+    clearInterval(clockTimer);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
 });
 
 // Time-aware greeting
@@ -319,6 +405,76 @@ const filteredSessions = computed(() => {
                     <div v-else class="st-empty">
                         Semua tantangan hari ini sudah selesai. Kerja bagus!
                     </div>
+                </div>
+            </section>
+
+            <!-- 3b. Leaderboard XP realtime -->
+            <section class="st-panel leaderboard" aria-labelledby="leaderboard-title">
+                <div class="st-panel-head">
+                    <div>
+                        <span class="st-eyebrow">Peringkat Siswa</span>
+                        <h2 id="leaderboard-title" class="st-panel-title">Leaderboard XP</h2>
+                    </div>
+                    <span class="live-badge" :class="{ 'is-error': boardError }" :title="`Diperbarui ${updatedLabel}`">
+                        <i></i>{{ boardError ? 'Terputus' : 'LIVE' }}
+                    </span>
+                </div>
+
+                <div v-if="myEntry" class="my-rank">
+                    <span class="my-rank-number">#{{ myEntry.rank }}</span>
+                    <div>
+                        <b>Peringkatmu dari {{ board.total }} siswa</b>
+                        <small v-if="myEntry.rank === 1">Kamu memimpin! Pertahankan dengan terus berlatih.</small>
+                        <small v-else-if="xpToNextRank">Butuh <b>{{ xpToNextRank.xp }} XP</b> lagi untuk menyalip {{ xpToNextRank.name }}.</small>
+                    </div>
+                    <span class="my-rank-xp"><Star :size="15" /> {{ myEntry.xp }} XP</span>
+                </div>
+
+                <ol v-if="boardEntries.length" class="rank-list">
+                    <TransitionGroup name="rank">
+                        <li
+                            v-for="entry in boardEntries"
+                            :key="entry.user_id"
+                            class="rank-row"
+                            :class="[`top-${entry.rank}`, { 'is-me': entry.is_me, 'moved-up': rankChanges[entry.user_id] === 'up', 'moved-down': rankChanges[entry.user_id] === 'down' }]"
+                        >
+                            <span class="rank-pos">
+                                <Crown v-if="entry.rank === 1" :size="18" />
+                                <template v-else>{{ entry.rank }}</template>
+                            </span>
+                            <span class="rank-avatar">{{ entry.initials }}</span>
+                            <span class="rank-name">
+                                <b>{{ entry.name }}</b>
+                                <small>{{ entry.level }} · <Flame :size="11" /> {{ entry.streak }} hari</small>
+                            </span>
+                            <span v-if="entry.is_me" class="me-tag">Kamu</span>
+                            <ArrowUp v-if="rankChanges[entry.user_id] === 'up'" :size="16" class="rank-trend up" />
+                            <ArrowDown v-else-if="rankChanges[entry.user_id] === 'down'" :size="16" class="rank-trend down" />
+                            <span class="rank-xp">{{ entry.xp }} <small>XP</small></span>
+                        </li>
+                    </TransitionGroup>
+                </ol>
+                <div v-else class="st-empty">Belum ada siswa di leaderboard.</div>
+
+                <template v-if="meOutsideTop">
+                    <div class="rank-gap" aria-hidden="true">•••</div>
+                    <div class="rank-row is-me">
+                        <span class="rank-pos">{{ myEntry.rank }}</span>
+                        <span class="rank-avatar">{{ myEntry.initials }}</span>
+                        <span class="rank-name">
+                            <b>{{ myEntry.name }}</b>
+                            <small>{{ myEntry.level }} · <Flame :size="11" /> {{ myEntry.streak }} hari</small>
+                        </span>
+                        <span class="me-tag">Kamu</span>
+                        <span class="rank-xp">{{ myEntry.xp }} <small>XP</small></span>
+                    </div>
+                </template>
+
+                <div class="st-panel-foot leaderboard-foot">
+                    <small>Diperbarui otomatis tiap 5 detik · terakhir {{ updatedLabel }}</small>
+                    <Link href="/practice" class="st-link">
+                        Tambah XP di AI Practice <ArrowRight :size="14" />
+                    </Link>
                 </div>
             </section>
 
@@ -716,6 +872,290 @@ const filteredSessions = computed(() => {
 
     .day-col {
         padding: 10px 2px;
+    }
+}
+/* Leaderboard XP */
+.leaderboard {
+    display: grid;
+    gap: 12px;
+}
+
+.live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    color: #b42318;
+    background: #fef0ee;
+    border-radius: 999px;
+}
+
+.live-badge i {
+    width: 8px;
+    height: 8px;
+    background: #ef4444;
+    border-radius: 50%;
+    animation: live-pulse 1.4s ease-in-out infinite;
+}
+
+.live-badge.is-error {
+    color: var(--st-muted);
+    background: var(--st-surface);
+}
+
+.live-badge.is-error i {
+    background: #94a3b8;
+    animation: none;
+}
+
+@keyframes live-pulse {
+    50% {
+        opacity: 0.25;
+    }
+}
+
+.my-rank {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: linear-gradient(120deg, #eefaf4, #fdf9ef);
+    border: 1px solid #d5f3e5;
+    border-radius: 14px;
+}
+
+.my-rank-number {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    min-width: 52px;
+    height: 52px;
+    padding: 0 6px;
+    font-size: 20px;
+    font-weight: 800;
+    color: #fff;
+    background: #34b182;
+    border-radius: 14px;
+}
+
+.my-rank > div {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+    min-width: 0;
+}
+
+.my-rank > div > b {
+    font-size: 15px;
+    color: var(--st-ink);
+}
+
+.my-rank small {
+    font-size: 13px;
+    color: var(--st-text);
+}
+
+.my-rank-xp {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 4px;
+    font-size: 15px;
+    font-weight: 800;
+    color: #94711f;
+}
+
+.rank-list {
+    position: relative;
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.rank-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px solid #eef3f0;
+    border-radius: 12px;
+    transition: background 0.3s, border-color 0.3s;
+}
+
+.rank-row.top-1 {
+    background: #fdf9ef;
+    border-color: #f1deaf;
+}
+
+.rank-row.top-2 {
+    background: #f6f8fa;
+    border-color: #e2e8f0;
+}
+
+.rank-row.top-3 {
+    background: #fbf3ee;
+    border-color: #f0dccd;
+}
+
+.rank-row.is-me {
+    border: 2px solid #34b182;
+    box-shadow: 0 0 0 3px #eefaf4;
+}
+
+.rank-row.moved-up {
+    background: #eefaf4;
+}
+
+.rank-row.moved-down {
+    background: #fef3f2;
+}
+
+.rank-pos {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--st-muted);
+    background: var(--st-surface);
+    border-radius: 50%;
+}
+
+.top-1 .rank-pos {
+    color: #fff;
+    background: #c29b40;
+}
+
+.top-2 .rank-pos {
+    color: #fff;
+    background: #94a3b8;
+}
+
+.top-3 .rank-pos {
+    color: #fff;
+    background: #c47a4a;
+}
+
+.rank-avatar {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #ad6544;
+    background: #ffe4bd;
+    border-radius: 50%;
+}
+
+.rank-name {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+}
+
+.rank-name b {
+    overflow: hidden;
+    font-size: 15px;
+    color: var(--st-ink);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rank-name small {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 12px;
+    color: var(--st-muted);
+}
+
+.me-tag {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #fff;
+    background: #34b182;
+    border-radius: 999px;
+}
+
+.rank-trend {
+    flex-shrink: 0;
+}
+
+.rank-trend.up {
+    color: #16a34a;
+}
+
+.rank-trend.down {
+    color: #dc2626;
+}
+
+.rank-xp {
+    flex-shrink: 0;
+    min-width: 64px;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--st-ink);
+    text-align: right;
+}
+
+.rank-xp small {
+    font-size: 11px;
+    color: var(--st-muted);
+}
+
+.rank-gap {
+    font-size: 14px;
+    letter-spacing: 4px;
+    color: var(--st-muted);
+    text-align: center;
+}
+
+.leaderboard-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.leaderboard-foot small {
+    font-size: 12px;
+    color: var(--st-muted);
+}
+
+.rank-move {
+    transition: transform 0.5s ease;
+}
+
+@media (max-width: 480px) {
+    .my-rank {
+        flex-wrap: wrap;
+    }
+
+    .rank-row {
+        gap: 8px;
+        padding: 8px 10px;
+    }
+
+    .rank-avatar {
+        display: none;
+    }
+
+    .rank-xp {
+        min-width: 0;
+        font-size: 14px;
     }
 }
 </style>

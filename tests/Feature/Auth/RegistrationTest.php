@@ -3,7 +3,11 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\Assignment;
+use App\Models\Category;
+use App\Models\Classroom;
 use App\Models\User;
+use App\Services\ClassroomService;
+use App\Services\TeacherStatsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -40,9 +44,25 @@ class RegistrationTest extends TestCase
 
     public function test_new_student_receives_active_assignments_but_not_expired_ones(): void
     {
-        $active = Assignment::factory()->create(['due_at' => now()->addDays(3)]);
-        $noDeadline = Assignment::factory()->create(['due_at' => null]);
-        Assignment::factory()->create(['due_at' => now()->subDay()]);
+        // Tugas kelas guru: aktif, tanpa deadline, dan sudah lewat deadline.
+        $teacher = User::factory()->teacher()->create();
+        $teacherModel = app(TeacherStatsService::class)->forUser($teacher);
+        $classroom = Classroom::factory()->for($teacherModel)->create();
+
+        $lessonProps = fn () => \App\Models\Lesson::factory()->for(\App\Models\Material::factory()->for(Category::factory()));
+
+        $active = Assignment::factory()->for($teacherModel)->for($lessonProps())->create([
+            'classroom_id' => $classroom->id,
+            'due_at' => now()->addDays(3),
+        ]);
+        $noDeadline = Assignment::factory()->for($teacherModel)->for($lessonProps())->create([
+            'classroom_id' => $classroom->id,
+            'due_at' => null,
+        ]);
+        Assignment::factory()->for($teacherModel)->for($lessonProps())->create([
+            'classroom_id' => $classroom->id,
+            'due_at' => now()->subDay(),
+        ]);
 
         $this->post('/register', [
             'name' => 'Test User',
@@ -52,6 +72,12 @@ class RegistrationTest extends TestCase
         ]);
 
         $student = User::where('email', 'test@example.com')->first()->student;
+
+        // Siswa baru belum punya kelas → belum menerima tugas apa pun.
+        $this->assertSame([], $student->submissions()->pluck('assignment_id')->all());
+
+        // Bergabung ke kelas (kode dari guru) → hanya tugas aktif yang dibagikan.
+        app(ClassroomService::class)->joinByCode($student, $classroom->code);
 
         $this->assertEqualsCanonicalizing(
             [$active->id, $noDeadline->id],

@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\AssignmentSubmission;
 use App\Models\Category;
 use App\Models\ChallengeProgress;
+use App\Models\Classroom;
 use App\Models\GestureResult;
 use App\Models\Lesson;
 use App\Models\Material;
@@ -42,6 +43,25 @@ class TeacherModuleTest extends TestCase
         return Lesson::factory()->for(Material::factory()->for(Category::factory()))->create([
             'gesture_label' => 'halo',
         ]);
+    }
+
+    /**
+     * Guru + kelas dengan siswa di dalamnya (arsitektur kelas baru).
+     *
+     * @return array{0: User, 1: Student, 2: Classroom}
+     */
+    private function teacherWithStudent(string $name = null): array
+    {
+        $teacher = $this->teacherUser();
+        $student = $this->studentUser();
+        if ($name !== null) {
+            $student->user->update(['name' => $name]);
+        }
+
+        $classroom = Classroom::factory()->for($teacher->teacher)->create();
+        $classroom->students()->attach($student);
+
+        return [$teacher, $student, $classroom];
     }
 
     /*
@@ -221,23 +241,21 @@ class TeacherModuleTest extends TestCase
 
     public function test_teacher_dashboard_shows_class_statistics(): void
     {
-        $teacher = $this->teacherUser();
-        $student = $this->studentUser();
-        $student->user->update(['name' => 'Rina Putri']);
+        [$teacher, $student, $classroom] = $this->teacherWithStudent('Rina Putri');
 
         PracticeSession::factory()->completed()->for($student)->create(['score' => 85]);
 
         $response = $this->actingAs($teacher)->get(route('teacher.dashboard'));
 
         $response->assertOk();
-        $response->assertSee('Dashboard Guru');
-        $response->assertSee($student->user->name);
+        // Monitoring guru hanya menampilkan siswa kelas miliknya sendiri.
+        $response->assertSee('Rina Putri', false);
+        $response->assertSee($classroom->name, false);
     }
 
     public function test_teacher_can_view_student_monitoring_list(): void
     {
-        $teacher = $this->teacherUser();
-        $student = $this->studentUser();
+        [$teacher, $student] = $this->teacherWithStudent();
 
         $response = $this->actingAs($teacher)->get(route('teacher.students.index'));
 
@@ -245,10 +263,27 @@ class TeacherModuleTest extends TestCase
         $response->assertSee($student->user->name);
     }
 
-    public function test_teacher_can_view_student_detail_with_error_analysis(): void
+    public function test_student_outside_classroom_is_hidden_from_teacher(): void
     {
         $teacher = $this->teacherUser();
-        $student = $this->studentUser();
+        $outsider = $this->studentUser();
+
+        $this->actingAs($teacher)->get(route('teacher.students.index'))->assertOk();
+
+        // Siswa di kelas teacher lain tidak boleh bocor ke teacher ini.
+        $anotherTeacher = $this->teacherUser();
+        $classroom = Classroom::factory()->for($anotherTeacher->teacher)->create();
+        $classroom->students()->attach($outsider->id);
+
+        $response = $this->actingAs($teacher)->get(route('teacher.students.index'));
+
+        $response->assertOk();
+        $response->assertDontSee($outsider->user->name, false);
+    }
+
+    public function test_teacher_can_view_student_detail_with_error_analysis(): void
+    {
+        [$teacher, $student] = $this->teacherWithStudent();
         $lesson = $this->lesson();
 
         $session = PracticeSession::factory()->completed()->for($student)->for($lesson)->create(['score' => 40]);
@@ -262,7 +297,15 @@ class TeacherModuleTest extends TestCase
 
         $response->assertOk();
         $response->assertSee($student->user->name);
-        $response->assertSee('halo');
+        $response->assertSee('halo', false);
+    }
+
+    public function test_teacher_cannot_view_student_outside_their_classrooms(): void
+    {
+        $teacher = $this->teacherUser();
+        $student = $this->studentUser(); // Belum tergabung di kelas teacher manapun.
+
+        $this->actingAs($teacher)->get(route('teacher.students.show', $student))->assertForbidden();
     }
 
     public function test_student_last_activity_comes_from_latest_completed_session(): void
@@ -278,13 +321,13 @@ class TeacherModuleTest extends TestCase
         $this->assertTrue($summary['last_activity']->isSameDay(now()->subDay()));
     }
 
-    public function test_teacher_student_detail_shows_assignments_and_challenges_of_student(): void
+    public function test_teacher_student_detail_shows_assignments_of_student(): void
     {
-        $teacher = $this->teacherUser();
-        $student = $this->studentUser();
+        [$teacher, $student] = $this->teacherWithStudent();
 
         $assignment = Assignment::factory()->for($teacher->teacher)->for($this->lesson())->create([
             'title' => 'Tugas Sapaan',
+            'classroom_id' => Classroom::factory()->for($teacher->teacher)->create()->id,
         ]);
         AssignmentSubmission::create([
             'assignment_id' => $assignment->id,
@@ -293,22 +336,12 @@ class TeacherModuleTest extends TestCase
             'score' => 88,
         ]);
 
-        $challenge = ChallengeService::ensureTodayChallenges()->first();
-        ChallengeProgress::create([
-            'user_id' => $student->user_id,
-            'challenge_id' => $challenge->id,
-            'progress' => $challenge->target,
-            'completed' => true,
-            'completed_at' => now(),
-        ]);
-
         $response = $this->actingAs($teacher)->get(route('teacher.students.show', $student));
 
         $response->assertOk();
         $response->assertSee('Tugas Sapaan');
-        $response->assertSee('Selesai');
-        $response->assertSee($challenge->title);
-        $response->assertSee('+'.$challenge->reward_xp.' XP');
+        $response->assertSee('"status":"completed"', false);
+        $response->assertSee('"score":88', false);
     }
 
     /*

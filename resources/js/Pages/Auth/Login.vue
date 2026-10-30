@@ -7,7 +7,6 @@ import {
     Eye,
     EyeOff,
     Hand,
-    KeyRound,
     Lock,
     LogIn,
     Mail,
@@ -33,12 +32,6 @@ function submit() {
     form.post('/login', {
         onFinish: () => form.reset('password'),
     });
-}
-
-function quickFill(email, password) {
-    form.email = email;
-    form.password = password;
-    submit();
 }
 </script>
 
@@ -151,33 +144,6 @@ function quickFill(email, password) {
                         <span>{{ form.processing ? 'Memverifikasi...' : 'Masuk ke SignTech' }}</span>
                     </button>
                 </form>
-
-                <!-- Quick Login Demo Buttons -->
-                <div class="mt-6 pt-5 border-t border-[#edf3f0]">
-                    <div class="text-center mb-3">
-                        <span class="text-[11px] font-semibold text-[#859c90] uppercase tracking-wider">
-                            Atau Masuk Cepat Akun Uji
-                        </span>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2.5">
-                        <button
-                            type="button"
-                            class="h-9 px-3 bg-[#f5fbf7] hover:bg-[#eefaf4] border border-[#d5f3e5] text-[#1e7253] text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition"
-                            @click="quickFill('siswa@signteach.id', 'siswa123')"
-                        >
-                            <User :size="13" class="text-[#34B182]" />
-                            <span>Akun Siswa</span>
-                        </button>
-                        <button
-                            type="button"
-                            class="h-9 px-3 bg-[#fdfaf3] hover:bg-[#fbf4e2] border border-[#f1deaf] text-[#836724] text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition"
-                            @click="quickFill('guru@signteach.id', 'guru123')"
-                        >
-                            <Users :size="13" class="text-[#C29B40]" />
-                            <span>Akun Guru</span>
-                        </button>
-                    </div>
-                </div>
 
                 <!-- Register Call to Action -->
                 <div class="mt-6 pt-4 text-center">

@@ -4,51 +4,75 @@ namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
 use App\Models\Assignment;
+use App\Models\AssignmentSubmission;
 use App\Models\PracticeSession;
+use App\Models\Student;
 use App\Services\AssignmentService;
+use App\Services\ClassroomService;
 use App\Services\StudentStatsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Illuminate\Support\Collection;
+use Inertia\Inertia;
+use Inertia\Response;
 
 /**
- * Assignment student (phase 6): daftar tugas (pending/selesai), detail tugas,
- * dan penyelesaian lewat sesi latihan gesture (skor >= min_score).
+ * Tugas siswa: daftar tugas dari guru kelasnya (belum/sudah selesai),
+ * bergabung ke kelas lewat kode, dan pengumpulan manual dari sesi latihan.
+ * Tugas juga selesai otomatis saat siswa lulus peragaan AI (PracticeService).
  */
 class AssignmentController extends Controller
 {
     public function __construct(
         private AssignmentService $assignments,
         private StudentStatsService $stats,
+        private ClassroomService $classrooms,
     ) {}
 
-    public function index(Request $request): View
+    public function index(Request $request): Response
     {
         $student = $this->stats->forUser($request->user());
 
-        // Safety net untuk siswa yang terdaftar sebelum tugas aktif dibagikan.
+        // Safety net untuk siswa yang bergabung sebelum tugas aktif dibagikan.
         $this->assignments->distributeActiveTo($student);
 
-        return view('student.assignments.index', [
-            'pending' => $this->assignments->pendingFor($student),
-            'completed' => $this->assignments->completedFor($student),
+        return Inertia::render('Assignments', [
+            'pending' => $this->present($this->assignments->pendingFor($student), $student),
+            'completed' => $this->present($this->assignments->completedFor($student), $student),
+            'classes' => $student->classrooms()
+                ->with('teacher.user:id,name')
+                ->orderBy('classroom_student.created_at')
+                ->get()
+                ->map(fn ($classroom) => [
+                    'id' => $classroom->id,
+                    'name' => $classroom->name,
+                    'description' => $classroom->description,
+                    'teacher' => $classroom->teacher?->user?->name,
+                    'joined_at' => $classroom->pivot->created_at?->toIso8601String(),
+                ]),
         ]);
     }
 
-    public function show(Request $request, Assignment $assignment): View
+    public function join(Request $request): RedirectResponse
     {
+        $validated = $request->validate(['code' => ['required', 'string', 'max:12']]);
         $student = $this->stats->forUser($request->user());
 
-        $submission = $assignment->submissions()
-            ->where('student_id', $student->id)
-            ->firstOrFail();
+        $classroom = $this->classrooms->joinByCode($student, $validated['code']);
 
-        $assignment->load('lesson.material.category', 'teacher.user');
+        if (! $classroom) {
+            return back()->withErrors(['code' => 'Kode kelas tidak ditemukan. Periksa lagi kode dari gurumu.']);
+        }
 
-        return view('student.assignments.show', [
-            'assignment' => $assignment,
-            'submission' => $submission,
-        ]);
+        return back()->with('status', "Berhasil bergabung ke kelas {$classroom->name}!");
+    }
+
+    public function show(Request $request, Assignment $assignment): RedirectResponse
+    {
+        $student = $this->stats->forUser($request->user());
+        abort_unless($assignment->submissions()->where('student_id', $student->id)->exists(), 404);
+
+        return redirect()->route('vue.lesson', $assignment->lesson_id);
     }
 
     /**
@@ -78,12 +102,43 @@ class AssignmentController extends Controller
 
         if ($outcome['completed']) {
             return redirect()
-                ->route('student.assignments.show', $assignment)
-                ->with('status', '🎉 Tugas selesai! Skor '.$outcome['score'].' (+'.$outcome['xp_earned'].' XP).');
+                ->route('student.assignments.index')
+                ->with('status', 'Tugas selesai! Skor '.$outcome['score'].' (+'.$outcome['xp_earned'].' XP).');
         }
 
         return redirect()
-            ->route('student.assignments.show', $assignment)
+            ->route('student.assignments.index')
             ->with('error', 'Skor latihan '.$outcome['score'].' belum mencapai syarat '.$assignment->min_score.'. Latihan lagi lalu kumpulkan ulang!');
+    }
+
+    /**
+     * @param  Collection<int, Assignment>  $assignments
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function present(Collection $assignments, Student $student): Collection
+    {
+        return $assignments->map(function (Assignment $assignment) {
+            /** @var AssignmentSubmission|null $submission */
+            $submission = $assignment->submissions->first();
+
+            return [
+                'id' => $assignment->id,
+                'title' => $assignment->title,
+                'description' => $assignment->description,
+                'teacher' => $assignment->teacher?->user?->name,
+                'classroom_id' => $assignment->classroom_id,
+                'classroom' => $assignment->classroom?->name,
+                'lesson_id' => $assignment->lesson_id,
+                'lesson' => $assignment->lesson?->title,
+                'language' => strtoupper((string) $assignment->lesson?->material?->language),
+                'min_score' => (int) $assignment->min_score,
+                'xp_reward' => (int) $assignment->xp_reward,
+                'due_at' => $assignment->due_at?->toIso8601String(),
+                'is_overdue' => $assignment->due_at !== null && $assignment->due_at->isPast(),
+                'status' => $submission?->status,
+                'score' => $submission?->score,
+                'completed_at' => $submission?->completed_at?->toIso8601String(),
+            ];
+        })->values();
     }
 }

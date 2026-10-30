@@ -20,6 +20,9 @@ use App\Http\Controllers\Student\PracticeController;
 use App\Http\Controllers\Student\ProgressController;
 use App\Http\Controllers\Student\StudentDashboardController;
 use App\Http\Controllers\Teacher\AssignmentController as TeacherAssignmentController;
+use App\Http\Controllers\Teacher\ClassroomController as TeacherClassroomController;
+use App\Http\Controllers\Teacher\ModuleController as TeacherModuleController;
+use App\Http\Controllers\Teacher\ReportController as TeacherReportController;
 use App\Http\Controllers\Teacher\StudentController as TeacherStudentController;
 use App\Http\Controllers\Teacher\TeacherDashboardController;
 use Illuminate\Http\Request;
@@ -36,8 +39,8 @@ use Inertia\Inertia;
 Route::get('/', fn () => Inertia::render('Landing'))->name('home');
 Route::get('/landing', fn () => Inertia::render('Landing'))->name('landing');
 
-// Protected Application Routes (Requires Login — Data Fetched Strictly from Database)
-Route::middleware(['auth'])->group(function () {
+// Area belajar siswa (guru diarahkan ke dashboard guru oleh middleware role)
+Route::middleware(['auth', 'role:student'])->group(function () {
     Route::get('/dashboard', function (Request $request, SignTechApiController $api) {
         $data = $api->dashboard($request)->getData(true);
         return Inertia::render('Dashboard', ($data['status'] ?? '') === 'success' ? $data : []);
@@ -73,13 +76,10 @@ Route::middleware(['auth'])->group(function () {
         return Inertia::render('Progress', ($data['status'] ?? '') === 'success' ? $data : []);
     })->name('vue.progress');
 
-    Route::get('/classroom', function (Request $request, SignTechApiController $api) {
-        $data = $api->classroom($request)->getData(true);
-        return Inertia::render('Classroom', ($data['status'] ?? '') === 'success' ? $data : []);
-    })->name('vue.classroom');
-
-    Route::get('/profile', fn () => Inertia::render('Profile'))->name('profile.edit');
 });
+
+// Alamat lama ruang kelas guru
+Route::middleware(['auth', 'role:teacher'])->get('/classroom', fn () => redirect()->route('teacher.dashboard'))->name('vue.classroom');
 
 // Landing page publik alternatif
 Route::get('/landing', LandingController::class)->name('landing');
@@ -172,25 +172,45 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
     })->name('achievements.index');
 
     Route::get('/assignments', [StudentAssignmentController::class, 'index'])->name('assignments.index');
+    Route::post('/classes/join', [StudentAssignmentController::class, 'join'])->name('classes.join');
     Route::get('/assignments/{assignment}', [StudentAssignmentController::class, 'show'])->name('assignments.show');
     Route::post('/assignments/{assignment}/submit', [StudentAssignmentController::class, 'submit'])->name('assignments.submit');
 });
 
 // ── Area Teacher (Jembatan Inertia ke Vue) ───────────────────
 Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')->group(function () {
-    Route::get('/dashboard', function (Request $request, SignTechApiController $api) {
-        $data = $api->classroom($request)->getData(true);
-        $payload = ($data['status'] ?? '') === 'success' ? $data : [];
-        $payload['title'] = 'Dashboard Guru';
-        view()->share($payload);
-        return Inertia::render('Classroom', $payload);
-    })->name('dashboard');
+    Route::get('/dashboard', TeacherDashboardController::class)->name('dashboard');
+    Route::get('/dashboard/live', [TeacherDashboardController::class, 'live'])->name('dashboard.live');
+
+    Route::get('/classes', [TeacherClassroomController::class, 'index'])->name('classes.index');
+    Route::post('/classes', [TeacherClassroomController::class, 'store'])->name('classes.store');
+    Route::get('/classes/{classroom}', [TeacherClassroomController::class, 'show'])->name('classes.show');
+    Route::get('/classes/{classroom}/live', [TeacherClassroomController::class, 'live'])->name('classes.live');
+    Route::put('/classes/{classroom}', [TeacherClassroomController::class, 'update'])->name('classes.update');
+    Route::delete('/classes/{classroom}', [TeacherClassroomController::class, 'destroy'])->name('classes.destroy');
+    Route::post('/classes/{classroom}/code', [TeacherClassroomController::class, 'regenerateCode'])->name('classes.code');
+    Route::post('/classes/{classroom}/students', [TeacherClassroomController::class, 'addStudent'])->name('classes.students.add');
+    Route::delete('/classes/{classroom}/students/{student}', [TeacherClassroomController::class, 'removeStudent'])->name('classes.students.remove');
 
     Route::get('/students', [TeacherStudentController::class, 'index'])->name('students.index');
+    Route::get('/students/live', [TeacherStudentController::class, 'live'])->name('students.live');
+    Route::post('/students', [TeacherStudentController::class, 'store'])->name('students.store');
     Route::get('/students/{student}', [TeacherStudentController::class, 'show'])->name('students.show');
+    Route::put('/students/{student}', [TeacherStudentController::class, 'update'])->name('students.update');
+    Route::put('/students/{student}/password', [TeacherStudentController::class, 'resetPassword'])->name('students.password');
+
+    Route::get('/modules', [TeacherModuleController::class, 'index'])->name('modules.index');
+    Route::post('/modules', [TeacherModuleController::class, 'storeMaterial'])->name('modules.store');
+    Route::put('/modules/{material}', [TeacherModuleController::class, 'updateMaterial'])->name('modules.update');
+    Route::delete('/modules/{material}', [TeacherModuleController::class, 'destroyMaterial'])->name('modules.destroy');
+    Route::post('/modules/{material}/lessons', [TeacherModuleController::class, 'storeLesson'])->name('modules.lessons.store');
+    Route::put('/lessons/{lesson}', [TeacherModuleController::class, 'updateLesson'])->name('modules.lessons.update');
+    Route::delete('/lessons/{lesson}', [TeacherModuleController::class, 'destroyLesson'])->name('modules.lessons.destroy');
+
+    Route::get('/reports', [TeacherReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/export', [TeacherReportController::class, 'export'])->name('reports.export');
 
     Route::get('/assignments', [TeacherAssignmentController::class, 'index'])->name('assignments.index');
-    Route::get('/assignments/create', [TeacherAssignmentController::class, 'create'])->name('assignments.create');
     Route::post('/assignments', [TeacherAssignmentController::class, 'store'])->name('assignments.store');
     Route::get('/assignments/{assignment}', [TeacherAssignmentController::class, 'show'])->name('assignments.show');
     Route::delete('/assignments/{assignment}', [TeacherAssignmentController::class, 'destroy'])->name('assignments.destroy');
@@ -212,7 +232,7 @@ Route::middleware(['auth', 'role:student,teacher'])->group(function () {
 
     Route::put('/password', [PasswordController::class, 'update'])->name('password.update');
 
-    Route::get('/profile', fn () => Inertia::render('Profile'))->name('profile.edit');
+    Route::get('/profile', [ProfileController::class, 'show'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });

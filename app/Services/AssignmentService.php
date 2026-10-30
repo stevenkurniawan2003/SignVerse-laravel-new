@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Assignment;
 use App\Models\AssignmentSubmission;
+use App\Models\Classroom;
 use App\Models\PracticeSession;
 use App\Models\Student;
 use Illuminate\Support\Collection;
@@ -20,18 +21,21 @@ use Illuminate\Support\Facades\DB;
 class AssignmentService
 {
     /**
-     * Buat tugas baru + bagikan ke semua student (atau subset).
+     * Buat tugas baru + bagikan ke anggota kelasnya (atau subset tertentu).
+     * Tugas tanpa kelas (data lama) dibagikan ke semua student.
      *
-     * @param  Collection<int, Student>|null  $students  Null/empty = semua student.
+     * @param  Collection<int, Student>|null  $students  Null/empty = anggota kelas tugas.
      */
     public function createAndDistribute(array $data, ?Collection $students = null): Assignment
     {
         return DB::transaction(function () use ($data, $students) {
             $assignment = Assignment::create($data);
 
-            $targets = $students === null || $students->isEmpty()
-                ? Student::all()
-                : $students;
+            $targets = match (true) {
+                $students !== null && $students->isNotEmpty() => $students,
+                $assignment->classroom_id !== null => $assignment->classroom->students,
+                default => Student::all(),
+            };
 
             foreach ($targets as $student) {
                 AssignmentSubmission::firstOrCreate([
@@ -54,6 +58,7 @@ class AssignmentService
     public function distributeActiveTo(Student $student): int
     {
         $activeAssignments = Assignment::query()
+            ->whereIn('classroom_id', $student->classrooms()->select('classrooms.id'))
             ->where(fn ($query) => $query
                 ->whereNull('due_at')
                 ->orWhere('due_at', '>=', now()))
@@ -68,6 +73,49 @@ class AssignmentService
         }
 
         return $activeAssignments->count();
+    }
+
+    /**
+     * Bagikan tugas aktif satu kelas ke siswa yang baru bergabung.
+     */
+    public function distributeClassroomAssignmentsTo(Classroom $classroom, Student $student): void
+    {
+        $classroom->assignments()
+            ->where(fn ($query) => $query->whereNull('due_at')->orWhere('due_at', '>=', now()))
+            ->get()
+            ->each(fn (Assignment $assignment) => AssignmentSubmission::firstOrCreate([
+                'assignment_id' => $assignment->id,
+                'student_id' => $student->id,
+            ]));
+    }
+
+    /**
+     * Selesaikan otomatis tugas yang menargetkan lesson ini setelah siswa
+     * lulus peragaan AI (dipanggil PracticeService::recordVerifiedAttempt).
+     * Hanya tugas yang sudah dibuka dan belum lewat deadline.
+     *
+     * @return array<int, array{title: string, xp_earned: int}> tugas yang baru selesai
+     */
+    public function completeFromPractice(Student $student, PracticeSession $session): array
+    {
+        $assignments = Assignment::query()
+            ->where('lesson_id', $session->lesson_id)
+            ->where(fn ($query) => $query->whereNull('available_at')->orWhere('available_at', '<=', now()))
+            ->where(fn ($query) => $query->whereNull('due_at')->orWhere('due_at', '>=', now()))
+            ->whereHas('submissions', fn ($query) => $query
+                ->where('student_id', $student->id)
+                ->where('status', '!=', AssignmentSubmission::STATUS_COMPLETED))
+            ->get();
+
+        $completed = [];
+        foreach ($assignments as $assignment) {
+            $outcome = $this->submitFromPractice($student, $assignment, $session);
+            if ($outcome['completed']) {
+                $completed[] = ['title' => $assignment->title, 'xp_earned' => $outcome['xp_earned']];
+            }
+        }
+
+        return $completed;
     }
 
     /**
@@ -123,7 +171,7 @@ class AssignmentService
             ->whereHas('submissions', fn ($query) => $query
                 ->where('student_id', $student->id)
                 ->whereIn('status', [AssignmentSubmission::STATUS_ASSIGNED, AssignmentSubmission::STATUS_IN_PROGRESS]))
-            ->with(['lesson.material.category', 'teacher.user', 'submissions' => fn ($q) => $q->where('student_id', $student->id)])
+            ->with(['lesson.material.category', 'teacher.user', 'classroom:id,name', 'submissions' => fn ($q) => $q->where('student_id', $student->id)])
             ->orderBy('due_at')
             ->get();
     }
@@ -137,7 +185,7 @@ class AssignmentService
             ->whereHas('submissions', fn ($query) => $query
                 ->where('student_id', $student->id)
                 ->where('status', AssignmentSubmission::STATUS_COMPLETED))
-            ->with(['lesson.material.category', 'teacher.user', 'submissions' => fn ($q) => $q->where('student_id', $student->id)])
+            ->with(['lesson.material.category', 'teacher.user', 'classroom:id,name', 'submissions' => fn ($q) => $q->where('student_id', $student->id)])
             ->orderByDesc('due_at')
             ->get();
     }

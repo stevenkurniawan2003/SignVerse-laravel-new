@@ -20,6 +20,7 @@ Route::middleware(['web', 'auth'])->group(function () {
         Route::get('/challenges', [SignTechApiController::class, 'challenges']);
         Route::post('/challenges/claim', [SignTechApiController::class, 'claimChallenge']);
         Route::get('/achievements', [SignTechApiController::class, 'achievements']);
+        Route::get('/leaderboard', [SignTechApiController::class, 'leaderboard']);
         Route::get('/classroom', [SignTechApiController::class, 'classroom']);
     });
 
@@ -32,5 +33,6 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/challenges', [SignTechApiController::class, 'challenges']);
     Route::post('/challenges/claim', [SignTechApiController::class, 'claimChallenge']);
     Route::get('/achievements', [SignTechApiController::class, 'achievements']);
+    Route::get('/leaderboard', [SignTechApiController::class, 'leaderboard']);
     Route::get('/classroom', [SignTechApiController::class, 'classroom']);
 });

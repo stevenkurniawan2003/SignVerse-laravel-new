@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\AssignmentSubmission;
 use App\Models\Student;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -335,6 +337,78 @@ class GamificationService
             ->sortByDesc('xp')
             ->take($limit)
             ->values();
+    }
+
+    /**
+     * Peringkat XP seluruh siswa untuk leaderboard realtime di dashboard.
+     *
+     * XP dihitung dalam satu query agregat (latihan selesai + reward challenge
+     * selesai + assignment selesai) — sama dengan Student::totalXp() tetapi
+     * tanpa query per siswa, karena endpoint ini di-poll setiap beberapa detik.
+     * Peringkat memakai standard competition ranking: XP sama → peringkat sama.
+     *
+     * @return array{entries: array<int, array{rank: int, user_id: int, name: string, initials: string, xp: int, level: string, streak: int, is_me: bool}>, me: ?array{rank: int, user_id: int, name: string, initials: string, xp: int, level: string, streak: int, is_me: bool}, total: int}
+     */
+    public static function rankings(?int $currentUserId, int $limit = 10): array
+    {
+        $practiceXp = DB::table('practice_sessions')
+            ->where('status', 'completed')
+            ->groupBy('student_id')
+            ->selectRaw('student_id, SUM(xp_earned) as xp');
+
+        $challengeXp = DB::table('challenge_progress as cp')
+            ->join('challenges as c', 'c.id', '=', 'cp.challenge_id')
+            ->where('cp.completed', 1)
+            ->groupBy('cp.user_id')
+            ->selectRaw('cp.user_id, SUM(c.reward_xp) as xp');
+
+        $assignmentXp = DB::table('assignment_submissions')
+            ->where('status', AssignmentSubmission::STATUS_COMPLETED)
+            ->groupBy('student_id')
+            ->selectRaw('student_id, SUM(xp_earned) as xp');
+
+        $rows = DB::table('students as s')
+            ->join('users as u', 'u.id', '=', 's.user_id')
+            ->where('u.role', User::ROLE_STUDENT) // guru tidak ikut leaderboard
+            ->leftJoinSub($practiceXp, 'p', 'p.student_id', '=', 's.id')
+            ->leftJoinSub($challengeXp, 'ch', 'ch.user_id', '=', 's.user_id')
+            ->leftJoinSub($assignmentXp, 'a', 'a.student_id', '=', 's.id')
+            ->selectRaw('s.user_id, u.name, s.current_streak, COALESCE(p.xp, 0) + COALESCE(ch.xp, 0) + COALESCE(a.xp, 0) as total_xp')
+            ->orderByDesc('total_xp')
+            ->orderBy('u.name')
+            ->get();
+
+        $entries = [];
+        $previousXp = null;
+        $rank = 0;
+        foreach ($rows as $index => $row) {
+            $xp = (int) $row->total_xp;
+            if ($xp !== $previousXp) {
+                $rank = $index + 1;
+                $previousXp = $xp;
+            }
+
+            $entries[] = [
+                'rank' => $rank,
+                'user_id' => (int) $row->user_id,
+                'name' => $row->name,
+                'initials' => collect(explode(' ', $row->name))
+                    ->filter()
+                    ->take(2)
+                    ->map(fn (string $word) => mb_strtoupper(mb_substr($word, 0, 1)))
+                    ->implode(''),
+                'xp' => $xp,
+                'level' => self::levelFromXp($xp)['name'],
+                'streak' => (int) $row->current_streak,
+                'is_me' => $currentUserId !== null && (int) $row->user_id === $currentUserId,
+            ];
+        }
+
+        return [
+            'entries' => array_slice($entries, 0, $limit),
+            'me' => collect($entries)->firstWhere('is_me', true),
+            'total' => count($entries),
+        ];
     }
 
     private static function studentId(int $userId): ?int

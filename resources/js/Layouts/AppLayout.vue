@@ -1,15 +1,20 @@
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue';
-import { Link, usePage } from '@inertiajs/vue3';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import {
     ArrowRight,
     Award,
     BookOpen,
+    CalendarCheck,
+    ClipboardList,
+    FileBarChart,
     Flame,
+    GraduationCap,
     Hand,
     LayoutDashboard,
     LogOut,
     Menu,
+    School,
     Star,
     Target,
     TrendingUp,
@@ -20,6 +25,32 @@ import {
 } from '@lucide/vue';
 
 const page = usePage();
+
+/*
+ * Notifikasi flash dari server (session 'status' / 'error') ditampilkan
+ * sebagai toast setelah setiap aksi, mis. "Kelas dibuat" atau alasan penolakan.
+ */
+const toast = ref(null);
+let toastTimer = null;
+
+// Partial reload (mis. polling) mempertahankan prop flash lama: tampilkan sekali saja
+let lastFlash = null;
+
+function showFlash(flash) {
+    const message = flash?.error || flash?.status;
+    if (!message || flash === lastFlash) return;
+    lastFlash = flash;
+    clearTimeout(toastTimer);
+    toast.value = { type: flash.error ? 'error' : 'success', message };
+    toastTimer = setTimeout(() => (toast.value = null), flash.error ? 8000 : 5000);
+}
+
+onMounted(() => showFlash(page.props.flash));
+const removeFlashListener = router.on('success', (event) => showFlash(event.detail.page.props.flash));
+onBeforeUnmount(() => {
+    removeFlashListener();
+    clearTimeout(toastTimer);
+});
 const menuOpen = ref(false);
 
 const authUser = computed(() => page.props.auth?.user || null);
@@ -40,36 +71,64 @@ function changeSystem(e) {
     window.dispatchEvent(new CustomEvent('signtech:system-changed', { detail: e.target.value }));
 }
 
+// Pilihan sistem juga bisa diganti dari halaman lain (mis. AI Practice)
+const syncSystem = (e) => (currentSystem.value = e.detail === 'BISINDO' ? 'BISINDO' : 'SIBI');
+window.addEventListener('signtech:system-changed', syncSystem);
+
 // Layar sempit: label sistem dipersingkat agar topbar tidak terpotong
 const compactQuery = window.matchMedia('(max-width: 1400px)');
 const isCompact = ref(compactQuery.matches);
 const updateCompact = (e) => (isCompact.value = e.matches);
 compactQuery.addEventListener('change', updateCompact);
-onBeforeUnmount(() => compactQuery.removeEventListener('change', updateCompact));
+onBeforeUnmount(() => {
+    compactQuery.removeEventListener('change', updateCompact);
+    window.removeEventListener('signtech:system-changed', syncSystem);
+});
+
+const isTeacher = computed(() => userRole.value === 'teacher');
+
+const teacherNav = [
+    { to: '/teacher/dashboard', label: 'Dashboard Guru', icon: LayoutDashboard },
+    { to: '/teacher/classes', label: 'Manajemen Kelas', icon: School },
+    { to: '/teacher/students', label: 'Manajemen Siswa', icon: Users },
+    { to: '/teacher/modules', label: 'Manajemen Modul', icon: BookOpen },
+    { to: '/teacher/assignments', label: 'Tugas Siswa', icon: ClipboardList },
+    { to: '/teacher/reports', label: 'Laporan', icon: FileBarChart },
+];
 
 const nav = computed(() => {
-    const list = [
-        { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { to: '/learn', label: 'Materi Belajar', icon: BookOpen },
-        { to: '/practice', label: 'AI Practice', icon: Hand },
-        { to: '/challenge', label: 'Challenge Harian', icon: Target },
-        { to: '/achievement', label: 'Achievement', icon: Trophy },
-        { to: '/progress', label: 'Progress Belajar', icon: TrendingUp },
-    ];
-    if (userRole.value === 'teacher') {
-        list.push({ to: '/classroom', label: 'Ruang Kelas', icon: Users });
-    }
+    const list = isTeacher.value
+        ? [...teacherNav]
+        : [
+              { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+              { to: '/learn', label: 'Materi Belajar', icon: BookOpen },
+              { to: '/practice', label: 'AI Practice', icon: Hand },
+              { to: '/challenge', label: 'Challenge Harian', icon: Target },
+              { to: '/student/assignments', label: 'Tugas Guru', icon: CalendarCheck },
+              { to: '/achievement', label: 'Achievement', icon: Trophy },
+              { to: '/progress', label: 'Progress Belajar', icon: TrendingUp },
+          ];
     list.push({ to: '/profile', label: 'Profil Saya', icon: UserRound });
     return list;
 });
 
-const mobileNav = [
-    { to: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
-    { to: '/learn', label: 'Materi', icon: BookOpen },
-    { to: '/practice', label: 'Practice', icon: Hand },
-    { to: '/challenge', label: 'Misi', icon: Target },
-    { to: '/profile', label: 'Profil', icon: UserRound },
-];
+const mobileNav = computed(() =>
+    isTeacher.value
+        ? [
+              { to: '/teacher/dashboard', label: 'Beranda', icon: LayoutDashboard },
+              { to: '/teacher/classes', label: 'Kelas', icon: School },
+              { to: '/teacher/students', label: 'Siswa', icon: Users },
+              { to: '/teacher/assignments', label: 'Tugas', icon: ClipboardList },
+              { to: '/profile', label: 'Profil', icon: UserRound },
+          ]
+        : [
+              { to: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
+              { to: '/learn', label: 'Materi', icon: BookOpen },
+              { to: '/practice', label: 'Practice', icon: Hand },
+              { to: '/student/assignments', label: 'Tugas', icon: CalendarCheck },
+              { to: '/profile', label: 'Profil', icon: UserRound },
+          ],
+);
 
 // Halaman yang sama juga tersedia di bawah prefix role (/student/*, /teacher/*)
 const linkAliases = {
@@ -77,9 +136,15 @@ const linkAliases = {
     '/learn': ['/lesson/', '/student/materials'],
     '/practice': ['/student/practice'],
     '/challenge': ['/student/challenge'],
+    '/student/assignments': ['/student/assignments'],
     '/achievement': ['/student/achievements'],
     '/progress': ['/student/progress'],
-    '/classroom': ['/teacher/students'],
+    '/teacher/dashboard': ['/teacher/dashboard'],
+    '/teacher/classes': ['/teacher/classes', '/classroom'],
+    '/teacher/students': ['/teacher/students'],
+    '/teacher/modules': ['/teacher/modules'],
+    '/teacher/assignments': ['/teacher/assignments'],
+    '/teacher/reports': ['/teacher/reports'],
 };
 
 function activeLink(to) {
@@ -101,7 +166,7 @@ const streakWeek = computed(() => {
 </script>
 
 <template>
-    <div class="app-shell font-sans text-ink bg-surface min-h-screen">
+    <div class="app-shell font-sans text-ink bg-surface min-h-screen" :class="{ 'is-teacher': isTeacher }">
         <!-- Mobile Trigger -->
         <button class="mobile-menu" aria-label="Buka navigasi" @click="menuOpen = true">
             <Menu :size="22" />
@@ -170,9 +235,16 @@ const streakWeek = computed(() => {
 
         <!-- Main Workspace Column -->
         <main class="main-column">
-            <!-- Topbar with System Switcher and Real Database Stats -->
-            <header class="top-stats">
-                <label class="system-select">
+            <!-- Topbar with System Switcher and Real Database Stats -->                <header class="top-stats">
+                    <template v-if="isTeacher">
+                        <span class="stat-pill">
+                            <GraduationCap class="text-primary" :size="17" />
+                            <b>Mode Guru</b>
+                            <small>SignTech</small>
+                        </span>
+                    </template>
+                    <template v-else>
+                    <label class="system-select">
                     <Hand :size="16" class="text-primary" />
                     <select
                         aria-label="Pilih sistem bahasa isyarat"
@@ -200,13 +272,22 @@ const streakWeek = computed(() => {
                     <Award :size="16" class="text-primary" />
                     {{ level.name }}
                 </span>
+                    </template>
             </header>
 
             <slot />
         </main>
 
+        <!-- Toast notifikasi aksi -->
+        <Transition name="toast">
+            <div v-if="toast" class="app-toast" :class="`app-toast--${toast.type}`" :role="toast.type === 'error' ? 'alert' : 'status'">
+                <span>{{ toast.message }}</span>
+                <button type="button" aria-label="Tutup notifikasi" @click="toast = null">&times;</button>
+            </div>
+        </Transition>
+
         <!-- Right Insights Sidebar Panel -->
-        <aside class="right-panel">
+        <aside v-if="!isTeacher" class="right-panel">
             <div class="panel-heading">
                 <span>Aktivitas Belajar</span>
             </div>
@@ -453,4 +534,62 @@ const streakWeek = computed(() => {
     font-weight: 700;
 }
 
+.app-toast {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 70;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    max-width: min(440px, calc(100vw - 32px));
+    padding: 14px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+    border-radius: 14px;
+    box-shadow: 0 16px 40px rgba(20, 34, 29, 0.18);
+}
+
+.app-toast--success {
+    color: #1e7253;
+    background: #eefaf4;
+    border: 1px solid #bfe8d4;
+}
+
+.app-toast--error {
+    color: #b42318;
+    background: #fef0ee;
+    border: 1px solid #f7c7c0;
+}
+
+.app-toast button {
+    flex-shrink: 0;
+    font-size: 20px;
+    line-height: 1;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+
+.toast-enter-active,
+.toast-leave-active {
+    transition: 0.25s ease;
+}
+
+.toast-enter-from,
+.toast-leave-to {
+    opacity: 0;
+    transform: translateY(12px);
+}
+
+@media (max-width: 760px) {
+    .app-toast {
+        right: 16px;
+        bottom: 84px;
+        left: 16px;
+        max-width: none;
+    }
+}
 </style>

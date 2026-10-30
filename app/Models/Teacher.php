@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\TeacherFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,6 +24,26 @@ class Teacher extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(Assignment::class);
+    }
+
+    public function classrooms(): HasMany
+    {
+        return $this->hasMany(Classroom::class);
+    }
+
+    /**
+     * Query siswa yang tergabung di salah satu kelas guru ini.
+     *
+     * @return Builder<Student>
+     */
+    public function studentsQuery(): Builder
+    {
+        return Student::query()->whereHas('classrooms', fn (Builder $query) => $query->where('teacher_id', $this->id));
+    }
+
+    public function hasStudent(Student $student): bool
+    {
+        return $this->studentsQuery()->whereKey($student->id)->exists();
     }
 
     public function assignmentsCount(): int

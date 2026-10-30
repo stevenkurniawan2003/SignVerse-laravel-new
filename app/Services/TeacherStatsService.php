@@ -2,13 +2,17 @@
 
 namespace App\Services;
 
+use App\Models\AssignmentSubmission;
+use App\Models\Classroom;
 use App\Models\GestureResult;
+use App\Models\Lesson;
 use App\Models\PracticeSession;
 use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Teacher module (phase 7): statistik kelas, monitoring siswa,
@@ -141,6 +145,153 @@ class TeacherStatsService
         ];
     }
 
+    /* ==========================================================================
+     | Monitoring realtime (di-poll halaman guru)
+     * ========================================================================*/
+
+    /**
+     * Ringkasan kelas milik guru: hanya siswa yang tergabung di kelasnya.
+     *
+     * @return array{classes: int, students: int, active_today: int, weekly_sessions: int, avg_score: float, active_assignments: int}
+     */
+    public function teacherOverview(Teacher $teacher): array
+    {
+        $studentIds = $teacher->studentsQuery()->pluck('students.id');
+        $completed = PracticeSession::query()
+            ->whereIn('student_id', $studentIds)
+            ->where('status', PracticeSession::STATUS_COMPLETED);
+
+        return [
+            'classes' => $teacher->classrooms()->count(),
+            'students' => $studentIds->count(),
+            'active_today' => (int) (clone $completed)->where('completed_at', '>=', today())->distinct('student_id')->count('student_id'),
+            'weekly_sessions' => (int) (clone $completed)->where('completed_at', '>=', now()->startOfWeek())->count(),
+            'avg_score' => round((float) (clone $completed)->avg('score'), 1),
+            'active_assignments' => $this->activeAssignments($teacher)->count(),
+        ];
+    }
+
+    /**
+     * Tabel siswa guru (opsional satu kelas) dengan agregat dalam satu query:
+     * jumlah latihan, rata-rata skor, huruf dikuasai, XP, streak, aktivitas terakhir.
+     *
+     * @return Collection<int, array{id: int, user_id: int, name: string, email: string, sessions: int, avg_score: float, mastered: int, xp: int, level: string, streak: int, last_activity: ?string, classes: string[]}>
+     */
+    public function studentsTable(Teacher $teacher, ?Classroom $classroom = null): Collection
+    {
+        $sessions = DB::table('practice_sessions')
+            ->where('status', PracticeSession::STATUS_COMPLETED)
+            ->groupBy('student_id')
+            ->selectRaw('student_id, COUNT(*) as sessions, AVG(score) as avg_score, MAX(completed_at) as last_activity, SUM(xp_earned) as xp')
+            ->selectRaw('COUNT(DISTINCT CASE WHEN score >= ? THEN lesson_id END) as mastered', [PracticeService::PASS_SCORE]);
+
+        $challengeXp = DB::table('challenge_progress as cp')
+            ->join('challenges as c', 'c.id', '=', 'cp.challenge_id')
+            ->where('cp.completed', 1)
+            ->groupBy('cp.user_id')
+            ->selectRaw('cp.user_id, SUM(c.reward_xp) as xp');
+
+        $assignmentXp = DB::table('assignment_submissions')
+            ->where('status', AssignmentSubmission::STATUS_COMPLETED)
+            ->groupBy('student_id')
+            ->selectRaw('student_id, SUM(xp_earned) as xp');
+
+        $studentIds = $classroom
+            ? $classroom->students()->pluck('students.id')
+            : $teacher->studentsQuery()->pluck('students.id');
+
+        $classNames = DB::table('classroom_student as cs')
+            ->join('classrooms as c', 'c.id', '=', 'cs.classroom_id')
+            ->where('c.teacher_id', $teacher->id)
+            ->whereIn('cs.student_id', $studentIds)
+            ->get(['cs.student_id', 'c.name'])
+            ->groupBy('student_id')
+            ->map(fn (Collection $rows) => $rows->pluck('name')->all());
+
+        return DB::table('students as s')
+            ->join('users as u', 'u.id', '=', 's.user_id')
+            ->leftJoinSub($sessions, 'p', 'p.student_id', '=', 's.id')
+            ->leftJoinSub($challengeXp, 'ch', 'ch.user_id', '=', 's.user_id')
+            ->leftJoinSub($assignmentXp, 'a', 'a.student_id', '=', 's.id')
+            ->whereIn('s.id', $studentIds)
+            ->orderBy('u.name')
+            ->get([
+                's.id', 's.user_id', 'u.name', 'u.email', 's.current_streak',
+                'p.sessions', 'p.avg_score', 'p.mastered', 'p.last_activity',
+                DB::raw('COALESCE(p.xp, 0) + COALESCE(ch.xp, 0) + COALESCE(a.xp, 0) as total_xp'),
+            ])
+            ->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'user_id' => (int) $row->user_id,
+                'name' => $row->name,
+                'email' => $row->email,
+                'sessions' => (int) $row->sessions,
+                'avg_score' => round((float) $row->avg_score, 1),
+                'mastered' => (int) $row->mastered,
+                'xp' => (int) $row->total_xp,
+                'level' => GamificationService::levelFromXp((int) $row->total_xp)['name'],
+                'streak' => (int) $row->current_streak,
+                'last_activity' => $row->last_activity ? Carbon::parse($row->last_activity)->toIso8601String() : null,
+                'classes' => $classNames->get($row->id, []),
+            ]);
+    }
+
+    /**
+     * Aktivitas latihan terbaru siswa guru (feed realtime dashboard).
+     *
+     * @return Collection<int, array{id: int, student_id: int, student: string, lesson: string, language: string, score: int, passed: bool, xp: int, at: ?string}>
+     */
+    public function recentActivity(Teacher $teacher, int $limit = 12): Collection
+    {
+        return PracticeSession::query()
+            ->whereIn('student_id', $teacher->studentsQuery()->select('students.id'))
+            ->where('status', PracticeSession::STATUS_COMPLETED)
+            ->with(['student.user:id,name', 'lesson:id,title'])
+            ->latest('completed_at')
+            ->latest('id')
+            ->limit($limit)
+            ->get()
+            ->map(fn (PracticeSession $session) => [
+                'id' => $session->id,
+                'student_id' => $session->student_id,
+                'student' => $session->student?->user?->name ?? 'Siswa',
+                'lesson' => $session->lesson?->title ?? '-',
+                'language' => strtoupper($session->language),
+                'score' => (int) $session->score,
+                'passed' => (int) $session->score >= PracticeService::PASS_SCORE,
+                'xp' => (int) $session->xp_earned,
+                'at' => $session->completed_at?->toIso8601String(),
+            ]);
+    }
+
+    /**
+     * Huruf yang sudah dikuasai siswa per sistem isyarat (untuk grid A–Z guru).
+     *
+     * @return array<string, array<int, array{letter: string, mastered: bool, best_score: int}>>
+     */
+    public function letterMastery(Student $student): array
+    {
+        $best = PracticeSession::query()
+            ->where('student_id', $student->id)
+            ->where('status', PracticeSession::STATUS_COMPLETED)
+            ->groupBy('lesson_id')
+            ->selectRaw('lesson_id, MAX(score) as best')
+            ->pluck('best', 'lesson_id');
+
+        return Lesson::query()
+            ->with('material:id,language,category_id', 'material.category:id,slug')
+            ->whereHas('material.category', fn ($query) => $query->where('slug', 'alphabet'))
+            ->orderBy('title')
+            ->get()
+            ->groupBy(fn (Lesson $lesson) => strtoupper($lesson->material->language))
+            ->map(fn (Collection $lessons) => $lessons->map(fn (Lesson $lesson) => [
+                'letter' => $lesson->title,
+                'mastered' => (int) ($best[$lesson->id] ?? 0) >= PracticeService::PASS_SCORE,
+                'best_score' => (int) ($best[$lesson->id] ?? 0),
+            ])->values()->all())
+            ->all();
+    }
+
     /**
      * Teacher model dari user yang sedang login.
      * Profil dibuat otomatis jika belum ada (safety net untuk user lama).
@@ -159,10 +310,14 @@ class TeacherStatsService
      *
      * @return Collection<int, array{lesson_id: int, lesson: string, gesture: string, wrong: int, total: int, accuracy: int}>
      */
-    public function errorAnalysisForLesson(?int $lessonId = null): Collection
+    public function errorAnalysisForLesson(?int $lessonId = null, ?Teacher $teacher = null): Collection
     {
         $results = GestureResult::query()
             ->when($lessonId !== null, fn ($query) => $query->where('lesson_id', $lessonId))
+            ->when($teacher !== null, fn ($query) => $query->whereHas(
+                'practiceSession',
+                fn ($session) => $session->whereIn('student_id', $teacher->studentsQuery()->select('students.id')),
+            ))
             ->with('lesson:id,title')
             ->get();
 

@@ -150,6 +150,7 @@ class SignTechApiController extends Controller
                     'unlocked' => count($unlockedBadges),
                     'total' => count($achievements),
                 ],
+                'leaderboard' => GamificationService::rankings($uid),
             ]);
         } catch (Throwable $e) {
             return response()->json([
@@ -414,6 +415,7 @@ class SignTechApiController extends Controller
             'leveled_up' => $outcome['leveled_up'] ?? false,
             'new_badges' => $outcome['new_badges'] ?? [],
             'challenge_completed' => $outcome['challenge_completed'] ?? false,
+            'assignments_completed' => $outcome['assignments_completed'] ?? [],
             'streak' => $outcome['streak'] ?? 0,
             'source' => $recognition['source'] ?? 'signtech_ai_service',
         ]);
@@ -540,6 +542,26 @@ class SignTechApiController extends Controller
                 'message' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Leaderboard XP siswa — di-poll dashboard setiap beberapa detik.
+     */
+    public function leaderboard(Request $request): JsonResponse
+    {
+        $student = $this->resolveStudent($request);
+        if (!$student) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Profil siswa tidak ditemukan di database.',
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            ...GamificationService::rankings($student->user_id),
+            'generated_at' => now()->toIso8601String(),
+        ]);
     }
 
     /**

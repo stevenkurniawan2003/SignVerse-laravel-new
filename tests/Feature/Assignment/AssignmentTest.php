@@ -170,10 +170,12 @@ class AssignmentTest extends TestCase
     public function test_teacher_can_create_and_distribute_assignment_via_http(): void
     {
         $teacher = $this->teacherUser();
-        Student::factory()->count(2)->create();
+        $classroom = \App\Models\Classroom::factory()->for($teacher->teacher)->create();
+        $classroom->students()->attach(Student::factory()->count(2)->create());
         $lesson = $this->lesson();
 
         $response = $this->actingAs($teacher)->post(route('teacher.assignments.store'), [
+            'classroom_id' => $classroom->id,
             'lesson_id' => $lesson->id,
             'title' => 'Latihan Alphabet',
             'min_score' => 60,
@@ -222,7 +224,8 @@ class AssignmentTest extends TestCase
             'practice_session_id' => $session->id,
         ]);
 
-        $response->assertRedirect(route('student.assignments.show', $assignment));
+        // Selesai → diarahkan ke daftar tugas siswa dengan notifikasi sukses.
+        $response->assertRedirect(route('student.assignments.index'));
         $response->assertSessionHas('status');
         $this->assertSame(AssignmentSubmission::STATUS_COMPLETED,
             $assignment->submissions()->where('student_id', $user->student->id)->first()->status);

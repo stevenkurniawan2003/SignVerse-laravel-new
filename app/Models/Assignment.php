@@ -15,6 +15,7 @@ class Assignment extends Model
 
     protected $fillable = [
         'teacher_id',
+        'classroom_id',
         'lesson_id',
         'title',
         'description',
@@ -40,6 +41,11 @@ class Assignment extends Model
     public function lesson(): BelongsTo
     {
         return $this->belongsTo(Lesson::class);
+    }
+
+    public function classroom(): BelongsTo
+    {
+        return $this->belongsTo(Classroom::class);
     }
 
     public function submissions(): HasMany

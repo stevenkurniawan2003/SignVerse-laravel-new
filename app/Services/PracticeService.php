@@ -41,6 +41,7 @@ class PracticeService
 
     public function __construct(
         private GestureRecognitionService $recognizer,
+        private AssignmentService $assignments,
     ) {}
 
     /**
@@ -163,7 +164,7 @@ class PracticeService
      *     peragaan ulang tetap menambah progres challenge & badge
      *
      * @param  array{recognized: ?string, confidence: int, correct: bool}  $recognition
-     * @return array{recorded: bool, passed: bool, score: int, xp_earned: int, already_mastered: bool, total_xp: int, level: array<string, mixed>, leveled_up: bool, new_badges: string[], challenge_completed: bool, streak: int}
+     * @return array{recorded: bool, passed: bool, score: int, xp_earned: int, already_mastered: bool, total_xp: int, level: array<string, mixed>, leveled_up: bool, new_badges: string[], challenge_completed: bool, assignments_completed: array<int, array{title: string, xp_earned: int}>, streak: int}
      */
     public function recordVerifiedAttempt(Student $student, Lesson $lesson, array $recognition): array
     {
@@ -183,6 +184,7 @@ class PracticeService
                 'leveled_up' => false,
                 'new_badges' => [],
                 'challenge_completed' => false,
+                'assignments_completed' => [],
                 'streak' => (int) $student->current_streak,
             ];
         }
@@ -217,9 +219,13 @@ class PracticeService
 
             $newBadges = [];
             $challengeCompleted = false;
+            $assignmentsCompleted = [];
 
             if ($passed) {
                 $this->updateStreak($student);
+
+                // Tugas guru yang menargetkan lesson ini ikut selesai otomatis.
+                $assignmentsCompleted = $this->assignments->completeFromPractice($student, $session);
 
                 $challengeCompleted = ChallengeService::bumpChallenge($userId, $lesson->material->category->slug);
 
@@ -245,6 +251,7 @@ class PracticeService
                 'leveled_up' => $level['name'] !== $levelBefore['name'],
                 'new_badges' => $newBadges,
                 'challenge_completed' => $challengeCompleted,
+                'assignments_completed' => $assignmentsCompleted,
                 'streak' => (int) $student->refresh()->current_streak,
             ];
         });

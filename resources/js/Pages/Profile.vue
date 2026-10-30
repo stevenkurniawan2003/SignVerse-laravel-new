@@ -46,6 +46,7 @@ function submitProfile() {
 function submitPassword() {
     passwordForm.put('/password', {
         preserveScroll: true,
+        errorBag: 'updatePassword',
         onSuccess: () => {
             passwordForm.reset();
             passwordSuccess.value = 'Kata sandi berhasil diperbarui.';
