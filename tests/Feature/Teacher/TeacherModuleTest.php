@@ -50,7 +50,7 @@ class TeacherModuleTest extends TestCase
      *
      * @return array{0: User, 1: Student, 2: Classroom}
      */
-    private function teacherWithStudent(string $name = null): array
+    private function teacherWithStudent(?string $name = null): array
     {
         $teacher = $this->teacherUser();
         $student = $this->studentUser();

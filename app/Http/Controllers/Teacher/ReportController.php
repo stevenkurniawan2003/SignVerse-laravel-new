@@ -65,7 +65,7 @@ class ReportController extends Controller
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // BOM agar Excel membaca UTF-8
 
-            $write = fn (array $row) => fputcsv($out, $row, ';');
+            $write = fn (array $row) => fputcsv($out, $row, ';', '"', '');
             $summary = $report['summary'];
 
             $write(['Laporan Belajar SignTech']);

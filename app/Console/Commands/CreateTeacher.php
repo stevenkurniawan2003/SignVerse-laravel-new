@@ -30,7 +30,7 @@ class CreateTeacher extends Command
         $email = ($email = (string) $this->option('email')) !== '' ? $email : $this->ask('Email guru');
         $email = strtolower(trim($email));
 
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $this->error("Email \"{$email}\" tidak valid.");
 
             return self::FAILURE;
@@ -52,24 +52,15 @@ class CreateTeacher extends Command
             return self::FAILURE;
         }
 
-        if ($user) {
-            $user->update([
-                'name' => $name,
-                'role' => User::ROLE_TEACHER,
-                'password' => Hash::make($password),
-                'email_verified_at' => $user->email_verified_at ?? now(),
-            ]);
-            $user->teacher()->firstOrCreate();
-        } else {
-            $user = User::create([
-                'name' => $name,
-                'email' => $email,
-                'password' => Hash::make($password),
-                'role' => User::ROLE_TEACHER,
-                'email_verified_at' => now(),
-            ]);
-            $user->teacher()->create();
-        }
+        // email_verified_at tidak termasuk $fillable User, jadi diisi lewat forceFill.
+        $user ??= new User(['email' => $email]);
+        $user->forceFill([
+            'name' => $name,
+            'role' => User::ROLE_TEACHER,
+            'password' => Hash::make($password),
+            'email_verified_at' => $user->email_verified_at ?? now(),
+        ])->save();
+        $user->teacher()->firstOrCreate();
 
         $this->info("Akun guru berhasil: {$user->name} <{$user->email}> — silakan login di halaman masuk dengan kata sandi yang sudah disembunyikan tadi.");
 
@@ -78,8 +69,9 @@ class CreateTeacher extends Command
 
     private function validPassword(string $password): bool
     {
+        // passes() mengembalikan bool; validate() justru mengembalikan array data.
         return validator(['password' => $password], [
-            'password' => Password::min(8),
-        ])->validate();
+            'password' => ['required', 'string', Password::min(8)],
+        ])->passes();
     }
 }
