@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Category;
 use App\Models\Material;
+use App\Services\AlphabetLessonService;
 use Illuminate\Database\Seeder;
 
 /**
@@ -19,20 +20,7 @@ class ContentSeeder extends Seeder
                 'name' => 'Alphabet',
                 'icon' => 'alphabet',
                 'description' => 'Isyarat huruf A-Z (SIBI & BISINDO).',
-                'materials' => [
-                    [
-                        'title' => 'Huruf A-M (SIBI)',
-                        'language' => Material::LANGUAGE_SIBI,
-                        'difficulty' => 1,
-                        'lessons' => ['A', 'B', 'C', 'D', 'E'],
-                    ],
-                    [
-                        'title' => 'Huruf N-Z (SIBI)',
-                        'language' => Material::LANGUAGE_SIBI,
-                        'difficulty' => 1,
-                        'lessons' => ['N', 'O', 'P', 'Q', 'R'],
-                    ],
-                ],
+                'materials' => [],
             ],
             [
                 'name' => 'Number',
@@ -104,5 +92,7 @@ class ContentSeeder extends Seeder
                 }
             }
         }
+
+        AlphabetLessonService::ensureComplete();
     }
 }

@@ -9,7 +9,7 @@ use App\Models\Lesson;
 use App\Models\PracticeSession;
 use App\Models\Student;
 use App\Models\Teacher;
-use App\Models\User;
+use App\Services\AlphabetLessonService;
 use App\Services\ChallengeService;
 use App\Services\Contracts\GestureRecognitionService;
 use App\Services\GamificationService;
@@ -153,10 +153,7 @@ class SignTechApiController extends Controller
                 'leaderboard' => GamificationService::rankings($uid),
             ]);
         } catch (Throwable $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], 500);
+            return $this->serverError($e);
         }
     }
 
@@ -166,13 +163,16 @@ class SignTechApiController extends Controller
     public function materials(Request $request): JsonResponse
     {
         try {
+            AlphabetLessonService::ensureComplete();
+
             $language = $request->query('language');
             $categories = Category::query()
                 ->with(['materials' => function ($q) use ($language) {
                     if ($language) {
                         $q->where('language', $language);
                     }
-                    $q->with('lessons');
+                    $q->orderBy('order')->orderBy('id')
+                        ->with(['lessons' => fn ($lessons) => $lessons->orderBy('order')->orderBy('id')]);
                 }])
                 ->when($language, fn ($q) => $q->whereHas('materials', fn ($m) => $m->where('language', $language)))
                 ->orderBy('order')
@@ -195,10 +195,7 @@ class SignTechApiController extends Controller
                 'completedLessonIds' => $completedLessonIds,
             ]);
         } catch (Throwable $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], 500);
+            return $this->serverError($e);
         }
     }
 
@@ -222,7 +219,10 @@ class SignTechApiController extends Controller
             }
 
             if (!$lesson) {
-                $lesson = Lesson::with(['material.category'])->firstOrFail();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Pelajaran tidak ditemukan.',
+                ], 404);
             }
 
             $relatedLessons = Lesson::where('material_id', $lesson->material_id)
@@ -249,10 +249,7 @@ class SignTechApiController extends Controller
                 'ai_supported' => PracticeService::isAiSupported($lesson),
             ]);
         } catch (Throwable $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], 404);
+            return $this->serverError($e);
         }
     }
 
@@ -304,18 +301,22 @@ class SignTechApiController extends Controller
     public function practiceTargets(Request $request): JsonResponse
     {
         try {
-            // Urut per kategori → materi → urutan lesson, sehingga tiap sistem
-            // isyarat tampil rapi A–Z lalu 1–10 (frontend memfilter per sistem).
+            AlphabetLessonService::ensureComplete();
+
+            // Satu target per huruf per sistem isyarat, selalu urut A–Z
+            // (frontend memfilter per sistem).
             $lessons = Lesson::query()
                 ->select('lessons.*')
                 ->with('material.category')
                 ->join('materials', 'materials.id', '=', 'lessons.material_id')
                 ->join('categories', 'categories.id', '=', 'materials.category_id')
                 ->whereIn('categories.slug', PracticeService::AI_SUPPORTED_CATEGORIES)
-                ->orderBy('categories.order')
-                ->orderBy('materials.id')
-                ->orderBy('lessons.order')
-                ->get();
+                ->orderBy('lessons.id')
+                ->get()
+                ->filter(fn (Lesson $l) => preg_match('/^[A-Z]$/', strtoupper(trim($l->title))) === 1)
+                ->unique(fn (Lesson $l) => $l->material->language.'|'.strtoupper(trim($l->title)))
+                ->sortBy(fn (Lesson $l) => strtoupper(trim($l->title)))
+                ->values();
 
             $student = $this->resolveStudent($request);
             $completedLessonIds = $student
@@ -349,10 +350,7 @@ class SignTechApiController extends Controller
                 }),
             ]);
         } catch (Throwable $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], 500);
+            return $this->serverError($e);
         }
     }
 
@@ -474,10 +472,7 @@ class SignTechApiController extends Controller
                 'rewards' => $rewards,
             ]);
         } catch (Throwable $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], 500);
+            return $this->serverError($e);
         }
     }
 
@@ -537,10 +532,7 @@ class SignTechApiController extends Controller
                 'message' => "Selamat! Bonus +{$challenge->reward_xp} XP berhasil diklaim.",
             ]);
         } catch (Throwable $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], 500);
+            return $this->serverError($e);
         }
     }
 
@@ -596,11 +588,22 @@ class SignTechApiController extends Controller
                 'total_xp' => $totalXp,
             ]);
         } catch (Throwable $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], 500);
+            return $this->serverError($e);
         }
+    }
+
+    /**
+     * Catat error ke log dan kirim pesan umum: detail teknis (mis. query SQL)
+     * tidak boleh sampai ke pengguna.
+     */
+    private function serverError(Throwable $e): JsonResponse
+    {
+        report($e);
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Terjadi kesalahan pada server. Coba lagi beberapa saat lagi.',
+        ], 500);
     }
 
     /**
@@ -608,24 +611,21 @@ class SignTechApiController extends Controller
      */
     public function classroom(Request $request): JsonResponse
     {
+        $teacherUser = $request->user();
+        if (!$teacherUser || !$teacherUser->isTeacher()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Halaman ini hanya untuk guru.',
+            ], 403);
+        }
+
         try {
-            $teacherUser = $request->user();
-            if (!$teacherUser || !$teacherUser->isTeacher()) {
-                $teacherUser = User::where('role', User::ROLE_TEACHER)->first() ?? User::first();
-            }
-
-            if (!$teacherUser) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Akun pengajar tidak ditemukan di database.',
-                ], 404);
-            }
-
             $teacher = $this->teacherStats->forUser($teacherUser);
-            $overview = $this->teacherStats->classOverview($teacher);
-            $students = $this->teacherStats->studentsOverview();
+            $teacherOverview = $this->teacherStats->teacherOverview($teacher);
+            $overview = [...$teacherOverview, 'avg_class_score' => $teacherOverview['avg_score']];
+            $students = $this->teacherStats->studentsOverview($teacher);
             $activeAssignments = $this->teacherStats->activeAssignments($teacher);
-            $errorAnalysis = $this->teacherStats->errorAnalysisForLesson()->take(8);
+            $errorAnalysis = $this->teacherStats->errorAnalysisForLesson(teacher: $teacher)->take(8);
 
             return response()->json([
                 'status' => 'success',
@@ -649,10 +649,7 @@ class SignTechApiController extends Controller
                 'errorAnalysis' => $errorAnalysis,
             ]);
         } catch (Throwable $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], 500);
+            return $this->serverError($e);
         }
     }
 }

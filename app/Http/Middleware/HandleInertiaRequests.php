@@ -50,7 +50,7 @@ class HandleInertiaRequests extends Middleware
                 'total_xp' => $xp,
                 'level' => $level,
                 'current_streak' => $streak['streak'],
-                'longest_streak' => (int) $student->longest_streak,
+                'longest_streak' => max((int) $student->longest_streak, $streak['streak']),
             ];
         }
 

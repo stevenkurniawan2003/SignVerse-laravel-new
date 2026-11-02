@@ -90,12 +90,17 @@ class AssignmentController extends Controller
         $session = PracticeSession::query()
             ->where('student_id', $student->id)
             ->where('id', $validated['practice_session_id'])
+            ->where('lesson_id', $assignment->lesson_id)
             ->where('status', PracticeSession::STATUS_COMPLETED)
             ->first();
 
         if (! $session) {
             return back()->with('error',
-                'Sesi latihan tidak ditemukan / belum selesai. Selesaikan latihan dulu di halaman practice.');
+                'Sesi latihan tidak ditemukan / belum selesai. Selesaikan latihan untuk isyarat tugas ini dulu di halaman practice.');
+        }
+
+        if ($assignment->due_at !== null && $assignment->due_at->isPast()) {
+            return back()->with('error', 'Batas waktu tugas ini sudah lewat, jadi tugas tidak bisa dikumpulkan lagi.');
         }
 
         $outcome = $this->assignments->submitFromPractice($student, $assignment, $session);

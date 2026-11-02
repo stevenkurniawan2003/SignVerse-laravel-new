@@ -2,17 +2,20 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\Assignment;
 use App\Models\Category;
 use App\Models\Challenge;
 use App\Models\Lesson;
 use App\Models\Material;
 use App\Models\PracticeSession;
 use App\Models\Student;
+use App\Models\Teacher;
 use App\Models\User;
 use App\Services\ChallengeService;
 use App\Services\Contracts\GestureRecognitionService;
 use App\Services\GamificationService;
 use Database\Seeders\BadgeSeeder;
+use Database\Seeders\ContentSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -71,7 +74,84 @@ class PracticeApiTest extends TestCase
         $response = $this->actingAs($user)->getJson('/api/practice/targets');
 
         $response->assertOk()->assertJsonStructure(['status', 'targets' => [['id', 'letter', 'language', 'category_slug', 'practiced']]]);
-        $this->assertEqualsCanonicalizing(['sibi', 'bisindo'], collect($response->json('targets'))->pluck('language')->all());
+        $this->assertEqualsCanonicalizing(['sibi', 'bisindo'], collect($response->json('targets'))->pluck('language')->unique()->all());
+    }
+
+    public function test_targets_always_contain_full_alphabet_for_both_systems(): void
+    {
+        $user = $this->studentUser();
+
+        $targets = collect($this->actingAs($user)->getJson('/api/practice/targets')->assertOk()->json('targets'));
+
+        foreach (['sibi', 'bisindo'] as $language) {
+            $this->assertSame(
+                range('A', 'Z'),
+                $targets->where('language', $language)->pluck('letter')->values()->all(),
+            );
+        }
+    }
+
+    public function test_missing_letters_are_added_without_touching_existing_lessons(): void
+    {
+        $user = $this->studentUser();
+        $existing = $this->letterLesson('C', Material::LANGUAGE_SIBI, xp: 25);
+        PracticeSession::factory()->completed()->for($user->student)->for($existing)->create(['score' => 90]);
+
+        $targets = collect($this->actingAs($user)->getJson('/api/practice/targets')->json('targets'));
+        $letterC = $targets->where('language', 'sibi')->firstWhere('letter', 'C');
+
+        $this->assertSame($existing->id, $letterC['id']);
+        $this->assertSame(25, $letterC['xp_reward']);
+        $this->assertTrue($letterC['practiced']);
+        $this->assertCount(52, $targets);
+
+        $this->actingAs($user)->getJson('/api/practice/targets')->assertOk();
+        $this->assertSame(52, Lesson::count());
+    }
+
+    public function test_letter_deleted_from_modules_returns_to_practice_targets(): void
+    {
+        $user = $this->studentUser();
+        $this->actingAs($user)->getJson('/api/practice/targets')->assertOk();
+
+        Lesson::query()
+            ->where('title', 'Q')
+            ->whereHas('material', fn ($query) => $query->where('language', Material::LANGUAGE_BISINDO))
+            ->delete();
+
+        $targets = collect($this->actingAs($user)->getJson('/api/practice/targets')->json('targets'));
+
+        $this->assertSame(range('A', 'Z'), $targets->where('language', 'bisindo')->pluck('letter')->values()->all());
+    }
+
+    public function test_targets_ignore_assignments_from_teacher(): void
+    {
+        $user = $this->studentUser();
+        $lesson = $this->letterLesson('B', Material::LANGUAGE_SIBI);
+        Assignment::factory()->for(Teacher::factory())->for($lesson)->create();
+
+        $targets = collect($this->actingAs($user)->getJson('/api/practice/targets')->json('targets'));
+
+        $this->assertCount(26, $targets->where('language', 'sibi'));
+        $this->assertCount(26, $targets->where('language', 'bisindo'));
+    }
+
+    public function test_seeder_creates_full_alphabet_for_both_systems(): void
+    {
+        $this->seed(ContentSeeder::class);
+
+        foreach ([Material::LANGUAGE_SIBI, Material::LANGUAGE_BISINDO] as $language) {
+            $letters = Lesson::query()
+                ->whereHas('material', fn ($query) => $query
+                    ->where('language', $language)
+                    ->whereHas('category', fn ($category) => $category->where('slug', 'alphabet')))
+                ->pluck('title')
+                ->sort()
+                ->values()
+                ->all();
+
+            $this->assertSame(range('A', 'Z'), $letters);
+        }
     }
 
     public function test_attempt_without_detected_hand_is_not_recorded(): void

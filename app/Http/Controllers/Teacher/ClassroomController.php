@@ -111,8 +111,18 @@ class ClassroomController extends Controller
         DB::transaction(function () use ($classroom) {
             // Tugas yang sudah dikerjakan siswa dilepas dari kelas (diarsipkan)
             // agar XP tugas mereka tidak ikut terhapus bersama kelas.
-            $classroom->assignments()
+            // Pengerjaan yang belum selesai ikut dicabut karena kelasnya sudah tidak ada.
+            $archivedAssignmentIds = $classroom->assignments()
                 ->whereHas('submissions', fn ($query) => $query->where('status', AssignmentSubmission::STATUS_COMPLETED))
+                ->pluck('id');
+
+            AssignmentSubmission::query()
+                ->whereIn('assignment_id', $archivedAssignmentIds)
+                ->where('status', '!=', AssignmentSubmission::STATUS_COMPLETED)
+                ->delete();
+
+            $classroom->assignments()
+                ->whereKey($archivedAssignmentIds)
                 ->update(['classroom_id' => null]);
 
             $classroom->delete();

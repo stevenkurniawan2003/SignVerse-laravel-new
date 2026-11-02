@@ -137,7 +137,7 @@ class StudentModuleTest extends TestCase
 
         $response->assertOk();
         $response->assertViewHas('progress', function ($progress) {
-            $row = $progress->first();
+            $row = $progress[0];
 
             return $row['total'] === 2 && $row['done'] === 1 && $row['percent'] === 50;
         });

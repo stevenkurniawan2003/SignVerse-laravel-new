@@ -242,6 +242,23 @@
     }
 }
 
+/* ── Animasi masuk saat membuka halaman ────────────────────── */
+@keyframes page-slide-in {
+    from {
+        opacity: 0;
+        transform: translateX(28px);
+    }
+}
+
+.page-slide-in {
+    animation: page-slide-in 0.28s ease-out;
+}
+
+/* Cegah scrollbar horizontal sesaat selama halaman bergeser */
+body:has(.page-slide-in) {
+    overflow-x: clip;
+}
+
 /* ── Tabel di dalam kartu: header lembut + highlight baris ──── */
 @layer components {
     .card table thead tr {

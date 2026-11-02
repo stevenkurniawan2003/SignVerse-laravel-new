@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
     Activity,
@@ -161,6 +161,18 @@ const page = usePage();
 const authUser = computed(() => page.props.auth?.user || null);
 const loginHref = computed(() => (authUser.value ? (authUser.value.role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard') : '/login'));
 const loginLabel = computed(() => (authUser.value ? 'Ke Dashboard' : 'Masuk Akun'));
+
+// Notifikasi dari server, mis. setelah berhasil keluar dari akun
+const flashMessage = ref('');
+let flashTimer = null;
+
+onMounted(() => {
+    flashMessage.value = page.props.flash?.status || '';
+    if (flashMessage.value) {
+        flashTimer = setTimeout(() => (flashMessage.value = ''), 5000);
+    }
+});
+onBeforeUnmount(() => clearTimeout(flashTimer));
 </script>
 
 <template>
@@ -604,6 +616,24 @@ const loginLabel = computed(() => (authUser.value ? 'Ke Dashboard' : 'Masuk Akun
                 </div>
             </div>
         </div>
+
+        <!-- Notifikasi setelah keluar dari akun -->
+        <Transition
+            enter-active-class="transition duration-200"
+            enter-from-class="-translate-y-3 opacity-0"
+            leave-active-class="transition duration-200"
+            leave-to-class="-translate-y-3 opacity-0"
+        >
+            <div
+                v-if="flashMessage"
+                class="fixed top-20 left-4 right-4 z-[70] flex items-start gap-3 rounded-2xl border border-[#bfe8d4] bg-[#eefaf4] px-4 py-3.5 text-sm font-semibold leading-relaxed text-[#1e7253] shadow-xl sm:left-auto sm:right-5 sm:max-w-md"
+                role="status"
+            >
+                <CheckCircle2 :size="18" class="mt-0.5 shrink-0" />
+                <span class="flex-1">{{ flashMessage }}</span>
+                <button type="button" aria-label="Tutup notifikasi" class="shrink-0 text-xl leading-none" @click="flashMessage = ''">&times;</button>
+            </div>
+        </Transition>
     </div>
 </template>
 

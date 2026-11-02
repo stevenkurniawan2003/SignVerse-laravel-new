@@ -163,7 +163,7 @@ class PracticeDataCleanupService
     }
 
     /**
-     * Progres challenge = jumlah peragaan lulus pada tanggal & kategori challenge.
+     * Progres challenge = jumlah huruf berbeda yang lulus pada tanggal & kategori challenge.
      */
     private function rebuildChallengeProgress(int $userId, Student $student): void
     {
@@ -173,10 +173,10 @@ class PracticeDataCleanupService
             ->join('categories as c', 'c.id', '=', 'm.category_id')
             ->where('practice_sessions.status', PracticeSession::STATUS_COMPLETED)
             ->where('practice_sessions.score', '>=', PracticeService::PASS_SCORE)
-            ->get(['practice_sessions.created_at', 'c.slug'])
+            ->get(['practice_sessions.created_at', 'practice_sessions.lesson_id', 'c.slug'])
             ->groupBy(fn ($row) => CarbonImmutable::parse($row->created_at)->toDateString()
                 .'|'.(ChallengeService::CATEGORY_MAP[$row->slug] ?? $row->slug))
-            ->map(fn (Collection $rows) => $rows->sortBy('created_at')->values());
+            ->map(fn (Collection $rows) => $rows->sortBy('created_at')->unique('lesson_id')->values());
 
         $challengeIds = DB::table('challenge_progress')->where('user_id', $userId)->pluck('challenge_id');
         $passedDates = $passedByDayAndCategory->keys()->map(fn (string $key) => explode('|', $key)[0])->unique()->values();

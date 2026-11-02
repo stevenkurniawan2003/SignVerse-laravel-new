@@ -97,5 +97,21 @@ class AuthenticationTest extends TestCase
 
         $this->assertGuest();
         $response->assertRedirect('/');
+        $response->assertSessionHas('status', 'Kamu berhasil keluar dari akun. Sampai jumpa lagi!');
+    }
+
+    public function test_logout_notification_reaches_landing_page_once(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post('/logout');
+
+        $this->get('/')->assertInertia(fn ($page) => $page
+            ->component('Landing')
+            ->where('flash.status', 'Kamu berhasil keluar dari akun. Sampai jumpa lagi!'));
+
+        $this->get('/')->assertInertia(fn ($page) => $page
+            ->component('Landing')
+            ->where('flash.status', null));
     }
 }

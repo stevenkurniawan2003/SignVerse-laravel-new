@@ -65,7 +65,7 @@ class ReportController extends Controller
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // BOM agar Excel membaca UTF-8
 
-            $write = fn (array $row) => fputcsv($out, $row, ';', '"', '');
+            $write = fn (array $row) => fputcsv($out, array_map($this->neutralizeFormula(...), $row), ';', '"', '');
             $summary = $report['summary'];
 
             $write(['Laporan Belajar SignTech']);
@@ -119,6 +119,14 @@ class ReportController extends Controller
 
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * Nama & judul diisi pengguna; awalan ini akan dijalankan Excel sebagai formula.
+     */
+    private function neutralizeFormula(mixed $value): mixed
+    {
+        return is_string($value) && preg_match('/^[=+\-@\t\r].+/s', $value) === 1 ? "'".$value : $value;
     }
 
     /**

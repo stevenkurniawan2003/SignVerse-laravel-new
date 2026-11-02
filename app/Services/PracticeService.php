@@ -7,6 +7,7 @@ use App\Models\Lesson;
 use App\Models\PracticeSession;
 use App\Models\Student;
 use App\Services\Contracts\GestureRecognitionService;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 
@@ -117,7 +118,8 @@ class PracticeService
 
             $score = $total > 0 ? (int) round($correct / $total * 100) : 0;
             $passed = $score >= self::PASS_SCORE;
-            $xp = $passed ? $session->lesson->xp_reward : 0;
+            $xp = $passed && ! $this->hasMastered($session->student, $session->lesson) ? $session->lesson->xp_reward : 0;
+            $alreadyPassedToday = $this->hasPassedToday($session->student, $session->lesson);
 
             $session->forceFill([
                 'status' => PracticeSession::STATUS_COMPLETED,
@@ -138,7 +140,7 @@ class PracticeService
                 $badgesBefore,
             )));
 
-            if ($session->lesson->material) {
+            if ($passed && ! $alreadyPassedToday && $session->lesson->material) {
                 ChallengeService::bumpChallenge($userId, $session->lesson->material->category->slug);
             }
 
@@ -160,8 +162,9 @@ class PracticeService
      *   - kamera tidak menangkap tangan / AI tidak terjangkau → tidak dicatat
      *   - lulus bila label AI sama dengan target DAN confidence >= PASS_SCORE
      *   - skor = confidence bila label benar, 0 bila label salah
-     *   - XP pelajaran hanya diberikan saat pertama kali lulus (anti-farming);
-     *     peragaan ulang tetap menambah progres challenge & badge
+     *   - XP pelajaran hanya diberikan saat pertama kali lulus (anti-farming)
+     *   - challenge harian menghitung huruf berbeda: huruf yang sama hanya sekali
+     *     per hari; peragaan ulang tetap dihitung untuk badge
      *
      * @param  array{recognized: ?string, confidence: int, correct: bool}  $recognition
      * @return array{recorded: bool, passed: bool, score: int, xp_earned: int, already_mastered: bool, total_xp: int, level: array<string, mixed>, leveled_up: bool, new_badges: string[], challenge_completed: bool, assignments_completed: array<int, array{title: string, xp_earned: int}>, streak: int}
@@ -195,8 +198,9 @@ class PracticeService
         $score = $isCorrectLabel ? $confidence : 0;
         $alreadyMastered = $this->hasMastered($student, $lesson);
         $xp = $passed && ! $alreadyMastered ? (int) $lesson->xp_reward : 0;
+        $alreadyPassedToday = $this->hasPassedToday($student, $lesson);
 
-        return DB::transaction(function () use ($student, $lesson, $recognition, $userId, $levelBefore, $passed, $score, $alreadyMastered, $xp) {
+        return DB::transaction(function () use ($student, $lesson, $recognition, $userId, $levelBefore, $passed, $score, $alreadyMastered, $xp, $alreadyPassedToday) {
             $session = PracticeSession::create([
                 'student_id' => $student->id,
                 'lesson_id' => $lesson->id,
@@ -227,7 +231,10 @@ class PracticeService
                 // Tugas guru yang menargetkan lesson ini ikut selesai otomatis.
                 $assignmentsCompleted = $this->assignments->completeFromPractice($student, $session);
 
-                $challengeCompleted = ChallengeService::bumpChallenge($userId, $lesson->material->category->slug);
+                // Siswa bisa langsung berlatih tanpa membuka dashboard lebih dulu hari ini.
+                ChallengeService::ensureTodayChallenges();
+                $challengeCompleted = ! $alreadyPassedToday
+                    && ChallengeService::bumpChallenge($userId, $lesson->material->category->slug);
 
                 $badgesBefore = GamificationService::unlockedKeys($userId);
                 GamificationService::evaluateBadges($userId);
@@ -270,6 +277,19 @@ class PracticeService
     }
 
     /**
+     * Apakah student sudah lulus peragaan lesson ini pada hari ini.
+     */
+    private function hasPassedToday(Student $student, Lesson $lesson): bool
+    {
+        return $student->practiceSessions()
+            ->where('lesson_id', $lesson->id)
+            ->where('status', PracticeSession::STATUS_COMPLETED)
+            ->where('score', '>=', self::PASS_SCORE)
+            ->whereDate('completed_at', CarbonImmutable::today()->toDateString())
+            ->exists();
+    }
+
+    /**
      * Ambil sesi in_progress milik student, atau gagal 404.
      */
     public function findActiveSession(Student $student, int $sessionId): PracticeSession
@@ -292,7 +312,7 @@ class PracticeService
      */
     private function updateStreak(Student $student): void
     {
-        $today = today();
+        $today = CarbonImmutable::today();
 
         if ($student->last_activity_date?->isSameDay($today)) {
             return; // Sudah dihitung hari ini

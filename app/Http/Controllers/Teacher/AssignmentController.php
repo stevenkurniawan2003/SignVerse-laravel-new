@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Teacher;
 use App\Http\Controllers\Controller;
 use App\Models\Assignment;
 use App\Models\Lesson;
+use App\Services\AlphabetLessonService;
 use App\Services\AssignmentService;
 use App\Services\PracticeService;
 use App\Services\TeacherStatsService;
@@ -30,6 +31,7 @@ class AssignmentController extends Controller
     public function index(Request $request): Response
     {
         $teacher = $this->stats->forUser($request->user());
+        AlphabetLessonService::ensureComplete();
 
         return Inertia::render('Teacher/Assignments', [
             'assignments' => Assignment::query()

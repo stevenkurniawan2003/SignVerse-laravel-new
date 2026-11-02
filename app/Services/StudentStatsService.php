@@ -7,6 +7,7 @@ use App\Models\Lesson;
 use App\Models\PracticeSession;
 use App\Models\Student;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
@@ -34,15 +35,17 @@ class StudentStatsService
 
         $avgScore = (float) (clone $sessions)->avg('score');
 
+        $streak = GamificationService::streakInfo($student->user_id)['streak'];
+
         return [
             'xp' => $xp,
             'level' => $level,
-            'streak' => GamificationService::streakInfo($student->user_id)['streak'],
-            'longest_streak' => $student->longest_streak,
+            'streak' => $streak,
+            'longest_streak' => max((int) $student->longest_streak, $streak),
             'sessions' => (clone $sessions)->count(),
             'avg_score' => round($avgScore, 1),
             'lessons_mastered' => $this->lessonsMastered($student),
-            'lessons_total' => (int) Lesson::count(),
+            'lessons_total' => $this->aiVerifiableLessons()->count(),
         ];
     }
 
@@ -128,7 +131,7 @@ class StudentStatsService
             ->groupBy('lesson_id')
             ->pluck('best_score', 'lesson_id');
 
-        $attemptedFailing = Lesson::query()
+        $attemptedFailing = $this->aiVerifiableLessons()
             ->whereIn('id', $scores->filter(fn ($score) => $score < 60)->keys())
             ->with('material.category')
             ->orderBy('difficulty')
@@ -139,7 +142,7 @@ class StudentStatsService
             return $attemptedFailing;
         }
 
-        $fresh = Lesson::query()
+        $fresh = $this->aiVerifiableLessons()
             ->whereNotIn('id', $scores->keys())
             ->with('material.category')
             ->orderBy('difficulty')
@@ -148,6 +151,19 @@ class StudentStatsService
             ->get();
 
         return $attemptedFailing->concat($fresh);
+    }
+
+    /**
+     * Lesson yang bisa diselesaikan siswa, yaitu yang peragaannya bisa dinilai AI.
+     *
+     * @return Builder<Lesson>
+     */
+    private function aiVerifiableLessons(): Builder
+    {
+        return Lesson::query()->whereHas(
+            'material.category',
+            fn (Builder $query) => $query->whereIn('slug', PracticeService::AI_SUPPORTED_CATEGORIES),
+        );
     }
 
     /**

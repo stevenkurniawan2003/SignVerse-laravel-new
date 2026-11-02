@@ -53,7 +53,8 @@ Route::middleware(['auth', 'role:student'])->group(function () {
 
     Route::get('/lesson/{id}', function (Request $request, $id, SignTechApiController $api) {
         $data = $api->getLesson($request, $id)->getData(true);
-        return Inertia::render('Lesson', ($data['status'] ?? '') === 'success' ? $data : ['id' => (string) $id]);
+        abort_unless(($data['status'] ?? '') === 'success', 404);
+        return Inertia::render('Lesson', $data);
     })->name('vue.lesson');
 
     Route::get('/practice', function (Request $request, SignTechApiController $api) {
@@ -152,14 +153,9 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
         return Inertia::render('Challenge', $payload);
     })->name('challenge');
 
-    Route::get('/progress', function (Request $request, \App\Services\StudentStatsService $stats, SignTechApiController $api) {
-        $student = $stats->forUser($request->user());
-        $progress = $stats->progressByCategory($student);
-        $summary = $stats->dashboardSummary($student);
-        $payload = [
-            'summary' => $summary,
-            'progress' => $progress,
-        ];
+    Route::get('/progress', function (Request $request, SignTechApiController $api) {
+        $data = $api->dashboard($request)->getData(true);
+        $payload = ($data['status'] ?? '') === 'success' ? $data : [];
         view()->share($payload);
         return Inertia::render('Progress', $payload);
     })->name('progress');

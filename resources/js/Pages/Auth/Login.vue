@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import {
     ArrowRight,
     CheckCircle,
@@ -20,6 +20,9 @@ const props = defineProps({
     status: { type: String, default: '' },
     canResetPassword: { type: Boolean, default: false },
 });
+
+const page = usePage();
+const flashError = computed(() => page.props.flash?.error || '');
 
 const showPassword = ref(false);
 
@@ -63,6 +66,10 @@ function submit() {
                 <span>{{ status }}</span>
             </div>
 
+            <div v-if="flashError" class="mb-5 p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm font-medium rounded-xl" role="alert">
+                {{ flashError }}
+            </div>
+
             <!-- Form Card -->
             <div class="card bg-white rounded-2xl shadow-xl shadow-[#14221d]/5 border border-[#e2ede6] p-6 sm:p-8">
                 <form class="space-y-4" @submit.prevent="submit">
@@ -98,13 +105,14 @@ function submit() {
                             <label for="password" class="block text-xs font-semibold text-[#14221d]">
                                 Kata Sandi
                             </label>
-                            <Link
+                            <!-- Halaman ini Blade, bukan Inertia, jadi harus dibuka sebagai tautan biasa -->
+                            <a
                                 v-if="canResetPassword"
                                 href="/forgot-password"
                                 class="text-xs font-semibold text-[#34B182] hover:text-[#279069] transition"
                             >
                                 Lupa kata sandi?
-                            </Link>
+                            </a>
                         </div>
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#7b9186]">

@@ -49,7 +49,7 @@ class TeacherReportService
             ->get(['id', 'student_id', 'lesson_id', 'language', 'score', 'completed_at']);
 
         $assignments = $this->assignments($teacher, $classroom);
-        $students = $this->students($teacher, $studentIds, $sessions, $assignments);
+        $students = $this->students($teacher, $studentIds, $sessions, $assignments, $from, $to);
 
         $passed = $sessions->filter(fn (PracticeSession $session) => $session->score >= PracticeService::PASS_SCORE);
         $submissions = $assignments->sum('total');
@@ -109,7 +109,7 @@ class TeacherReportService
      * @param  Collection<int, array<string, mixed>>  $assignments
      * @return Collection<int, array<string, mixed>>
      */
-    private function students(Teacher $teacher, Collection $studentIds, Collection $sessions, Collection $assignments): Collection
+    private function students(Teacher $teacher, Collection $studentIds, Collection $sessions, Collection $assignments, CarbonImmutable $from, CarbonImmutable $to): Collection
     {
         $bySession = $sessions->groupBy('student_id');
 
@@ -121,6 +121,17 @@ class TeacherReportService
             ->groupBy('student_id')
             ->selectRaw('student_id, COUNT(DISTINCT lesson_id) as total')
             ->pluck('total', 'student_id');
+
+        // Huruf "baru": pertama kali lulus sepanjang waktu jatuh di dalam periode ini.
+        $newLetters = PracticeSession::query()
+            ->whereIn('student_id', $studentIds)
+            ->where('status', PracticeSession::STATUS_COMPLETED)
+            ->where('score', '>=', PracticeService::PASS_SCORE)
+            ->groupBy('student_id', 'lesson_id')
+            ->selectRaw('student_id, lesson_id, MIN(completed_at) as first_at')
+            ->get()
+            ->filter(fn ($row) => CarbonImmutable::parse($row->first_at)->betweenIncluded($from, $to))
+            ->countBy('student_id');
 
         $lastActive = PracticeSession::query()
             ->whereIn('student_id', $studentIds)
@@ -148,7 +159,7 @@ class TeacherReportService
             ->whereIn('s.id', $studentIds)
             ->orderBy('u.name')
             ->get(['s.id', 'u.name', 'u.email'])
-            ->map(function ($row) use ($bySession, $masteredTotal, $lastActive, $submissions, $classNames) {
+            ->map(function ($row) use ($bySession, $masteredTotal, $newLetters, $lastActive, $submissions, $classNames) {
                 $own = $bySession->get($row->id, collect());
                 $passedOwn = $own->filter(fn ($session) => $session->score >= PracticeService::PASS_SCORE);
                 $ownSubmissions = $submissions->get($row->id, collect());
@@ -162,7 +173,7 @@ class TeacherReportService
                     'passed' => $passedOwn->count(),
                     'pass_rate' => $own->count() ? (int) round($passedOwn->count() / $own->count() * 100) : 0,
                     'avg_score' => round((float) $own->avg('score'), 1),
-                    'new_letters' => $passedOwn->pluck('lesson_id')->unique()->count(),
+                    'new_letters' => (int) ($newLetters[$row->id] ?? 0),
                     'mastered_total' => (int) ($masteredTotal[$row->id] ?? 0),
                     'assignments_done' => $ownSubmissions->where('status', AssignmentSubmission::STATUS_COMPLETED)->count(),
                     'assignments_total' => $ownSubmissions->count(),

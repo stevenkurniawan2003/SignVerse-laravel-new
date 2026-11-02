@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Lesson;
 use App\Models\Material;
+use App\Services\AlphabetLessonService;
 use App\Services\PracticeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,8 +22,12 @@ use Inertia\Response;
  */
 class ModuleController extends Controller
 {
+    private const ALPHABET_LOCKED_MESSAGE = 'Huruf A–Z selalu tersedia di AI Practice untuk SIBI dan BISINDO, jadi tidak bisa dihapus, diganti, atau dipindahkan. XP dan tingkat kesulitannya tetap bisa diubah.';
+
     public function index(): Response
     {
+        AlphabetLessonService::ensureComplete();
+
         $categories = Category::query()
             ->orderBy('order')
             ->with(['materials' => fn ($query) => $query
@@ -73,13 +78,25 @@ class ModuleController extends Controller
 
     public function updateMaterial(Request $request, Material $material): RedirectResponse
     {
-        $material->update($this->validateMaterial($request));
+        $validated = $this->validateMaterial($request);
+        $movesAlphabetLessons = $this->holdsAlphabetLessons($material)
+            && ($validated['language'] !== $material->language || (int) $validated['category_id'] !== (int) $material->category_id);
+
+        if ($movesAlphabetLessons) {
+            return back()->with('error', self::ALPHABET_LOCKED_MESSAGE);
+        }
+
+        $material->update($validated);
 
         return back()->with('status', 'Materi diperbarui.');
     }
 
     public function destroyMaterial(Material $material): RedirectResponse
     {
+        if ($this->holdsAlphabetLessons($material)) {
+            return back()->with('error', self::ALPHABET_LOCKED_MESSAGE);
+        }
+
         if ($material->lessons()->whereHas('practiceSessions')->exists()) {
             return back()->with('error', 'Materi ini sudah dipakai latihan siswa, jadi tidak bisa dihapus agar riwayat belajar mereka tetap aman.');
         }
@@ -106,6 +123,10 @@ class ModuleController extends Controller
     {
         $validated = $this->validateLesson($request, $lesson->material, $lesson);
 
+        if ($this->holdsAlphabetLessons($lesson->material) && $validated['title'] !== strtoupper($lesson->title)) {
+            return back()->with('error', self::ALPHABET_LOCKED_MESSAGE);
+        }
+
         $lesson->update([...$validated, 'gesture_label' => strtolower($validated['title'])]);
 
         return back()->with('status', 'Pelajaran diperbarui.');
@@ -113,6 +134,10 @@ class ModuleController extends Controller
 
     public function destroyLesson(Lesson $lesson): RedirectResponse
     {
+        if ($this->holdsAlphabetLessons($lesson->material)) {
+            return back()->with('error', self::ALPHABET_LOCKED_MESSAGE);
+        }
+
         if ($lesson->practiceSessions()->exists()) {
             return back()->with('error', 'Pelajaran ini sudah dipakai latihan siswa, jadi tidak bisa dihapus agar riwayat belajar mereka tetap aman.');
         }
@@ -172,6 +197,12 @@ class ModuleController extends Controller
         ], [
             'title.regex' => 'Pelajaran alfabet harus berupa satu huruf A–Z agar bisa dinilai AI.',
         ]);
+    }
+
+    private function holdsAlphabetLessons(Material $material): bool
+    {
+        return $material->category?->slug === AlphabetLessonService::CATEGORY_SLUG
+            && $material->lessons()->exists();
     }
 
     private function uniqueSlug(string $title): string

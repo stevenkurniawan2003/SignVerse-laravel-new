@@ -68,13 +68,14 @@ class TeacherStatsService
      * ========================================================================*/
 
     /**
-     * Semua siswa dengan ringkasan aktivitas untuk tabel monitoring.
+     * Siswa dengan ringkasan aktivitas untuk tabel monitoring: siswa kelas milik
+     * guru bila diberikan, seluruh siswa bila tidak.
      *
      * @return Collection<int, array{student: Student, name: string, sessions: int, avg_score: float, xp: int, level: int, streak: int, last_activity: Carbon|null}>
      */
-    public function studentsOverview(): Collection
+    public function studentsOverview(?Teacher $teacher = null): Collection
     {
-        return Student::query()
+        return ($teacher?->studentsQuery() ?? Student::query())
             ->with('user:id,name')
             ->get()
             ->map(fn (Student $student) => $this->studentSummary($student))
@@ -216,7 +217,7 @@ class TeacherStatsService
             ->whereIn('s.id', $studentIds)
             ->orderBy('u.name')
             ->get([
-                's.id', 's.user_id', 'u.name', 'u.email', 's.current_streak',
+                's.id', 's.user_id', 'u.name', 'u.email', 's.current_streak', 's.last_activity_date',
                 'p.sessions', 'p.avg_score', 'p.mastered', 'p.last_activity',
                 DB::raw('COALESCE(p.xp, 0) + COALESCE(ch.xp, 0) + COALESCE(a.xp, 0) as total_xp'),
             ])
@@ -230,7 +231,7 @@ class TeacherStatsService
                 'mastered' => (int) $row->mastered,
                 'xp' => (int) $row->total_xp,
                 'level' => GamificationService::levelFromXp((int) $row->total_xp)['name'],
-                'streak' => (int) $row->current_streak,
+                'streak' => GamificationService::activeStreak((int) $row->current_streak, $row->last_activity_date),
                 'last_activity' => $row->last_activity ? Carbon::parse($row->last_activity)->toIso8601String() : null,
                 'classes' => $classNames->get($row->id, []),
             ]);

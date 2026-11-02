@@ -131,6 +131,21 @@ class GamificationService
         ];
     }
 
+    /**
+     * Streak tersimpan hanya diperbarui saat siswa lulus latihan, jadi dianggap
+     * putus bila latihan terakhir lebih lama dari kemarin.
+     */
+    public static function activeStreak(int $storedStreak, ?string $lastActivityDate): int
+    {
+        if ($lastActivityDate === null) {
+            return 0;
+        }
+
+        return CarbonImmutable::parse($lastActivityDate)->startOfDay()->greaterThanOrEqualTo(CarbonImmutable::yesterday())
+            ? $storedStreak
+            : 0;
+    }
+
     public static function badgeCatalog(): array
     {
         return DB::table('badges')->get()->keyBy('badge_key')->all();
@@ -373,7 +388,7 @@ class GamificationService
             ->leftJoinSub($practiceXp, 'p', 'p.student_id', '=', 's.id')
             ->leftJoinSub($challengeXp, 'ch', 'ch.user_id', '=', 's.user_id')
             ->leftJoinSub($assignmentXp, 'a', 'a.student_id', '=', 's.id')
-            ->selectRaw('s.user_id, u.name, s.current_streak, COALESCE(p.xp, 0) + COALESCE(ch.xp, 0) + COALESCE(a.xp, 0) as total_xp')
+            ->selectRaw('s.user_id, u.name, s.current_streak, s.last_activity_date, COALESCE(p.xp, 0) + COALESCE(ch.xp, 0) + COALESCE(a.xp, 0) as total_xp')
             ->orderByDesc('total_xp')
             ->orderBy('u.name')
             ->get();
@@ -399,7 +414,7 @@ class GamificationService
                     ->implode(''),
                 'xp' => $xp,
                 'level' => self::levelFromXp($xp)['name'],
-                'streak' => (int) $row->current_streak,
+                'streak' => self::activeStreak((int) $row->current_streak, $row->last_activity_date),
                 'is_me' => $currentUserId !== null && (int) $row->user_id === $currentUserId,
             ];
         }

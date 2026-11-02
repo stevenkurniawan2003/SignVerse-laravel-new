@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     ArrowRight,
     Award,
@@ -14,6 +14,9 @@ import {
     Trophy,
     X,
 } from '@lucide/vue';
+import { shouldAnimatePageEntry } from '../pageTransition';
+
+const isPageEntering = ref(shouldAnimatePageEntry(usePage().url));
 
 const props = defineProps({
     id: { type: String, default: '1' },
@@ -95,7 +98,14 @@ const options = computed(() => {
         if (!list.includes(f)) list.push(f);
         if (list.length >= 4) break;
     }
-    return list.slice(0, 4);
+
+    // Acak agar jawaban benar tidak selalu berada di pilihan pertama
+    const shuffled = list.slice(0, 4);
+    for (let index = shuffled.length - 1; index > 0; index--) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+    return shuffled;
 });
 
 function advance() {
@@ -239,7 +249,11 @@ async function verifyDemonstration() {
 <template>
     <Head :title="`Pelajaran: ${lessonTitleText}`" />
 
-    <div class="focus-layout font-sans text-ink bg-surface min-h-screen">
+    <div
+        class="focus-layout font-sans text-ink bg-surface min-h-screen"
+        :class="{ 'page-slide-in': isPageEntering }"
+        @animationend.self="isPageEntering = false"
+    >
         <header class="lesson-header">
             <Link href="/learn" class="exit-lesson" aria-label="Keluar latihan">
                 <X :size="20" />

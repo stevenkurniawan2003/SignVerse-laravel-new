@@ -49,7 +49,7 @@ class ChallengeService
     {
         $today = now()->toDateString();
         $rows = [
-            [$today, 'Praktik 5 huruf', 'Peragakan 5 isyarat huruf dengan benar hari ini.', 'alfabet', 5],
+            [$today, 'Praktik 5 huruf', 'Peragakan 5 huruf berbeda dengan benar hari ini.', 'alfabet', 5],
         ];
 
         foreach ($rows as [$date, $title, $description, $category, $target]) {
@@ -113,7 +113,7 @@ class ChallengeService
 
         $unlockedAny = false;
         foreach ($challenges as $ch) {
-            $newProgress = $completedAll ? $ch->target : $ch->current_progress + 1;
+            $newProgress = $completedAll ? $ch->target : min($ch->target, $ch->current_progress + 1);
             $completed = $newProgress >= $ch->target ? 1 : 0;
 
             $exists = DB::table('challenge_progress')
