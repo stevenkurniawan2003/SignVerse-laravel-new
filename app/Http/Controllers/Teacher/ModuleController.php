@@ -27,6 +27,7 @@ class ModuleController extends Controller
     public function index(): Response
     {
         AlphabetLessonService::ensureComplete();
+        $this->ensureVocabularyCategory();
 
         $categories = Category::query()
             ->orderBy('order')
@@ -36,7 +37,8 @@ class ModuleController extends Controller
                 ->withCount('lessons')
                 ->with(['lessons' => fn ($lessons) => $lessons
                     ->orderBy('order')
-                    ->withCount('practiceSessions')])])
+                    ->orderBy('id')
+                    ->withCount(['practiceSessions', 'assignments'])])])
             ->get();
 
         return Inertia::render('Teacher/Modules', [
@@ -56,7 +58,7 @@ class ModuleController extends Controller
                         'title' => $lesson->title,
                         'xp_reward' => (int) $lesson->xp_reward,
                         'difficulty' => (int) $lesson->difficulty,
-                        'used' => $lesson->practice_sessions_count > 0,
+                        'used' => $lesson->practice_sessions_count > 0 || $lesson->assignments_count > 0,
                     ]),
                 ]),
             ]),
@@ -65,7 +67,20 @@ class ModuleController extends Controller
 
     public function storeMaterial(Request $request): RedirectResponse
     {
-        $validated = $this->validateMaterial($request);
+        $validated = [
+            ...$this->validateMaterial($request),
+            ...$request->validate([
+                'category_id' => [
+                    'required',
+                    'exists:categories,id',
+                    function (string $attribute, mixed $value, \Closure $fail) {
+                        if (Category::whereKey($value)->where('slug', AlphabetLessonService::CATEGORY_SLUG)->exists()) {
+                            $fail('Huruf A–Z sudah lengkap. Pilih kategori lain untuk modul baru.');
+                        }
+                    },
+                ],
+            ]),
+        ];
 
         Material::create([
             ...$validated,
@@ -73,22 +88,20 @@ class ModuleController extends Controller
             'order' => (int) Material::where('category_id', $validated['category_id'])->max('order') + 1,
         ]);
 
-        return back()->with('status', "Materi {$validated['title']} ditambahkan.");
+        return back()->with('status', "Modul {$validated['title']} ditambahkan.");
     }
 
     public function updateMaterial(Request $request, Material $material): RedirectResponse
     {
         $validated = $this->validateMaterial($request);
-        $movesAlphabetLessons = $this->holdsAlphabetLessons($material)
-            && ($validated['language'] !== $material->language || (int) $validated['category_id'] !== (int) $material->category_id);
 
-        if ($movesAlphabetLessons) {
+        if ($this->holdsAlphabetLessons($material) && $validated['language'] !== $material->language) {
             return back()->with('error', self::ALPHABET_LOCKED_MESSAGE);
         }
 
         $material->update($validated);
 
-        return back()->with('status', 'Materi diperbarui.');
+        return back()->with('status', 'Modul diperbarui.');
     }
 
     public function destroyMaterial(Material $material): RedirectResponse
@@ -97,13 +110,13 @@ class ModuleController extends Controller
             return back()->with('error', self::ALPHABET_LOCKED_MESSAGE);
         }
 
-        if ($material->lessons()->whereHas('practiceSessions')->exists()) {
-            return back()->with('error', 'Materi ini sudah dipakai latihan siswa, jadi tidak bisa dihapus agar riwayat belajar mereka tetap aman.');
+        if ($material->lessons()->where(fn ($query) => $query->whereHas('practiceSessions')->orWhereHas('assignments'))->exists()) {
+            return back()->with('error', 'Modul ini sudah dipakai latihan atau tugas siswa, jadi tidak bisa dihapus agar riwayat belajar mereka tetap aman.');
         }
 
         $material->delete();
 
-        return back()->with('status', 'Materi dihapus.');
+        return back()->with('status', 'Modul dihapus.');
     }
 
     public function storeLesson(Request $request, Material $material): RedirectResponse
@@ -112,11 +125,11 @@ class ModuleController extends Controller
 
         $material->lessons()->create([
             ...$validated,
-            'gesture_label' => strtolower($validated['title']),
+            'gesture_label' => $this->gestureLabel($validated['title']),
             'order' => (int) $material->lessons()->max('order') + 1,
         ]);
 
-        return back()->with('status', "Pelajaran {$validated['title']} ditambahkan.");
+        return back()->with('status', "{$validated['title']} ditambahkan.");
     }
 
     public function updateLesson(Request $request, Lesson $lesson): RedirectResponse
@@ -127,9 +140,9 @@ class ModuleController extends Controller
             return back()->with('error', self::ALPHABET_LOCKED_MESSAGE);
         }
 
-        $lesson->update([...$validated, 'gesture_label' => strtolower($validated['title'])]);
+        $lesson->update([...$validated, 'gesture_label' => $this->gestureLabel($validated['title'])]);
 
-        return back()->with('status', 'Pelajaran diperbarui.');
+        return back()->with('status', "{$validated['title']} diperbarui.");
     }
 
     public function destroyLesson(Lesson $lesson): RedirectResponse
@@ -138,49 +151,52 @@ class ModuleController extends Controller
             return back()->with('error', self::ALPHABET_LOCKED_MESSAGE);
         }
 
-        if ($lesson->practiceSessions()->exists()) {
-            return back()->with('error', 'Pelajaran ini sudah dipakai latihan siswa, jadi tidak bisa dihapus agar riwayat belajar mereka tetap aman.');
+        if ($lesson->practiceSessions()->exists() || $lesson->assignments()->exists()) {
+            return back()->with('error', "{$lesson->title} sudah dipakai latihan atau tugas siswa, jadi tidak bisa dihapus agar riwayat belajar mereka tetap aman.");
         }
 
         $lesson->delete();
 
-        return back()->with('status', 'Pelajaran dihapus.');
+        return back()->with('status', "{$lesson->title} dihapus.");
     }
 
     /**
-     * @return array{category_id: int, title: string, language: string, difficulty: int, description: ?string}
+     * Kategori hanya dipilih saat modul dibuat, jadi tidak ikut divalidasi di sini.
+     *
+     * @return array{title: string, language: string, difficulty?: int, description?: ?string}
      */
     private function validateMaterial(Request $request): array
     {
         return $request->validate([
-            'category_id' => ['required', 'exists:categories,id'],
             'title' => ['required', 'string', 'max:200'],
             'language' => ['required', Rule::in(['sibi', 'bisindo'])],
-            'difficulty' => ['required', 'integer', 'min:1', 'max:5'],
+            'difficulty' => ['sometimes', 'integer', 'min:1', 'max:5'],
             'description' => ['nullable', 'string', 'max:2000'],
         ]);
     }
 
     /**
-     * Pelajaran alfabet harus satu huruf A–Z (label yang dikenali AI) dan
-     * tidak boleh dobel dalam sistem isyarat yang sama.
+     * Pelajaran alfabet harus satu huruf A–Z (label yang dikenali AI), sedangkan
+     * kosakata disimpan sesuai ketikan guru. Keduanya tidak boleh dobel dalam
+     * kategori dan sistem isyarat yang sama.
      *
-     * @return array{title: string, xp_reward: int, difficulty: int}
+     * @return array{title: string, xp_reward?: int, difficulty?: int}
      */
     private function validateLesson(Request $request, Material $material, ?Lesson $ignore = null): array
     {
-        $request->merge(['title' => strtoupper(trim((string) $request->input('title')))]);
-        $isAlphabet = $material->category?->slug === 'alphabet';
+        $isAlphabet = $material->category?->slug === AlphabetLessonService::CATEGORY_SLUG;
+        $title = trim((string) $request->input('title'));
+        $request->merge(['title' => $isAlphabet ? strtoupper($title) : $title]);
 
         return $request->validate([
             'title' => [
                 'required',
                 'string',
-                'max:50',
+                'max:100',
                 ...($isAlphabet ? ['regex:/^[A-Z]$/'] : []),
                 function (string $attribute, string $value, \Closure $fail) use ($material, $ignore) {
                     $duplicate = Lesson::query()
-                        ->where('title', $value)
+                        ->whereRaw('LOWER(title) = ?', [mb_strtolower($value)])
                         ->when($ignore, fn ($query) => $query->whereKeyNot($ignore->id))
                         ->whereHas('material', fn ($query) => $query
                             ->where('language', $material->language)
@@ -188,15 +204,32 @@ class ModuleController extends Controller
                         ->exists();
 
                     if ($duplicate) {
-                        $fail("Pelajaran {$value} sudah ada untuk ".strtoupper($material->language).'.');
+                        $fail("{$value} sudah ada untuk ".strtoupper($material->language).'.');
                     }
                 },
             ],
-            'xp_reward' => ['required', 'integer', 'min:1', 'max:100'],
-            'difficulty' => ['required', 'integer', 'min:1', 'max:3'],
+            'xp_reward' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'difficulty' => ['sometimes', 'integer', 'min:1', 'max:3'],
         ], [
             'title.regex' => 'Pelajaran alfabet harus berupa satu huruf A–Z agar bisa dinilai AI.',
         ]);
+    }
+
+    /**
+     * Database yang tidak dibuat dari seeder lengkap bisa belum punya kategori
+     * kosakata, padahal guru perlu memilihnya saat membuat modul.
+     */
+    private function ensureVocabularyCategory(): void
+    {
+        Category::firstOrCreate(
+            ['slug' => 'word'],
+            ['name' => 'Word', 'icon' => 'word', 'description' => 'Kosakata sehari-hari.', 'order' => 2],
+        );
+    }
+
+    private function gestureLabel(string $title): string
+    {
+        return Str::of($title)->lower()->snake()->value();
     }
 
     private function holdsAlphabetLessons(Material $material): bool

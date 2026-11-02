@@ -11,10 +11,12 @@ import {
     Camera,
     CheckCircle,
     ChevronRight,
+    Compass,
     Crown,
     Flame,
     Hand,
     MessageSquare,
+    Sprout,
     Star,
     Target,
     Trophy,
@@ -23,6 +25,7 @@ import AppLayout from '../Layouts/AppLayout.vue';
 
 const props = defineProps({
     summary: { type: Object, default: () => ({}) },
+    levels: { type: Array, default: () => [] },
     progress: { type: Array, default: () => [] },
     recentSessions: { type: Array, default: () => [] },
     recommended: { type: Array, default: () => [] },
@@ -142,7 +145,43 @@ const currentLevel = computed(() => props.summary?.level || {
     pct: 0,
 });
 
-const levelPercent = computed(() => Math.min(100, Math.round(Number(currentLevel.value.pct || 0))));
+const levelPercent = computed(() =>
+    currentLevel.value.next_xp ? Math.min(100, Math.round(Number(currentLevel.value.pct || 0))) : 100
+);
+
+// Urutan peringkat dan XP yang masih dibutuhkan untuk mencapai tiap peringkat
+const levelIcons = {
+    Beginner: Sprout,
+    Explorer: Compass,
+    Communicator: MessageSquare,
+    'Inclusive Champion': Crown,
+};
+
+function formatXp(xp) {
+    return Number(xp).toLocaleString('id-ID');
+}
+
+const levelSteps = computed(() => {
+    const reachedCount = props.levels.filter((level) => totalXp.value >= level.min_xp).length;
+
+    return props.levels.map((level, index) => {
+        const isCurrent = index === reachedCount - 1;
+        const isNext = index === reachedCount;
+        const remainingXp = level.min_xp - totalXp.value;
+        const reachedLabel = isCurrent ? 'Peringkat kamu' : 'Sudah tercapai';
+
+        return {
+            ...level,
+            position: index + 1,
+            icon: levelIcons[level.name] || Award,
+            isCurrent,
+            isNext,
+            isReached: index < reachedCount,
+            requirement: level.min_xp === 0 ? 'Peringkat awal' : `Total ${formatXp(level.min_xp)} XP`,
+            status: remainingXp > 0 ? `Butuh ${formatXp(remainingXp)} XP lagi` : reachedLabel,
+        };
+    });
+});
 
 // Active Challenge from Database
 const challengeList = ref(Array.isArray(props.challenges) ? [...props.challenges] : []);
@@ -311,6 +350,44 @@ const filteredSessions = computed(() => {
                     <div class="st-stat-value">{{ avgScore }}<small>%</small></div>
                     <div class="st-stat-foot">{{ sessionsCount }} sesi latihan tervalidasi</div>
                 </article>
+            </section>
+
+            <!-- 2b. Urutan peringkat -->
+            <section v-if="levelSteps.length" class="st-panel" aria-labelledby="level-ladder-title">
+                <div class="st-panel-head">
+                    <div>
+                        <span class="st-eyebrow">Jalur Peringkat</span>
+                        <h2 id="level-ladder-title" class="st-panel-title">Urutan Peringkat & XP</h2>
+                    </div>
+                    <span class="st-badge st-badge--gold">
+                        <Star :size="13" />
+                        {{ formatXp(totalXp) }} XP kamu
+                    </span>
+                </div>
+
+                <ol class="level-ladder">
+                    <li
+                        v-for="step in levelSteps"
+                        :key="step.name"
+                        class="level-step"
+                        :class="{ 'is-reached': step.isReached, 'is-current': step.isCurrent, 'is-next': step.isNext }"
+                        :aria-current="step.isCurrent ? 'step' : undefined"
+                    >
+                        <div class="level-step-head">
+                            <span class="level-step-icon"><component :is="step.icon" :size="20" /></span>
+                            <span class="level-step-position">{{ step.position }}</span>
+                        </div>
+                        <b>{{ step.name }}</b>
+                        <small>{{ step.requirement }}</small>
+                        <div v-if="step.isNext" class="st-track" role="progressbar" :aria-valuenow="levelPercent" aria-valuemin="0" aria-valuemax="100">
+                            <i :style="{ width: `${levelPercent}%` }"></i>
+                        </div>
+                        <span class="level-step-status">
+                            <CheckCircle v-if="step.isReached" :size="14" />
+                            {{ step.status }}
+                        </span>
+                    </li>
+                </ol>
             </section>
 
             <!-- 3. Ritme belajar & tantangan harian -->
@@ -640,6 +717,102 @@ const filteredSessions = computed(() => {
 }
 
 .level-box-foot b {
+    color: var(--st-primary-dark);
+}
+
+/* Urutan peringkat */
+.level-ladder {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.level-step {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px;
+    background: var(--st-surface);
+    border: 1px solid var(--st-line-soft);
+    border-radius: 14px;
+}
+
+.level-step.is-reached {
+    background: var(--st-primary-soft);
+    border-color: var(--st-primary-line);
+}
+
+.level-step.is-current {
+    background: #fff;
+    border: 2px solid var(--st-primary);
+    box-shadow: 0 0 0 3px var(--st-primary-soft);
+}
+
+.level-step.is-next {
+    background: #fff;
+    border-color: var(--st-line);
+}
+
+.level-step-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.level-step-icon {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    color: var(--st-muted);
+    background: #fff;
+    border: 1px solid var(--st-line);
+    border-radius: 50%;
+}
+
+.level-step.is-reached .level-step-icon {
+    color: #fff;
+    background: var(--st-primary);
+    border-color: var(--st-primary);
+}
+
+.level-step-position {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--st-muted);
+}
+
+.level-step b {
+    font-size: 15px;
+    line-height: 1.3;
+    color: var(--st-ink);
+}
+
+.level-step small {
+    font-size: 13px;
+    color: var(--st-muted);
+}
+
+.level-step .st-track {
+    margin-top: 6px;
+}
+
+.level-step-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: auto;
+    padding-top: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--st-text);
+}
+
+.level-step.is-reached .level-step-status {
     color: var(--st-primary-dark);
 }
 

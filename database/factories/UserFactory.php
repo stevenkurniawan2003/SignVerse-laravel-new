@@ -24,7 +24,8 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
+            // Tanpa apostrof agar assertSee tidak gagal acak karena perbedaan escaping
+            'name' => str_replace("'", '', fake()->name()),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),

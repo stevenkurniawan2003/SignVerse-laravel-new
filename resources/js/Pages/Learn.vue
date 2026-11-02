@@ -79,10 +79,22 @@ function completedCountOf(category) {
     );
 }
 
-function openLesson(lesson, material) {
-    selectedLesson.value = { ...lesson, materialTitle: material.title, language: material.language };
+// AI baru mengenali huruf alfabet; kosakata lain dilatih bersama guru
+function isAiGraded(category) {
+    return category.slug === 'alphabet';
 }
 
+function openLesson(lesson, material, category) {
+    selectedLesson.value = {
+        ...lesson,
+        materialTitle: material.title,
+        language: material.language,
+        aiGraded: isAiGraded(category),
+    };
+}
+
+// Kategori yang belum punya modul tidak ditampilkan ke siswa
+const visibleCategories = computed(() => categoryList.value.filter((cat) => (cat.materials || []).length > 0));
 const totalLessonsCount = computed(() => categoryList.value.reduce((acc, cat) => acc + lessonCountOf(cat), 0));
 const totalCompletedCount = computed(() => categoryList.value.reduce((acc, cat) => acc + completedCountOf(cat), 0));
 </script>
@@ -102,17 +114,17 @@ const totalCompletedCount = computed(() => categoryList.value.reduce((acc, cat) 
                     <span class="st-icon st-icon--primary"><BookOpen :size="22" /></span>
                     <div>
                         <b>{{ totalCompletedCount }} / {{ totalLessonsCount }}</b>
-                        <small>modul selesai · {{ categoryList.length }} kategori</small>
+                        <small>modul selesai · {{ visibleCategories.length }} kategori</small>
                     </div>
                 </div>
             </header>
 
-            <div v-if="categoryList.length === 0" class="st-empty">
+            <div v-if="visibleCategories.length === 0" class="st-empty">
                 Materi belum tersedia. Silakan muat ulang halaman beberapa saat lagi.
             </div>
 
             <section
-                v-for="(cat, cIndex) in categoryList"
+                v-for="(cat, cIndex) in visibleCategories"
                 :key="cat.id"
                 class="st-panel"
             >
@@ -148,7 +160,7 @@ const totalCompletedCount = computed(() => categoryList.value.reduce((acc, cat) 
                             class="lesson-tile"
                             :class="{ 'is-done': isLessonCompleted(lesson) }"
                             :aria-label="`Buka materi ${lesson.title}`"
-                            @click="openLesson(lesson, mat)"
+                            @click="openLesson(lesson, mat, cat)"
                         >
                             <span class="lesson-tile-icon">
                                 <Check v-if="isLessonCompleted(lesson)" :size="18" />
@@ -156,7 +168,7 @@ const totalCompletedCount = computed(() => categoryList.value.reduce((acc, cat) 
                             </span>
                             <span class="lesson-tile-copy">
                                 <b>{{ lesson.title }}</b>
-                                <small>{{ isLessonCompleted(lesson) ? 'Selesai' : `+${lesson.xp_reward} XP` }}</small>
+                                <small>{{ isLessonCompleted(lesson) ? 'Selesai' : isAiGraded(cat) ? `+${lesson.xp_reward} XP` : 'Latihan bersama guru' }}</small>
                             </span>
                         </button>
                     </div>
@@ -171,14 +183,14 @@ const totalCompletedCount = computed(() => categoryList.value.reduce((acc, cat) 
                     </button>
                     <div class="modal-badge-row">
                         <span class="st-badge st-badge--primary">{{ String(selectedLesson.language || 'SIBI').toUpperCase() }}</span>
-                        <span class="st-badge st-badge--gold">+{{ selectedLesson.xp_reward || 10 }} XP</span>
+                        <span v-if="selectedLesson.aiGraded" class="st-badge st-badge--gold">+{{ selectedLesson.xp_reward || 10 }} XP</span>
                     </div>
                     <h2 id="lesson-modal-title">Isyarat {{ selectedLesson.title }}</h2>
-                    <p>{{ selectedLesson.materialTitle }} — pelajari dan peragakan bentuk isyarat ini dengan bantuan deteksi AI.</p>
+                    <p>{{ selectedLesson.materialTitle }} — {{ selectedLesson.aiGraded ? 'pelajari dan peragakan bentuk isyarat ini dengan bantuan deteksi AI.' : 'pelajari isyarat ini dan latih bersama guru. AI belum bisa menilai isyarat ini.' }}</p>
 
                     <div class="modal-meta">
                         <span><Clock3 :size="16" /> ± 5 menit</span>
-                        <span><Target :size="16" /> Deteksi AI</span>
+                        <span><Target :size="16" /> {{ selectedLesson.aiGraded ? 'Deteksi AI' : 'Latihan bersama guru' }}</span>
                     </div>
 
                     <Link

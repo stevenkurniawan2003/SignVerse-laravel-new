@@ -111,6 +111,7 @@ class SignTechApiController extends Controller
                         ->implode(''),
                 ],
                 'summary' => $summary,
+                'levels' => GamificationService::levels(),
                 'weekActivity' => $weekDays,
                 'progress' => $progress->map(fn ($p) => [
                     'id' => $p['category']->id,

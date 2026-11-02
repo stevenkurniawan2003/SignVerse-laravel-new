@@ -1,19 +1,9 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import {
-    ArrowRight,
-    Award,
-    Camera,
-    CameraOff,
-    CheckCircle,
-    Flame,
-    Hand,
-    RotateCcw,
-    Star,
-    Trophy,
-    X,
-} from '@lucide/vue';
+import { ArrowRight, Hand, Lightbulb, RotateCcw, X } from '@lucide/vue';
+import PracticeCamera from '../Layouts/PracticeCamera.vue';
+import PracticeResultModal from '../Layouts/PracticeResultModal.vue';
 import { shouldAnimatePageEntry } from '../pageTransition';
 
 const isPageEntering = ref(shouldAnimatePageEntry(usePage().url));
@@ -37,22 +27,12 @@ const related = ref(props.relatedLessons || []);
 const step = ref(0);
 const choice = ref('');
 const checked = ref(false);
-const wrong = ref(0);
-const done = ref(false);
 
 // Peragaan kamera — lesson hanya selesai bila AI menyatakan peragaan benar
-const videoRef = ref(null);
-const canvasRef = ref(null);
-const cameraActive = ref(false);
-const cameraError = ref('');
-const scanning = ref(false);
-const countdown = ref(0);
-const attempt = ref(null);
-const attemptCount = ref(0);
-let mediaStream = null;
-let countdownInterval = null;
-
-const demonstrationPassed = computed(() => Boolean(attempt.value?.correct));
+const cameraRef = ref(null);
+const result = ref(null);
+const resultOpen = ref(false);
+const passed = ref(false);
 
 onMounted(async () => {
     if (!currentLesson.value) {
@@ -82,6 +62,11 @@ const targetGesture = computed(() => currentLesson.value?.title || 'A');
 const types = ['info', 'choice', 'practice'];
 const currentType = computed(() => types[step.value] || 'info');
 const languageLabel = computed(() => String(currentMaterial.value?.language || 'SIBI').toUpperCase());
+const handTip = computed(() =>
+    languageLabel.value === 'BISINDO'
+        ? 'BISINDO umumnya memakai dua tangan. Pastikan kedua tangan masuk ke dalam bingkai kamera.'
+        : 'SIBI memakai satu tangan. Pastikan hanya satu tangan yang terlihat di kamera.'
+);
 
 const options = computed(() => {
     const list = [targetGesture.value];
@@ -114,14 +99,6 @@ function advance() {
     checked.value = false;
 }
 
-// Tahap akhir hanya bisa diselesaikan setelah peragaan lulus penilaian AI
-function finishLesson() {
-    if (!demonstrationPassed.value) return;
-    stopCamera();
-    done.value = true;
-    router.reload({ only: ['auth'] });
-}
-
 function chooseAnswer(option) {
     if (checked.value) return;
     choice.value = option;
@@ -131,9 +108,6 @@ const answerIsCorrect = computed(() => choice.value === targetGesture.value);
 
 function verifyAnswer() {
     checked.value = true;
-    if (!answerIsCorrect.value) {
-        wrong.value += 1;
-    }
 }
 
 function retryAnswer() {
@@ -141,108 +115,29 @@ function retryAnswer() {
     checked.value = false;
 }
 
-async function startCamera() {
-    cameraError.value = '';
-    try {
-        if (!navigator.mediaDevices?.getUserMedia) {
-            cameraError.value = 'Browser ini tidak mendukung akses kamera.';
-            return;
-        }
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
-            audio: false,
-        });
-        if (videoRef.value) {
-            videoRef.value.srcObject = mediaStream;
-            await videoRef.value.play();
-            cameraActive.value = true;
-        }
-    } catch {
-        cameraError.value = 'Izin kamera tidak diberikan atau kamera sedang dipakai aplikasi lain.';
-        cameraActive.value = false;
+// Pelajaran berikutnya dalam modul yang sama
+const nextLesson = computed(() => {
+    const position = related.value.findIndex((item) => item.id === currentLesson.value?.id);
+    return position >= 0 ? related.value[position + 1] ?? null : null;
+});
+
+const continueLabel = computed(() => (nextLesson.value ? `Lanjut ke Huruf ${nextLesson.value.title}` : 'Kembali ke Materi'));
+
+function continueLesson() {
+    router.visit(nextLesson.value ? `/lesson/${nextLesson.value.id}` : '/learn');
+}
+
+function onDetectionResult(detection) {
+    result.value = detection;
+    resultOpen.value = true;
+    if (detection.success) {
+        passed.value = true;
     }
 }
 
-function cancelCountdown() {
-    if (countdownInterval) {
-        clearInterval(countdownInterval);
-        countdownInterval = null;
-    }
-    countdown.value = 0;
-}
-
-function stopCamera() {
-    cancelCountdown();
-    mediaStream?.getTracks().forEach((track) => track.stop());
-    mediaStream = null;
-    if (videoRef.value) {
-        videoRef.value.srcObject = null;
-    }
-    cameraActive.value = false;
-}
-
-onBeforeUnmount(stopCamera);
-
-function captureFrame() {
-    const video = videoRef.value;
-    const canvas = canvasRef.value;
-    if (!cameraActive.value || !video || !canvas) return null;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', 0.85);
-}
-
-// Hitung mundur 3 detik agar siswa sempat menyiapkan bentuk tangan
-function startDemonstration() {
-    if (!cameraActive.value || scanning.value || countdown.value > 0) return;
-    attempt.value = null;
-    countdown.value = 3;
-    countdownInterval = setInterval(() => {
-        countdown.value -= 1;
-        if (countdown.value <= 0) {
-            cancelCountdown();
-            verifyDemonstration();
-        }
-    }, 1000);
-}
-
-async function verifyDemonstration() {
-    const frame = captureFrame();
-    if (!frame) {
-        attempt.value = { correct: false, message: 'Gagal mengambil gambar dari kamera. Pastikan kamera menyala.' };
-        return;
-    }
-
-    scanning.value = true;
-    try {
-        const res = await fetch('/api/practice/attempt', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': window.csrfToken || '',
-            },
-            body: JSON.stringify({
-                lesson_id: currentLesson.value?.id,
-                image: frame,
-                mirrored: true,
-            }),
-        });
-        const data = await res.json().catch(() => null);
-        if (!res.ok || !data) {
-            throw new Error(data?.message || `Respons server status ${res.status}`);
-        }
-        attempt.value = data;
-        if (data.evaluated) {
-            attemptCount.value += 1;
-        }
-    } catch (e) {
-        attempt.value = { correct: false, message: `Koneksi ke sistem deteksi terganggu: ${e.message}` };
-    } finally {
-        scanning.value = false;
-    }
+function retryFromPopup() {
+    resultOpen.value = false;
+    cameraRef.value?.startDetection();
 }
 </script>
 
@@ -259,72 +154,18 @@ async function verifyDemonstration() {
                 <X :size="20" />
             </Link>
             <div class="lesson-progress" role="progressbar" :aria-valuenow="step + 1" :aria-valuemax="types.length">
-                <i :style="{ width: `${done ? 100 : ((step + 1) / types.length) * 100}%` }"></i>
+                <i :style="{ width: `${passed ? 100 : (step / types.length) * 100}%` }"></i>
             </div>
             <div class="step-count">
-                {{ done ? types.length : step + 1 }} <small>/ {{ types.length }}</small>
+                {{ step + 1 }} <small>/ {{ types.length }}</small>
             </div>
         </header>
 
-        <section v-if="done" class="st-panel result-screen">
-            <div class="result-medal">
-                <Trophy :size="56" class="text-secondary" />
-            </div>
-            <h1>Pelajaran Selesai!</h1>
-            <p>Hebat! Peragaan isyarat {{ lessonTitleText }} kamu sudah dinilai benar oleh AI.</p>
-
-            <div class="reward-grid">
-                <div>
-                    <span class="reward-icon"><Star class="text-secondary" :size="22" /></span>
-                    <b>+{{ attempt?.xp_earned || 0 }} XP</b>
-                    <small>{{ attempt?.already_mastered ? 'Sudah dikuasai sebelumnya' : 'Hadiah Didapat' }}</small>
-                </div>
-                <div>
-                    <span class="reward-icon"><CheckCircle class="text-primary" :size="22" /></span>
-                    <b>{{ attempt?.confidence || 0 }}%</b>
-                    <small>Akurasi Peragaan</small>
-                </div>
-                <div>
-                    <span class="reward-icon"><Flame class="text-secondary" :size="22" /></span>
-                    <b>{{ attempt?.streak || 0 }} Hari</b>
-                    <small>Streak Aktif</small>
-                </div>
-            </div>
-
-            <ul class="lesson-rewards">
-                <li>
-                    <CheckCircle :size="15" />
-                    <span>Kuis dijawab benar {{ wrong === 0 ? 'pada percobaan pertama' : `setelah ${wrong} kali salah` }}, peragaan berhasil pada percobaan ke-{{ attemptCount }}.</span>
-                </li>
-                <li v-for="task in attempt?.assignments_completed || []" :key="task.title">
-                    <CheckCircle :size="15" />
-                    <span>Tugas guru selesai: <b>{{ task.title }}</b> (+{{ task.xp_earned }} XP)</span>
-                </li>
-                <li v-if="attempt?.challenge_completed">
-                    <Trophy :size="15" />
-                    <span>Tantangan harian selesai! Bonus XP tantangan sudah ditambahkan.</span>
-                </li>
-                <li v-for="badge in attempt?.new_badges || []" :key="badge">
-                    <Award :size="15" />
-                    <span>Lencana baru terbuka: <b>{{ badge }}</b></span>
-                </li>
-                <li v-if="attempt?.leveled_up">
-                    <Trophy :size="15" />
-                    <span>Naik level! Sekarang kamu <b>{{ attempt.level?.name }}</b>.</span>
-                </li>
-            </ul>
-
-            <Link href="/learn" class="st-btn st-btn--primary st-btn--block">
-                <span>Kembali ke Kurikulum</span>
-                <ArrowRight :size="16" />
-            </Link>
-        </section>
-
-        <section v-else-if="currentLesson" class="st-panel exercise-card">
+        <section v-if="currentLesson" class="st-panel exercise-card">
             <div class="exercise-kicker">
                 <span class="activity-badge"><Hand :size="14" /></span>
-                <span>{{ String(currentMaterial?.language || 'SIBI').toUpperCase() }} · {{ currentMaterial?.title || 'Kurikulum' }}</span>
-                <span class="st-badge st-badge--gold exercise-xp">+{{ currentLesson.xp_reward || 10 }} XP</span>
+                <span>{{ languageLabel }} · {{ currentMaterial?.title || 'Kurikulum' }}</span>
+                <span v-if="aiSupported" class="st-badge st-badge--gold exercise-xp">+{{ currentLesson.xp_reward || 10 }} XP</span>
             </div>
 
             <!-- Step 1: Info Gesture -->
@@ -334,7 +175,7 @@ async function verifyDemonstration() {
                     <span class="gesture-hand"><Hand :size="80" class="text-primary" /></span>
                     <span class="gesture-letter">{{ currentLesson.title }}</span>
                 </div>
-                <p class="exercise-detail">Peragakan bentuk jemari untuk isyarat <strong>{{ currentLesson.title }}</strong> sesuai kaidah {{ String(currentMaterial?.language || 'SIBI').toUpperCase() }}.</p>
+                <p class="exercise-detail">Peragakan bentuk jemari untuk isyarat <strong>{{ currentLesson.title }}</strong> sesuai kaidah {{ languageLabel }}.</p>
                 <button type="button" class="st-btn st-btn--primary st-btn--block exercise-submit" @click="advance">
                     <span>Saya Siap Berlatih</span>
                     <ArrowRight :size="16" />
@@ -388,7 +229,7 @@ async function verifyDemonstration() {
             <!-- Step 3 (isyarat belum didukung AI): tidak bisa diverifikasi kamera -->
             <div v-else-if="currentType === 'practice' && !aiSupported">
                 <h1>Peragakan Isyarat {{ targetGesture }}</h1>
-                <div class="practice-feedback retry" role="status">
+                <div class="practice-feedback" role="status">
                     <b>Isyarat ini belum bisa dinilai AI.</b>
                     <small>Saat ini AI SignTech baru mengenali isyarat huruf alfabet. Latih isyarat {{ targetGesture }} bersama guru dulu; pelajaran ini akan bisa diselesaikan dan memberi XP setelah AI mendukungnya.</small>
                 </div>
@@ -399,66 +240,26 @@ async function verifyDemonstration() {
             </div>
 
             <!-- Step 3: Peragaan di depan kamera, dinilai AI -->
-            <div v-else-if="currentType === 'practice'">
+            <div v-else-if="currentType === 'practice'" class="practice-step">
                 <h1>Peragakan Isyarat {{ targetGesture }}</h1>
-                <p class="exercise-detail">Nyalakan kamera, tekan tombol peragaan, lalu tahan bentuk tangan isyarat {{ targetGesture }} ({{ languageLabel }}) sampai foto diambil. Pelajaran selesai setelah AI menyatakan peragaanmu benar.</p>
-                <div class="practice-target">
-                    <span>TARGET</span>
-                    <b>Isyarat {{ targetGesture }}</b>
+                <div class="hand-tip">
+                    <Lightbulb :size="16" />
+                    <p>{{ handTip }}</p>
                 </div>
 
-                <canvas ref="canvasRef" class="hidden-canvas"></canvas>
-                <div class="camera-preview" :class="{ scanning }">
-                    <video v-show="cameraActive" ref="videoRef" class="camera-video" autoplay playsinline muted></video>
-                    <div v-if="!cameraActive" class="camera-frame">
-                        <CameraOff :size="40" />
-                        <span class="camera-label">KAMERA BELUM AKTIF</span>
-                    </div>
-                    <div v-if="countdown > 0" class="camera-overlay">
-                        <b>{{ countdown }}</b>
-                        <span>Tahan posisi tangan...</span>
-                    </div>
-                    <div v-else-if="scanning" class="camera-overlay">
-                        <span>MEMERIKSA ISYARAT...</span>
-                    </div>
-                </div>
+                <PracticeCamera
+                    ref="cameraRef"
+                    :lesson-id="currentLesson.id"
+                    :letter="targetGesture"
+                    :system="languageLabel"
+                    :attempted="Boolean(result)"
+                    @result="onDetectionResult"
+                />
 
-                <div v-if="cameraError" class="practice-feedback retry" role="alert">
-                    <b>{{ cameraError }}</b>
-                </div>
-
-                <div v-if="attempt" class="practice-feedback" :class="demonstrationPassed ? 'success' : 'retry'" role="status">
-                    <b>{{ demonstrationPassed ? `Benar! Isyarat ${targetGesture} dikenali dengan akurasi ${attempt.confidence}%.` : 'Peragaan belum berhasil.' }}</b>
-                    <small v-if="!demonstrationPassed && attempt.message">{{ attempt.message }}</small>
-                </div>
-
-                <div class="practice-actions">
-                    <button v-if="!cameraActive" type="button" class="st-btn st-btn--secondary" @click="startCamera">
-                        <Camera :size="16" />
-                        <span>Nyalakan Kamera</span>
-                    </button>
-                    <button
-                        v-else
-                        type="button"
-                        class="st-btn st-btn--secondary"
-                        :disabled="scanning || countdown > 0"
-                        @click="startDemonstration"
-                    >
-                        <RotateCcw v-if="attempt" :size="16" />
-                        <Camera v-else :size="16" />
-                        <span>{{ countdown > 0 ? `Bersiap (${countdown})...` : scanning ? 'Memeriksa...' : attempt ? 'Peragakan Lagi' : 'Mulai Peragaan' }}</span>
-                    </button>
-                    <button
-                        type="button"
-                        class="st-btn st-btn--primary"
-                        :disabled="!demonstrationPassed"
-                        :title="demonstrationPassed ? '' : 'Peragakan isyarat dengan benar terlebih dahulu'"
-                        @click="finishLesson"
-                    >
-                        <span>Selesaikan Pelajaran</span>
-                        <ArrowRight :size="16" />
-                    </button>
-                </div>
+                <button v-if="passed" type="button" class="st-btn st-btn--secondary st-btn--block" @click="continueLesson">
+                    <span>{{ continueLabel }}</span>
+                    <ArrowRight :size="16" />
+                </button>
             </div>
         </section>
 
@@ -468,6 +269,15 @@ async function verifyDemonstration() {
                 <Link href="/learn" class="st-btn st-btn--outline">Kembali ke Materi</Link>
             </div>
         </section>
+
+        <PracticeResultModal
+            :open="resultOpen"
+            :result="result"
+            :next-label="continueLabel"
+            @close="resultOpen = false"
+            @retry="retryFromPopup"
+            @next="continueLesson"
+        />
     </div>
 </template>
 
@@ -608,54 +418,30 @@ async function verifyDemonstration() {
     place-items: center;
     font-size: 12px;
 }
-.practice-target {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: #eefaf4;
-    padding: 10px 14px;
-    border-radius: 10px;
-    margin-bottom: 14px;
-    font-size: 14px;
-    font-weight: 700;
-    color: #1e7253;
-}
-.camera-preview {
-    position: relative;
-    height: 260px;
-    overflow: hidden;
-    background: #14221d;
-    border-radius: 14px;
+.practice-step {
     display: grid;
-    place-items: center;
-    color: #ffffff;
-    margin-bottom: 14px;
+    gap: 14px;
 }
-.camera-video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transform: scaleX(-1);
+.practice-step h1 {
+    margin: 0;
 }
-.camera-overlay {
-    position: absolute;
-    inset: 0;
+.hand-tip {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    background: rgba(20, 34, 29, 0.55);
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
+    gap: 8px;
+    padding: 12px;
+    color: #1e7253;
+    background: #eefaf4;
+    border-radius: 14px;
 }
-.camera-overlay b {
-    font-size: 56px;
-    line-height: 1;
+.hand-tip svg {
+    flex-shrink: 0;
+    margin-top: 2px;
 }
-.hidden-canvas {
-    display: none;
+.hand-tip p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--st-text);
 }
 .practice-feedback {
     display: grid;
@@ -664,12 +450,6 @@ async function verifyDemonstration() {
     padding: 12px 14px;
     border-radius: 12px;
     font-size: 14px;
-}
-.practice-feedback.success {
-    background: #eefaf4;
-    color: #1e7253;
-}
-.practice-feedback.retry {
     background: #fff5eb;
     color: #9a6a2f;
 }
@@ -677,97 +457,8 @@ async function verifyDemonstration() {
     font-size: 13px;
     color: var(--st-text);
 }
-.lesson-rewards {
-    display: grid;
-    gap: 8px;
-    margin: 0 0 20px;
-    padding: 0;
-    list-style: none;
-    text-align: left;
-}
-.lesson-rewards li {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 10px 12px;
-    font-size: 14px;
-    color: var(--st-text);
-    background: #f8faf9;
-    border-radius: 10px;
-}
-.lesson-rewards svg {
-    flex-shrink: 0;
-    margin-top: 2px;
-    color: #C29B40;
-}
-.camera-frame {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-}
-.camera-label {
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    color: #ade6cc;
-}
-.practice-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-.result-screen {
-    text-align: center;
-    padding: 36px 24px;
-    border-radius: 20px;
-}
-.result-medal {
-    width: 88px;
-    height: 88px;
-    border-radius: 50%;
-    background: #fdf9ef;
-    display: grid;
-    place-items: center;
-    margin: 0 auto 16px;
-}
-.reward-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin: 24px 0;
-}
-.result-screen h1 {
-    margin: 0 0 8px;
-    font-size: 24px;
-    font-weight: 800;
-}
-.result-screen > p {
-    margin: 0;
-    font-size: 15px;
-    line-height: 1.6;
-    color: var(--st-text);
-}
-.reward-grid b {
-    font-size: 18px;
-}
-.reward-grid small {
-    font-size: 12px;
-    color: var(--st-muted);
-}
-.reward-grid > div {
-    background: #f8faf9;
-    border: 1px solid #eef3f0;
-    border-radius: 12px;
-    padding: 14px 8px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-}
 @media (max-width: 520px) {
-    .answer-grid,
-    .practice-actions {
+    .answer-grid {
         grid-template-columns: 1fr;
     }
     .exercise-card {

@@ -348,7 +348,7 @@ const streakWeek = computed(() => {
                 <div class="progress-track">
                     <i
                         class="accent-progress"
-                        :style="{ width: `${level.pct || 0}%` }"
+                        :style="{ width: `${level.next_xp ? level.pct || 0 : 100}%` }"
                     ></i>
                 </div>
                 <small>

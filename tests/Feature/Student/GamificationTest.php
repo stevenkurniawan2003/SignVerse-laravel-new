@@ -15,6 +15,7 @@ use App\Services\Contracts\GestureRecognitionService;
 use App\Services\GamificationService;
 use Database\Seeders\BadgeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
 /**
@@ -59,6 +60,26 @@ class GamificationTest extends TestCase
         $this->assertSame('Inclusive Champion', $top['name']);
         $this->assertNull($top['next_xp']);
         $this->assertSame(0.0, $top['pct']);
+    }
+
+    public function test_dashboard_lists_every_level_in_order_with_required_xp(): void
+    {
+        $expectedLevels = [
+            ['name' => 'Beginner', 'min_xp' => 0],
+            ['name' => 'Explorer', 'min_xp' => 300],
+            ['name' => 'Communicator', 'min_xp' => 900],
+            ['name' => 'Inclusive Champion', 'min_xp' => 2000],
+        ];
+
+        $this->assertSame($expectedLevels, GamificationService::levels());
+
+        foreach (['/dashboard', '/student/dashboard'] as $dashboardUrl) {
+            $this->actingAs($this->studentUser())
+                ->get($dashboardUrl)
+                ->assertInertia(fn (AssertableInertia $page) => $page
+                    ->component('Dashboard')
+                    ->where('levels', $expectedLevels));
+        }
     }
 
     /*

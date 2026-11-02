@@ -58,6 +58,19 @@ class GamificationService
         'master_angka' => 'number',
     ];
 
+    /**
+     * Urutan seluruh peringkat beserta total XP minimal masing-masing.
+     *
+     * @return list<array{name: string, min_xp: int}>
+     */
+    public static function levels(): array
+    {
+        return array_map(
+            fn (array $level) => ['name' => $level[1], 'min_xp' => $level[0]],
+            self::LEVELS,
+        );
+    }
+
     public static function levelFromXp(int $xp): array
     {
         $current = self::LEVELS[0][1];
