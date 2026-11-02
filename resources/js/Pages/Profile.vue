@@ -3,7 +3,6 @@ import { computed, ref } from 'vue';
 import { Head, useForm, usePage } from '@inertiajs/vue3';
 import {
     Award,
-    CheckCircle,
     Flame,
     KeyRound,
     Save,
@@ -12,6 +11,7 @@ import {
     User as UserIcon,
 } from '@lucide/vue';
 import AppLayout from '../Layouts/AppLayout.vue';
+import ConfirmDialog from '../Layouts/ConfirmDialog.vue';
 
 const page = usePage();
 const user = computed(() => page.props.auth?.user || {});
@@ -28,32 +28,18 @@ const passwordForm = useForm({
     password_confirmation: '',
 });
 
-const profileSuccess = ref('');
-const passwordSuccess = ref('');
+const passwordDialogOpen = ref(false);
 
 function submitProfile() {
-    profileForm.patch('/profile', {
-        preserveScroll: true,
-        onSuccess: () => {
-            profileSuccess.value = 'Profil berhasil diperbarui.';
-            setTimeout(() => {
-                profileSuccess.value = '';
-            }, 3500);
-        },
-    });
+    profileForm.patch('/profile', { preserveScroll: true });
 }
 
 function submitPassword() {
     passwordForm.put('/password', {
         preserveScroll: true,
         errorBag: 'updatePassword',
-        onSuccess: () => {
-            passwordForm.reset();
-            passwordSuccess.value = 'Kata sandi berhasil diperbarui.';
-            setTimeout(() => {
-                passwordSuccess.value = '';
-            }, 3500);
-        },
+        onSuccess: () => passwordForm.reset(),
+        onFinish: () => (passwordDialogOpen.value = false),
     });
 }
 </script>
@@ -120,11 +106,6 @@ function submitPassword() {
                             </div>
                         </div>
 
-                        <div v-if="profileSuccess" class="st-alert st-alert--success form-alert" role="status">
-                            <CheckCircle :size="16" />
-                            <span>{{ profileSuccess }}</span>
-                        </div>
-
                         <form class="account-form" @submit.prevent="submitProfile">
                             <div class="form-group">
                                 <label for="profile_name">Nama Lengkap</label>
@@ -176,12 +157,7 @@ function submitPassword() {
                             </div>
                         </div>
 
-                        <div v-if="passwordSuccess" class="st-alert st-alert--success form-alert" role="status">
-                            <CheckCircle :size="16" />
-                            <span>{{ passwordSuccess }}</span>
-                        </div>
-
-                        <form class="account-form" @submit.prevent="submitPassword">
+                        <form class="account-form" @submit.prevent="passwordDialogOpen = true">
                             <div class="form-group">
                                 <label for="current_password">Kata Sandi Saat Ini</label>
                                 <input
@@ -237,6 +213,17 @@ function submitPassword() {
                 </div>
             </div>
         </div>
+
+        <ConfirmDialog
+            :open="passwordDialogOpen"
+            title="Ganti kata sandi?"
+            description="Setelah diganti, kamu harus memakai kata sandi baru saat masuk berikutnya."
+            :processing="passwordForm.processing"
+            @cancel="passwordDialogOpen = false"
+            @confirm="submitPassword"
+        >
+            <template #icon><KeyRound :size="26" /></template>
+        </ConfirmDialog>
     </AppLayout>
 </template>
 
@@ -335,10 +322,6 @@ function submitPassword() {
 
 .form-title .st-panel-title {
     margin-top: 0;
-}
-
-.form-alert {
-    margin-bottom: 16px;
 }
 
 .account-form {

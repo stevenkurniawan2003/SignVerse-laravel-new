@@ -491,4 +491,15 @@ class AuditRegressionTest extends TestCase
 
         $this->assertStringContainsString("'=HYPERLINK", $csv);
     }
+
+    /**
+     * Windows tidak membedakan huruf besar-kecil pada path, sedangkan CI Linux membedakannya.
+     * Nama folder dicocokkan dengan isi direktori agar salah kapital juga gagal di Windows.
+     */
+    public function test_inertia_page_paths_match_exact_folder_case(): void
+    {
+        foreach (config('inertia.pages.paths') as $pagePath) {
+            $this->assertContains(basename($pagePath), scandir(dirname($pagePath)));
+        }
+    }
 }

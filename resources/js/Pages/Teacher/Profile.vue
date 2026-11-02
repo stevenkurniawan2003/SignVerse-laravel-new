@@ -1,8 +1,9 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ClipboardList, GraduationCap, KeyRound, Mail, Save, School, ShieldCheck, Users } from '@lucide/vue';
 import AppLayout from '../../Layouts/AppLayout.vue';
+import ConfirmDialog from '../../Layouts/ConfirmDialog.vue';
 
 const props = defineProps({
     profile: { type: Object, default: () => ({}) },
@@ -36,6 +37,8 @@ const passwordForm = useForm({
     password_confirmation: '',
 });
 
+const passwordDialogOpen = ref(false);
+
 function submitProfile() {
     profileForm.patch('/profile', { preserveScroll: true });
 }
@@ -45,6 +48,7 @@ function submitPassword() {
         preserveScroll: true,
         errorBag: 'updatePassword',
         onSuccess: () => passwordForm.reset(),
+        onFinish: () => (passwordDialogOpen.value = false),
     });
 }
 </script>
@@ -109,7 +113,7 @@ function submitPassword() {
                     <h2><KeyRound :size="18" /> Ubah Kata Sandi</h2>
                     <p class="tp-desc">Gunakan minimal 8 karakter dan jangan bagikan kata sandi ke siswa.</p>
 
-                    <form class="tp-form" @submit.prevent="submitPassword">
+                    <form class="tp-form" @submit.prevent="passwordDialogOpen = true">
                         <label>
                             <span>Kata sandi saat ini</span>
                             <input v-model="passwordForm.current_password" type="password" required autocomplete="current-password" />
@@ -149,6 +153,17 @@ function submitPassword() {
                 <div v-else class="st-empty">Belum ada kelas. <Link href="/teacher/classes" class="st-link">Buat kelas pertama</Link>.</div>
             </section>
         </div>
+
+        <ConfirmDialog
+            :open="passwordDialogOpen"
+            title="Ganti kata sandi?"
+            description="Setelah diganti, Anda harus memakai kata sandi baru saat masuk berikutnya."
+            :processing="passwordForm.processing"
+            @cancel="passwordDialogOpen = false"
+            @confirm="submitPassword"
+        >
+            <template #icon><KeyRound :size="26" /></template>
+        </ConfirmDialog>
     </AppLayout>
 </template>
 

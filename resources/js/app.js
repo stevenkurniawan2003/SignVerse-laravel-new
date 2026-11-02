@@ -1,6 +1,7 @@
 import './bootstrap';
 import { createApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
+import ToastNotification from './Layouts/ToastNotification.vue';
 
 createInertiaApp({
     title: (title) => (title ? `${title} — SignTech` : 'SignTech — Platform AI Belajar Bahasa Isyarat'),
@@ -13,7 +14,9 @@ createInertiaApp({
         return page;
     },
     setup({ el, App, props, plugin }) {
-        createApp({ render: () => h(App, props) })
+        createApp({
+            render: () => [h(App, props), h(ToastNotification, { initialFlash: props.initialPage.props.flash })],
+        })
             .use(plugin)
             .mount(el);
     },

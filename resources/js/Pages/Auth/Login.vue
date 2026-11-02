@@ -1,9 +1,8 @@
 <script setup>
-import { computed, ref } from 'vue';
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 import {
     ArrowRight,
-    CheckCircle,
     Eye,
     EyeOff,
     Hand,
@@ -17,12 +16,8 @@ import {
 } from '@lucide/vue';
 
 const props = defineProps({
-    status: { type: String, default: '' },
     canResetPassword: { type: Boolean, default: false },
 });
-
-const page = usePage();
-const flashError = computed(() => page.props.flash?.error || '');
 
 const showPassword = ref(false);
 
@@ -58,16 +53,6 @@ function submit() {
                 <p class="mt-1.5 text-sm text-[#52685d]">
                     Masuk ke akun Anda untuk melanjutkan latihan interaktif.
                 </p>
-            </div>
-
-            <!-- Flash Status Message -->
-            <div v-if="status" class="mb-5 p-3.5 bg-[#eefaf4] border border-[#bcecd6] text-[#1e7253] text-xs sm:text-sm font-medium rounded-xl flex items-center gap-2" role="status">
-                <CheckCircle :size="16" class="shrink-0 text-[#34B182]" />
-                <span>{{ status }}</span>
-            </div>
-
-            <div v-if="flashError" class="mb-5 p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm font-medium rounded-xl" role="alert">
-                {{ flashError }}
             </div>
 
             <!-- Form Card -->

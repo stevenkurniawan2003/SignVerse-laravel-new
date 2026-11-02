@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowRight, Award, CircleCheck, Flame, Star, Target, Trophy } from '@lucide/vue';
 import AppLayout from '../Layouts/AppLayout.vue';
+import { showToast } from '../notifications';
 
 const props = defineProps({
     challenges: { type: Array, default: () => [] },
@@ -13,8 +14,6 @@ const props = defineProps({
 const challengeList = ref(Array.isArray(props.challenges) && props.challenges.length > 0 ? props.challenges : []);
 const rewardsList = ref(Array.isArray(props.rewards) ? props.rewards : []);
 const claimingId = ref(null);
-const claimStatusMessage = ref('');
-const claimFailed = ref(false);
 
 function challengePercent(ch) {
     return Math.min(100, Math.round(((ch.progress || 0) / (ch.target || 1)) * 100));
@@ -43,7 +42,6 @@ onMounted(async () => {
 async function claim(ch) {
     if (claimingId.value || ch.completed) return;
     claimingId.value = ch.id;
-    claimFailed.value = false;
     try {
         const res = await fetch('/api/challenges/claim', {
             method: 'POST',
@@ -59,15 +57,13 @@ async function claim(ch) {
             const data = await res.json();
             ch.completed = true;
             ch.progress = ch.target;
-            claimStatusMessage.value = data.message || `Selamat! Bonus +${ch.reward_xp} XP berhasil diklaim.`;
+            showToast(data.message || `Selamat! Bonus +${ch.reward_xp} XP berhasil diklaim.`);
             router.reload({ only: ['auth'] });
         } else {
-            claimFailed.value = true;
-            claimStatusMessage.value = 'Reward belum bisa diklaim. Coba lagi sebentar.';
+            showToast('Reward belum bisa diklaim. Coba lagi sebentar.', 'error');
         }
     } catch {
-        claimFailed.value = true;
-        claimStatusMessage.value = 'Gagal mengklaim reward. Periksa koneksi jaringan.';
+        showToast('Gagal mengklaim reward. Periksa koneksi jaringan.', 'error');
     } finally {
         claimingId.value = null;
     }
@@ -93,11 +89,6 @@ async function claim(ch) {
                     </div>
                 </div>
             </header>
-
-            <div v-if="claimStatusMessage" class="st-alert" :class="claimFailed ? 'st-alert--danger' : 'st-alert--success'" role="status">
-                <CircleCheck :size="18" />
-                <span>{{ claimStatusMessage }}</span>
-            </div>
 
             <div v-if="challengeList.length > 0" class="challenge-stack">
                 <section v-for="ch in challengeList" :key="ch.id" class="st-panel">

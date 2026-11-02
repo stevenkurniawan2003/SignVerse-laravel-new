@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import {
     ArrowRight,
@@ -23,54 +23,20 @@ import {
     Users,
     X,
 } from '@lucide/vue';
+import ConfirmDialog from './ConfirmDialog.vue';
 import { shouldAnimatePageEntry } from '../pageTransition';
 
 const page = usePage();
 const isPageEntering = ref(shouldAnimatePageEntry(page.url));
-
-/*
- * Notifikasi flash dari server (session 'status' / 'error') ditampilkan
- * sebagai toast setelah setiap aksi, mis. "Kelas dibuat" atau alasan penolakan.
- */
-const toast = ref(null);
-let toastTimer = null;
-
-// Partial reload (mis. polling) mempertahankan prop flash lama: tampilkan sekali saja
-let lastFlash = null;
-
-function showFlash(flash) {
-    const message = flash?.error || flash?.status;
-    if (!message || flash === lastFlash) return;
-    lastFlash = flash;
-    clearTimeout(toastTimer);
-    toast.value = { type: flash.error ? 'error' : 'success', message };
-    toastTimer = setTimeout(() => (toast.value = null), flash.error ? 8000 : 5000);
-}
-
-onMounted(() => showFlash(page.props.flash));
-const removeFlashListener = router.on('success', (event) => showFlash(event.detail.page.props.flash));
-onBeforeUnmount(() => {
-    removeFlashListener();
-    clearTimeout(toastTimer);
-});
 const menuOpen = ref(false);
 
 // Pop-up konfirmasi sebelum keluar dari akun
 const logoutDialogOpen = ref(false);
 const loggingOut = ref(false);
-const logoutCancelButton = ref(null);
 
-async function openLogoutDialog() {
+function openLogoutDialog() {
     menuOpen.value = false;
     logoutDialogOpen.value = true;
-    await nextTick();
-    logoutCancelButton.value?.focus();
-}
-
-function closeLogoutDialog() {
-    if (!loggingOut.value) {
-        logoutDialogOpen.value = false;
-    }
 }
 
 function confirmLogout() {
@@ -309,56 +275,20 @@ const streakWeek = computed(() => {
             </div>
         </main>
 
-        <!-- Toast notifikasi aksi -->
-        <Transition name="toast">
-            <div v-if="toast" class="app-toast" :class="`app-toast--${toast.type}`" :role="toast.type === 'error' ? 'alert' : 'status'">
-                <span>{{ toast.message }}</span>
-                <button type="button" aria-label="Tutup notifikasi" @click="toast = null">&times;</button>
-            </div>
-        </Transition>
-
         <!-- Pop-up konfirmasi keluar -->
-        <Teleport to="body">
-            <Transition name="logout-dialog">
-                <div
-                    v-if="logoutDialogOpen"
-                    class="logout-backdrop"
-                    @click.self="closeLogoutDialog"
-                    @keydown.esc="closeLogoutDialog"
-                >
-                    <div
-                        class="logout-dialog"
-                        role="alertdialog"
-                        aria-modal="true"
-                        aria-labelledby="logout-dialog-title"
-                        aria-describedby="logout-dialog-description"
-                    >
-                        <span class="logout-dialog-icon"><LogOut :size="26" /></span>
-                        <h2 id="logout-dialog-title">Keluar dari akun?</h2>
-                        <p id="logout-dialog-description">Progres belajarmu tetap tersimpan. Kamu bisa masuk lagi kapan saja.</p>
-                        <div class="logout-dialog-actions">
-                            <button
-                                ref="logoutCancelButton"
-                                type="button"
-                                class="logout-dialog-cancel"
-                                :disabled="loggingOut"
-                                @click="closeLogoutDialog"
-                            >
-                                Batal
-                            </button>
-                            <button
-                                type="button"
-                                class="logout-dialog-confirm"
-                                :disabled="loggingOut"
-                                @click="confirmLogout"
-                            >
-                                {{ loggingOut ? 'Memproses...' : 'Ya, Keluar' }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </Transition>
-        </Teleport>
+        <ConfirmDialog
+            :open="logoutDialogOpen"
+            title="Keluar dari akun?"
+            description="Progres belajarmu tetap tersimpan. Kamu bisa masuk lagi kapan saja."
+            cancel-label="Batal"
+            confirm-label="Ya, Keluar"
+            tone="danger"
+            :processing="loggingOut"
+            @cancel="logoutDialogOpen = false"
+            @confirm="confirmLogout"
+        >
+            <template #icon><LogOut :size="26" /></template>
+        </ConfirmDialog>
 
         <!-- Right Insights Sidebar Panel -->
         <aside v-if="!isTeacher" class="right-panel">
@@ -606,154 +536,5 @@ const streakWeek = computed(() => {
     background: #eefaf4 !important;
     color: #1e7253 !important;
     font-weight: 700;
-}
-
-.app-toast {
-    position: fixed;
-    right: 20px;
-    bottom: 20px;
-    z-index: 70;
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    max-width: min(440px, calc(100vw - 32px));
-    padding: 14px 16px;
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 1.5;
-    border-radius: 14px;
-    box-shadow: 0 16px 40px rgba(20, 34, 29, 0.18);
-}
-
-.app-toast--success {
-    color: #1e7253;
-    background: #eefaf4;
-    border: 1px solid #bfe8d4;
-}
-
-.app-toast--error {
-    color: #b42318;
-    background: #fef0ee;
-    border: 1px solid #f7c7c0;
-}
-
-.app-toast button {
-    flex-shrink: 0;
-    font-size: 20px;
-    line-height: 1;
-    color: inherit;
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-}
-
-.logout-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 80;
-    display: grid;
-    place-items: center;
-    padding: 16px;
-    background: rgba(20, 34, 29, 0.55);
-}
-
-.logout-dialog {
-    display: grid;
-    justify-items: center;
-    gap: 10px;
-    width: min(100%, 400px);
-    padding: 26px 22px 22px;
-    text-align: center;
-    background: #ffffff;
-    border-radius: 20px;
-    box-shadow: 0 24px 60px rgba(20, 34, 29, 0.25);
-}
-
-.logout-dialog-icon {
-    display: grid;
-    place-items: center;
-    width: 60px;
-    height: 60px;
-    color: #d9534f;
-    background: #fdf2f2;
-    border-radius: 50%;
-}
-
-.logout-dialog h2 {
-    margin: 4px 0 0;
-    font-size: 20px;
-    font-weight: 800;
-    color: #14221d;
-}
-
-.logout-dialog p {
-    margin: 0;
-    font-size: 14px;
-    line-height: 1.5;
-    color: #52685d;
-}
-
-.logout-dialog-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    width: 100%;
-    margin-top: 10px;
-}
-
-.logout-dialog-actions button {
-    min-height: 46px;
-    padding: 0 12px;
-    font-size: 14px;
-    font-weight: 700;
-    border-radius: 12px;
-    cursor: pointer;
-}
-
-.logout-dialog-actions button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.logout-dialog-cancel {
-    color: #14221d;
-    background: #ffffff;
-    border: 1px solid #d5e2dc;
-}
-
-.logout-dialog-confirm {
-    color: #ffffff;
-    background: #d9534f;
-    border: 1px solid #d9534f;
-}
-
-.logout-dialog-enter-active,
-.logout-dialog-leave-active {
-    transition: opacity 0.18s;
-}
-
-.logout-dialog-enter-from,
-.logout-dialog-leave-to {
-    opacity: 0;
-}
-
-.toast-enter-active,
-.toast-leave-active {
-    transition: 0.25s ease;
-}
-
-.toast-enter-from,
-.toast-leave-to {
-    opacity: 0;
-    transform: translateY(12px);
-}
-
-@media (max-width: 760px) {
-    .app-toast {
-        right: 16px;
-        bottom: 84px;
-        left: 16px;
-        max-width: none;
-    }
 }
 </style>

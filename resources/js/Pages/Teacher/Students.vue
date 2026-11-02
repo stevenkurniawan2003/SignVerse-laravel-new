@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { KeyRound, Pencil, Plus, Search, UserPlus, Users } from '@lucide/vue';
 import AppLayout from '../../Layouts/AppLayout.vue';
+import ConfirmDialog from '../../Layouts/ConfirmDialog.vue';
 
 const props = defineProps({
     students: { type: Array, default: () => [] },
@@ -74,6 +75,7 @@ function saveEdit() {
 
 const pwRow = ref(null);
 const pwForm = useForm({ id: null, password: '' });
+const pwDialogOpen = ref(false);
 
 function startPassword(row) {
     pwRow.value = row;
@@ -84,6 +86,7 @@ function startPassword(row) {
 function savePassword() {
     pwForm.put(`/teacher/students/${pwForm.id}/password`, {
         onSuccess: () => (pwRow.value = null),
+        onFinish: () => (pwDialogOpen.value = false),
     });
 }
 
@@ -234,7 +237,7 @@ onBeforeUnmount(() => timer && clearInterval(timer));
 
             <!-- Modal reset sandi -->
             <div v-if="pwRow" class="st-modal-scrim" @click.self="pwRow = null">
-                <form class="st-card st-form st-modal" @submit.prevent="savePassword">
+                <form class="st-card st-form st-modal" @submit.prevent="pwDialogOpen = true">
                     <h2><KeyRound :size="18" /> Reset Kata Sandi — {{ pwRow.name }}</h2>
                     <label class="st-field">
                         <span>Kata sandi baru (min. 8 karakter) <em>*</em></span>
@@ -248,6 +251,17 @@ onBeforeUnmount(() => timer && clearInterval(timer));
                 </form>
             </div>
         </div>
+
+        <ConfirmDialog
+            :open="pwDialogOpen"
+            :title="`Ganti kata sandi ${pwRow?.name ?? 'siswa'}?`"
+            description="Kata sandi lama siswa tidak bisa dipakai lagi. Berikan kata sandi baru kepada siswa setelah ini."
+            :processing="pwForm.processing"
+            @cancel="pwDialogOpen = false"
+            @confirm="savePassword"
+        >
+            <template #icon><KeyRound :size="26" /></template>
+        </ConfirmDialog>
     </AppLayout>
 </template>
 
