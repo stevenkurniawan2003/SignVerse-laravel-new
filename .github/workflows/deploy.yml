@@ -57,7 +57,7 @@ jobs:
   deploy:
     name: Deploy ke VM
     # Setelah semua test hijau, ganti menjadi: needs: [test, build]
-    needs: [build]
+    needs: [test, build]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
