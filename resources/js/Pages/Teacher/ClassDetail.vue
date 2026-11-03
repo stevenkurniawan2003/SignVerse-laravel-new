@@ -4,10 +4,10 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import {
     ArrowLeft,
     ClipboardList,
-    KeyRound,
     Pencil,
     RefreshCw,
     Save,
+    School,
     Trash2,
     UserPlus,
     UserRoundMinus,
@@ -84,12 +84,28 @@ onBeforeUnmount(() => timer && clearInterval(timer));
         <Head :title="`Kelas ${classroom.name}`" />
 
         <div class="st-page">
-            <header class="st-page-header">
+            <header class="st-page-header st-page-header--tinted">
                 <div class="st-page-header-main">
-                    <Link href="/teacher/classes" class="st-back"><ArrowLeft :size="14" /> Kembali ke daftar kelas</Link>
-                    <span class="st-badge st-badge--primary">Detail Kelas</span>
+                    <div class="st-back-bar">
+                        <Link href="/teacher/classes" class="st-back">
+                            <ArrowLeft :size="15" />
+                            <span>Kembali ke daftar kelas</span>
+                        </Link>
+                        <span class="st-back-divider" aria-hidden="true"></span>
+                        <span class="st-badge st-badge--primary">
+                            <School :size="13" />
+                            Detail Kelas
+                        </span>
+                    </div>
+
                     <h1>{{ classroom.name }}</h1>
-                    <p>{{ classroom.description || 'Tanpa deskripsi.' }}</p>
+
+                    <ul class="st-meta" aria-label="Informasi kelas">
+                        <li class="is-primary"><Users :size="14" /> {{ students.length }} siswa</li>
+                        <li><ClipboardList :size="14" /> {{ assignments.length }} tugas</li>
+                    </ul>
+
+                    <p class="st-description">{{ classroom.description || 'Belum ada deskripsi untuk kelas ini.' }}</p>
                 </div>
                 <div class="st-page-header-aside st-code-box">
                     <small>Kode bergabung</small>
@@ -127,8 +143,11 @@ onBeforeUnmount(() => timer && clearInterval(timer));
 
             <article class="st-card">
                 <div class="st-card-head">
-                    <h2><Users :size="18" /> Siswa Kelas &nbsp;<small class="st-page-header-aside">{{ students.length }} orang</small></h2>
-                    <span class="st-live-dot">Live</span>
+                    <h2>
+                        <Users :size="18" /> Siswa Kelas
+                        <span class="st-badge st-badge--neutral">{{ students.length }} orang</span>
+                    </h2>
+                    <span class="st-live-dot"><i aria-hidden="true"></i> Live</span>
                 </div>
 
                 <form class="st-invite" @submit.prevent="invite">
@@ -179,10 +198,15 @@ onBeforeUnmount(() => timer && clearInterval(timer));
                         </tbody>
                     </table>
                 </div>
-                <p v-else class="st-empty">
-                    Belum ada siswa di kelas ini. Tambah lewat email di atas (untuk akun yang sudah ada), buatkan akun baru di
-                    <Link href="/teacher/students" class="st-link">Manajemen Siswa</Link>, atau bagikan kode kelasnya agar siswa bergabung sendiri.
-                </p>
+                <div v-else class="st-empty">
+                    <span>
+                        Belum ada siswa di kelas ini. Tambah lewat email di atas, bagikan kode kelas
+                        <b>{{ classroom.code }}</b> agar siswa bergabung sendiri, atau buatkan akun baru.
+                    </span>
+                    <Link href="/teacher/students" class="st-btn st-btn--outline st-btn--sm">
+                        <UserPlus :size="13" /> Buka Manajemen Siswa
+                    </Link>
+                </div>
             </article>
 
             <article class="st-card">
@@ -209,93 +233,91 @@ onBeforeUnmount(() => timer && clearInterval(timer));
                         </tbody>
                     </table>
                 </div>
-                <p v-else class="st-empty">Belum ada tugas untuk kelas ini. <Link href="/teacher/assignments" class="st-link">Buat tugas pertama</Link>.</p>
+                <div v-else class="st-empty">
+                    <span>Belum ada tugas untuk kelas ini.</span>
+                    <Link href="/teacher/assignments" class="st-btn st-btn--outline st-btn--sm">
+                        <ClipboardList :size="13" /> Buat Tugas Pertama
+                    </Link>
+                </div>
             </article>
         </div>
     </AppLayout>
 </template>
 
 <style scoped>
-.st-back {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 12.5px;
-    font-weight: 700;
-    color: #1e7253;
-    text-decoration: none;
-    margin-bottom: 6px;
-}
-
+/* Kotak kode bergabung di sisi kanan header */
 .st-code-box {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    width: 260px;
+    padding: 18px 20px;
     text-align: center;
     background: #fff;
-    border: 1px solid #e2ede6;
-    border-radius: 16px;
-    padding: 16px 20px;
-    box-shadow: 0 10px 30px rgba(20, 34, 29, 0.06);
+    border: 1px solid var(--st-line);
+    border-radius: var(--st-radius);
+    box-shadow: var(--st-shadow);
 }
 
 .st-code-box small {
-    color: #7b9186;
+    font-size: 12px;
     font-weight: 600;
+    line-height: 1.45;
+    color: var(--st-muted);
 }
 
 .st-code {
-    font-family: monospace;
+    padding: 6px 16px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 24px;
     font-weight: 800;
     letter-spacing: 4px;
-    background: #f5fbf7;
-    border: 1px dashed #9fd6ba;
-    color: #1e7253;
-    border-radius: 10px;
-    padding: 6px 16px;
+    color: var(--st-primary-dark);
+    background: var(--st-primary-soft);
+    border: 1px dashed var(--st-primary);
+    border-radius: var(--st-radius-sm);
 }
 
-.st-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 18px;
+.st-code-box .st-btn {
+    width: 100%;
 }
 
-.st-card-head h2 {
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 16px;
-    font-weight: 800;
-}
-
-.st-form {
-    margin-bottom: 18px;
+.st-card-head h2 .st-badge {
+    margin-left: 2px;
+    font-size: 11.5px;
 }
 
 .st-invite {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
     margin-bottom: 14px;
 }
 
 .st-invite input {
-    flex: 1;
-    padding: 9px 14px;
-    border: 1px solid #d5e2dc;
-    border-radius: 10px;
+    flex: 1 1 240px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 14px;
     font-size: 13.5px;
-    background: #fbfdfc;
+    background: var(--st-surface);
+    border: 1px solid var(--st-line);
+    border-radius: var(--st-radius-sm);
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.st-invite input:focus {
+    background: #fff;
+    border-color: var(--st-primary);
+    box-shadow: 0 0 0 3px var(--st-primary-soft);
 }
 
 .st-table-wrap td small {
     display: block;
-    color: #7b9186;
-    font-size: 11px;
+    font-size: 11.5px;
+    color: var(--st-muted);
 }
 
 .st-cell-user {
@@ -307,13 +329,42 @@ onBeforeUnmount(() => timer && clearInterval(timer));
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    padding: 3px 10px;
     font-size: 11px;
     font-weight: 700;
-    color: #1e7253;
-    background: #eefaf4;
-    border: 1px solid #d5f3e5;
+    color: var(--st-primary-dark);
+    background: var(--st-primary-soft);
+    border: 1px solid var(--st-primary-line);
     border-radius: 999px;
-    padding: 3px 10px;
+}
+
+.st-live-dot i {
+    width: 7px;
+    height: 7px;
+    background: var(--st-primary);
+    border-radius: 50%;
+    animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+@media (max-width: 760px) {
+    .st-code-box {
+        width: auto;
+    }
+
+    .st-invite .st-btn {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .st-live-dot i {
+        animation: none;
+    }
 }
 
 .fade-enter-active,

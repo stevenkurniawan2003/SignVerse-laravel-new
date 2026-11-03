@@ -13,6 +13,8 @@ import {
     Trophy,
     X,
 } from '@lucide/vue';
+import SpeakButton from './SpeakButton.vue';
+import { percentText, speak, stopSpeech } from '../speech';
 
 const props = defineProps({
     open: { type: Boolean, default: false },
@@ -80,6 +82,43 @@ const failure = computed(() => {
     };
 });
 
+/*
+ * Isyarat → suara: huruf yang dibaca AI dari kamera diucapkan, lalu
+ * ringkasan hasilnya. Dibacakan otomatis saat pop-up terbuka bila
+ * suara otomatis aktif, dan bisa diputar ulang lewat tombol.
+ */
+const recognizedSpeech = computed(() => (props.result?.recognized ? `Huruf ${props.result.recognized}` : ''));
+
+const resultSpeech = computed(() => {
+    const r = props.result;
+    if (!r) return '';
+
+    if (r.success) {
+        const parts = [
+            `Isyaratmu terbaca huruf ${r.letter}. Benar!`,
+            `Akurasi ${percentText(r.confidence)}.`,
+        ];
+        if (r.xp > 0) parts.push(`Kamu mendapat ${r.xp} XP.`);
+        else if (r.alreadyMastered) parts.push('Huruf ini sudah kamu kuasai sebelumnya.');
+        if (r.leveledUp && r.levelName) parts.push(`Selamat, kamu naik level menjadi ${r.levelName}.`);
+        r.assignmentsCompleted.forEach((task) => parts.push(`Tugas ${task.title} selesai.`));
+        if (r.challengeCompleted) parts.push('Tantangan harian selesai.');
+        return parts.join(' ');
+    }
+
+    const info = failure.value;
+    if (!info) return '';
+    const firstTip = info.tips[0] || '';
+
+    if (r.recognized && r.recognized !== r.letter) {
+        return `Isyaratmu terbaca huruf ${r.recognized}, padahal targetnya huruf ${r.letter}. ${firstTip}`;
+    }
+    if (r.recognized) {
+        return `Isyaratmu terbaca huruf ${r.recognized}, tetapi akurasinya baru ${percentText(r.confidence)}. Minimal 60 persen. ${firstTip}`;
+    }
+    return `${info.title}. ${info.reason} ${firstTip}`;
+});
+
 function onNext() {
     emit(props.nextLabel ? 'next' : 'close');
 }
@@ -91,13 +130,20 @@ function onKeydown(event) {
 }
 
 watch(() => props.open, async (open) => {
-    if (!open) return;
+    if (!open) {
+        stopSpeech();
+        return;
+    }
     await nextTick();
     (props.result?.success ? nextButtonRef.value : retryButtonRef.value)?.focus();
+    speak(resultSpeech.value, { auto: true });
 });
 
 onMounted(() => window.addEventListener('keydown', onKeydown));
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
+onBeforeUnmount(() => {
+    window.removeEventListener('keydown', onKeydown);
+    stopSpeech();
+});
 </script>
 
 <template>
@@ -121,6 +167,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
                         <span class="ps-modal-icon"><Check :size="40" /></span>
                         <h2 id="ps-modal-title">Hebat! Isyarat {{ result.letter }} benar</h2>
                         <p class="ps-modal-sub">AI mengenali isyarat huruf {{ result.letter }} ({{ result.system }}) kamu.</p>
+
+                        <div class="ps-modal-voice">
+                            <div v-if="result.recognized" class="ps-voice-read">
+                                <span class="ps-voice-letter">{{ result.recognized }}</span>
+                                <div>
+                                    <small>Isyaratmu terbaca</small>
+                                    <b>Huruf {{ result.recognized }}</b>
+                                </div>
+                                <SpeakButton :text="recognizedSpeech" label="Ucapkan huruf" icon-only />
+                            </div>
+                            <SpeakButton :text="resultSpeech" label="Bacakan hasil" />
+                        </div>
 
                         <div class="ps-modal-stats">
                             <div>
@@ -168,6 +226,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
                         <span class="ps-modal-icon"><X :size="40" /></span>
                         <h2 id="ps-modal-title">{{ failure.title }}</h2>
                         <p class="ps-modal-sub">Target: huruf <b>{{ result.letter }}</b> ({{ result.system }})</p>
+
+                        <div class="ps-modal-voice">
+                            <div v-if="result.recognized" class="ps-voice-read is-miss">
+                                <span class="ps-voice-letter">{{ result.recognized }}</span>
+                                <div>
+                                    <small>Isyaratmu terbaca</small>
+                                    <b>Huruf {{ result.recognized }}</b>
+                                </div>
+                                <SpeakButton :text="recognizedSpeech" label="Ucapkan huruf" icon-only />
+                            </div>
+                            <SpeakButton :text="resultSpeech" label="Bacakan hasil" />
+                        </div>
 
                         <div class="ps-modal-reason">
                             <b>Apa yang salah?</b>
@@ -277,6 +347,67 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
     margin: -6px 0 0;
     font-size: 14px;
     color: var(--st-muted);
+}
+
+/* Isyarat → suara: huruf yang terbaca + tombol bacakan */
+.ps-modal-voice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.ps-voice-read {
+    display: flex;
+    flex: 1 1 220px;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 8px 8px 10px;
+    text-align: left;
+    background: var(--sys-soft);
+    border: 1px solid var(--sys-line);
+    border-radius: 14px;
+}
+
+.ps-voice-read > div {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+}
+
+.ps-voice-read small {
+    font-size: 12px;
+    color: var(--st-muted);
+}
+
+.ps-voice-read b {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--st-ink);
+}
+
+.ps-voice-letter {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+    background: var(--sys);
+    border-radius: 11px;
+}
+
+.ps-voice-read.is-miss {
+    background: #fdeee4;
+    border-color: #f6d3bd;
+}
+
+.ps-voice-read.is-miss .ps-voice-letter {
+    background: #e07a3f;
 }
 
 .ps-modal-stats {

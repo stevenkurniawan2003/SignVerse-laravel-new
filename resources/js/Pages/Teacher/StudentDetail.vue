@@ -4,8 +4,10 @@ import { Head, Link } from '@inertiajs/vue3';
 import {
     ArrowLeft,
     BookOpenCheck,
+    ClipboardList,
     Flame,
     Mail,
+    School,
     Star,
     Target,
     TrendingUp,
@@ -45,10 +47,27 @@ function timeAgo(iso) {
         <div class="st-page">
             <header class="st-page-header st-page-header--tinted">
                 <div class="st-page-header-main">
-                    <Link href="/teacher/students" class="st-back"><ArrowLeft :size="14" /> Kembali ke daftar siswa</Link>
-                    <span class="st-badge st-badge--primary">Progress Belajar Siswa</span>
+                    <div class="st-back-bar">
+                        <Link href="/teacher/students" class="st-back">
+                            <ArrowLeft :size="15" />
+                            <span>Kembali ke daftar siswa</span>
+                        </Link>
+                        <span class="st-back-divider" aria-hidden="true"></span>
+                        <span class="st-badge st-badge--primary">
+                            <TrendingUp :size="13" />
+                            Progress Belajar Siswa
+                        </span>
+                    </div>
+
                     <h1>{{ student.name }}</h1>
-                    <p class="st-mail"><Mail :size="14" /> {{ student.email }}</p>
+
+                    <ul class="st-meta" aria-label="Informasi siswa">
+                        <li><Mail :size="14" /> {{ student.email }}</li>
+                        <li v-for="klass in student.classes || []" :key="klass.id" class="is-primary">
+                            <School :size="14" /> {{ klass.name }}
+                        </li>
+                        <li v-if="!student.classes?.length"><School :size="14" /> Belum masuk kelas</li>
+                    </ul>
                 </div>
                 <div class="st-page-header-aside st-summary-box">
                     <span class="st-icon st-icon--primary"><Star :size="22" /></span>
@@ -58,10 +77,6 @@ function timeAgo(iso) {
                     </div>
                 </div>
             </header>
-
-            <div v-if="student.classes?.length" class="st-toolbar">
-                <span class="st-chip" v-for="klass in student.classes" :key="klass.id">{{ klass.name }}</span>
-            </div>
 
             <section class="st-stat-grid" aria-label="Ringkasan siswa">
                 <article class="st-stat">
@@ -133,7 +148,7 @@ function timeAgo(iso) {
                                 <td>{{ row.lesson }}</td>
                                 <td>{{ row.language }}</td>
                                 <td><span class="st-score" :class="row.score >= 60 ? 'st-score--pass' : 'st-score--fail'">{{ row.score }}%</span></td>
-                                <td>+{{ row.xp }}</td>
+                                <td><span class="st-badge st-badge--gold">+{{ row.xp }} XP</span></td>
                                 <td>{{ timeAgo(row.at) }}</td>
                             </tr>
                         </tbody>
@@ -176,68 +191,27 @@ function timeAgo(iso) {
                                         {{ row.status === 'completed' ? 'Selesai' : 'Belum selesai' }}
                                     </span>
                                 </td>
-                                <td>{{ row.score ?? '-' }}</td>
+                                <td>
+                                    <span v-if="row.score != null" class="st-score" :class="row.score >= 60 ? 'st-score--pass' : 'st-score--fail'">{{ row.score }}%</span>
+                                    <span v-else class="st-muted">—</span>
+                                </td>
                                 <td>{{ row.due_at ? new Date(row.due_at).toLocaleDateString('id-ID') : 'Tanpa deadline' }}</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-                <p v-else class="st-empty">
-                    Siswa ini belum menerima tugas.
-                    <Link href="/teacher/assignments" class="st-link">Beri tugas</Link> untuk kelasnya.
-                </p>
+                <div v-else class="st-empty">
+                    <span>Siswa ini belum menerima tugas.</span>
+                    <Link href="/teacher/assignments" class="st-btn st-btn--outline st-btn--sm">
+                        <ClipboardList :size="13" /> Beri Tugas
+                    </Link>
+                </div>
             </article>
         </div>
     </AppLayout>
 </template>
 
 <style scoped>
-.st-back {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 12.5px;
-    font-weight: 700;
-    color: #1e7253;
-    text-decoration: none;
-    margin-bottom: 6px;
-}
-
-.st-mail {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    color: #52685d;
-}
-
-.st-toolbar {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-}
-
-.st-chip {
-    display: inline-block;
-    font-size: 12px;
-    font-weight: 700;
-    background: #eefaf4;
-    color: #1e7253;
-    border: 1px solid #d5f3e5;
-    border-radius: 999px;
-    padding: 4px 12px;
-}
-
-.st-card-head h2 {
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 16px;
-    font-weight: 800;
-}
-
 .st-letters {
     display: flex;
     flex-direction: column;
@@ -327,22 +301,4 @@ function timeAgo(iso) {
     color: #7b9186;
 }
 
-.st-empty {
-    padding: 14px;
-    background: #fbfdfc;
-    border: 1px dashed #d5e2dc;
-    border-radius: 12px;
-    color: #52685d;
-    font-size: 13px;
-}
-
-.st-score {
-    font-size: 12px;
-    font-weight: 800;
-    padding: 3px 8px;
-    border-radius: 999px;
-}
-
-.st-score--pass { background: #eefaf4; color: #1e7253; }
-.st-score--fail { background: #fdf2f2; color: #d9534f; }
 </style>

@@ -82,6 +82,150 @@
     color: #14221d;
 }
 
+/* Header halaman detail: tombol kembali + label halaman */
+.st-back-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.st-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 0 12px 0 9px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--st-text);
+    text-decoration: none;
+    background: #fff;
+    border: 1px solid var(--st-line);
+    border-radius: 999px;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.st-back svg {
+    transition: transform 0.15s ease;
+}
+
+.st-back:hover {
+    color: var(--st-primary-dark);
+    background: var(--st-primary-soft);
+    border-color: var(--st-primary-line);
+}
+
+.st-back:hover svg {
+    transform: translateX(-2px);
+}
+
+.st-back:focus-visible {
+    outline: 2px solid var(--st-primary);
+    outline-offset: 2px;
+}
+
+.st-back-divider {
+    width: 1px;
+    height: 18px;
+    background: var(--st-line);
+}
+
+.st-back-bar .st-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Info ringkas di header dalam bentuk chip */
+.st-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.st-meta li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 5px 11px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--st-text);
+    background: #fff;
+    border: 1px solid var(--st-line);
+    border-radius: 999px;
+    overflow-wrap: anywhere;
+}
+
+.st-meta li svg {
+    flex-shrink: 0;
+    color: var(--st-muted);
+}
+
+.st-meta li.is-primary {
+    color: var(--st-primary-dark);
+    background: var(--st-primary-soft);
+    border-color: var(--st-primary-line);
+}
+
+.st-meta li.is-primary svg {
+    color: var(--st-primary);
+}
+
+.st-meta li.is-gold {
+    color: var(--st-gold-dark);
+    background: var(--st-gold-soft);
+    border-color: var(--st-gold-line);
+}
+
+.st-meta li.is-gold svg {
+    color: var(--st-gold);
+}
+
+.st-page-header .st-description {
+    margin-top: 14px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--st-text);
+    background: #fff;
+    border: 1px solid var(--st-line);
+    border-radius: var(--st-radius-sm);
+}
+
+/* Skor & teks redup di tabel */
+.st-score {
+    display: inline-block;
+    padding: 3px 9px;
+    font-size: 12px;
+    font-weight: 800;
+    border-radius: 999px;
+}
+
+.st-score--pass {
+    color: var(--st-primary-dark);
+    background: var(--st-primary-soft);
+}
+
+.st-score--fail {
+    color: var(--st-danger);
+    background: var(--st-danger-soft);
+}
+
+.st-muted {
+    color: var(--st-muted);
+}
+
+@media (max-width: 480px) {
+    .st-back-divider {
+        display: none;
+    }
+}
+
 /* Toolbar aksi di bawah header halaman */
 .st-toolbar {
     display: flex;

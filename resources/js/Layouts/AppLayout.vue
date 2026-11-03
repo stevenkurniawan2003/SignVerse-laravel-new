@@ -24,6 +24,7 @@ import {
     X,
 } from '@lucide/vue';
 import ConfirmDialog from './ConfirmDialog.vue';
+import SpeechToggle from './SpeechToggle.vue';
 import { shouldAnimatePageEntry } from '../pageTransition';
 
 const page = usePage();
@@ -250,6 +251,8 @@ const streakWeek = computed(() => {
                         <option value="BISINDO">{{ isCompact ? 'BISINDO' : 'BISINDO (Bahasa Isyarat Indonesia)' }}</option>
                     </select>
                 </label>
+
+                <SpeechToggle :compact="isCompact" />
 
                 <span class="stat-pill">
                     <Flame class="flame text-secondary" :size="17" />

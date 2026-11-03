@@ -11,6 +11,8 @@ import {
 import AppLayout from '../Layouts/AppLayout.vue';
 import PracticeCamera from '../Layouts/PracticeCamera.vue';
 import PracticeResultModal from '../Layouts/PracticeResultModal.vue';
+import SpeakButton from '../Layouts/SpeakButton.vue';
+import { stopSpeech } from '../speech';
 
 const props = defineProps({
     targets: { type: Array, default: () => [] },
@@ -106,9 +108,16 @@ function selectFirstOpenLetter() {
 
 function choose(item) {
     if (!item || scanning.value) return;
+    stopSpeech();
     selectedId.value = item.id;
     resetFeedback();
 }
+
+// Petunjuk huruf target yang dibacakan tombol "Dengarkan"
+const targetSpeech = computed(() => (target.value
+    ? `Huruf ${target.value.letter}, bahasa isyarat ${activeSystem.value}. ${systemInfo.value.tip} `
+        + 'Tekan tombol Mulai Peragaan, lalu tahan bentuk tanganmu sampai hitung mundur selesai.'
+    : ''));
 
 function shiftTarget(direction) {
     const list = letters.value;
@@ -239,6 +248,7 @@ onBeforeUnmount(() => {
                                 <span v-if="target && isMastered(target)" class="ps-chip ps-chip--done"><Check :size="12" /> Sudah dikuasai</span>
                                 <span v-else-if="target" class="ps-chip">+{{ target.xp_reward || 10 }} XP<span class="ps-chip-extra">&nbsp;saat pertama benar</span></span>
                             </div>
+                            <SpeakButton v-if="target" class="ps-target-speak" :text="targetSpeech" label="Dengarkan petunjuk" icon-only variant="light" />
                         </div>
                         <button type="button" class="ps-nav" aria-label="Huruf berikutnya" :disabled="busy || !letters.length" @click="shiftTarget(1)">
                             <ChevronRight :size="22" />
@@ -517,6 +527,11 @@ onBeforeUnmount(() => {
     background: var(--sys-soft);
     border: 1px solid var(--sys-line);
     border-radius: 16px;
+}
+
+.ps-target-main > div {
+    flex: 1;
+    min-width: 0;
 }
 
 .ps-target-letter {

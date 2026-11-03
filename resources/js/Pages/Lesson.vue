@@ -4,6 +4,9 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { ArrowRight, Hand, Lightbulb, RotateCcw, X } from '@lucide/vue';
 import PracticeCamera from '../Layouts/PracticeCamera.vue';
 import PracticeResultModal from '../Layouts/PracticeResultModal.vue';
+import SpeakButton from '../Layouts/SpeakButton.vue';
+import SpeechToggle from '../Layouts/SpeechToggle.vue';
+import { speak, stopSpeech } from '../speech';
 import { shouldAnimatePageEntry } from '../pageTransition';
 
 const isPageEntering = ref(shouldAnimatePageEntry(usePage().url));
@@ -94,6 +97,7 @@ const options = computed(() => {
 });
 
 function advance() {
+    stopSpeech();
     step.value += 1;
     choice.value = '';
     checked.value = false;
@@ -108,7 +112,27 @@ const answerIsCorrect = computed(() => choice.value === targetGesture.value);
 
 function verifyAnswer() {
     checked.value = true;
+    speak(
+        answerIsCorrect.value
+            ? `Jawaban benar! Isyarat tadi adalah huruf ${targetGesture.value}. Sekarang saatnya memperagakan isyarat ini.`
+            : `Kurang tepat. Kamu memilih huruf ${choice.value}. Coba ingat lagi bentuk isyarat yang tadi kamu amati.`,
+        { auto: true },
+    );
 }
+
+// Teks yang dibacakan tombol "Dengarkan" di tiap langkah
+const infoSpeech = computed(() =>
+    `Huruf ${targetGesture.value}, bahasa isyarat ${languageLabel.value}. `
+    + `Amati dan peragakan bentuk jemari untuk isyarat ${targetGesture.value} sesuai kaidah ${languageLabel.value}. ${handTip.value}`
+);
+const quizSpeech = computed(() => {
+    const choices = options.value.map((option) => `huruf ${option}`).join(', ');
+    return `Isyarat yang baru kamu amati melambangkan apa? Pilihannya: ${choices}.`;
+});
+const practiceSpeech = computed(() =>
+    `Peragakan isyarat huruf ${targetGesture.value} di depan kamera. ${handTip.value} `
+    + 'Tekan tombol Mulai Peragaan, lalu tahan bentuk tanganmu sampai hitung mundur selesai.'
+);
 
 function retryAnswer() {
     choice.value = '';
@@ -174,6 +198,7 @@ function retryFromPopup() {
             <div class="step-count">
                 {{ step + 1 }} <small>/ {{ types.length }}</small>
             </div>
+            <SpeechToggle compact />
         </header>
 
         <section v-if="currentLesson" class="st-panel exercise-card">
@@ -185,7 +210,10 @@ function retryFromPopup() {
 
             <!-- Step 1: Info Gesture -->
             <div v-if="currentType === 'info'">
-                <h1>Amati Bentuk Isyarat {{ currentLesson.title }}</h1>
+                <div class="title-row">
+                    <h1>Amati Bentuk Isyarat {{ currentLesson.title }}</h1>
+                    <SpeakButton :text="infoSpeech" />
+                </div>
                 <div class="gesture-demo">
                     <span class="gesture-hand"><Hand :size="80" class="text-primary" /></span>
                     <span class="gesture-letter">{{ currentLesson.title }}</span>
@@ -199,7 +227,10 @@ function retryFromPopup() {
 
             <!-- Step 2: Kuis pemahaman -->
             <div v-else-if="currentType === 'choice'">
-                <h1>Isyarat yang baru kamu amati melambangkan apa?</h1>
+                <div class="title-row">
+                    <h1>Isyarat yang baru kamu amati melambangkan apa?</h1>
+                    <SpeakButton :text="quizSpeech" />
+                </div>
                 <div class="gesture-demo">
                     <span class="gesture-hand"><Hand :size="80" class="text-primary" /></span>
                 </div>
@@ -256,7 +287,10 @@ function retryFromPopup() {
 
             <!-- Step 3: Peragaan di depan kamera, dinilai AI -->
             <div v-else-if="currentType === 'practice'" class="practice-step">
-                <h1>Peragakan Isyarat {{ targetGesture }}</h1>
+                <div class="title-row">
+                    <h1>Peragakan Isyarat {{ targetGesture }}</h1>
+                    <SpeakButton :text="practiceSpeech" />
+                </div>
                 <div class="hand-tip">
                     <Lightbulb :size="16" />
                     <p>{{ handTip }}</p>
@@ -439,6 +473,27 @@ function retryFromPopup() {
 }
 .practice-step h1 {
     margin: 0;
+}
+/* Judul langkah + tombol Dengarkan */
+.title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.exercise-card .title-row h1 {
+    margin: 0;
+    min-width: 0;
+}
+.practice-step .title-row {
+    margin-bottom: 0;
+}
+@media (max-width: 480px) {
+    .title-row {
+        flex-direction: column;
+        gap: 10px;
+    }
 }
 .hand-tip {
     display: flex;

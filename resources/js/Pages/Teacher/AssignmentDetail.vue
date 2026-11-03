@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, CalendarClock, ClipboardList, Gauge, Hand, School, Star, Target, Trophy, UserRound } from '@lucide/vue';
+import { ArrowLeft, ArrowRight, CalendarClock, ClipboardList, Gauge, Hand, School, Star, Target, Trophy, UserRound } from '@lucide/vue';
 import AppLayout from '../../Layouts/AppLayout.vue';
 
 const props = defineProps({
@@ -50,13 +50,13 @@ function timeAgo(iso) {
         <div class="st-page">
             <header class="st-page-header st-page-header--tinted">
                 <div class="st-page-header-main">
-                    <div class="ad-topbar">
-                        <Link href="/teacher/assignments" class="ad-back">
+                    <div class="st-back-bar">
+                        <Link href="/teacher/assignments" class="st-back">
                             <ArrowLeft :size="15" />
                             <span>Kembali ke daftar tugas</span>
                         </Link>
-                        <span class="ad-divider" aria-hidden="true"></span>
-                        <span class="st-badge st-badge--primary ad-badge">
+                        <span class="st-back-divider" aria-hidden="true"></span>
+                        <span class="st-badge st-badge--primary">
                             <ClipboardList :size="13" />
                             Detail Tugas
                         </span>
@@ -64,11 +64,11 @@ function timeAgo(iso) {
 
                     <h1>{{ assignment.title }}</h1>
 
-                    <ul class="ad-meta" aria-label="Informasi tugas">
-                        <li class="is-class"><School :size="14" /> {{ assignment.classroom }}</li>
+                    <ul class="st-meta" aria-label="Informasi tugas">
+                        <li class="is-primary"><School :size="14" /> {{ assignment.classroom }}</li>
                         <li><Hand :size="14" /> Isyarat {{ assignment.lesson }} · {{ assignment.language }}</li>
                         <li><Target :size="14" /> Skor minimal {{ assignment.min_score }}%</li>
-                        <li class="is-xp"><Star :size="14" /> +{{ assignment.xp_reward }} XP</li>
+                        <li class="is-gold"><Star :size="14" /> +{{ assignment.xp_reward }} XP</li>
                         <li><CalendarClock :size="14" /> {{ dueLabel }}</li>
                     </ul>
 
@@ -105,7 +105,7 @@ function timeAgo(iso) {
             <article class="st-card">
                 <div class="st-card-head">
                     <h2><UserRound :size="18" /> Pengerjaan Siswa</h2>
-                    <Link :href="`/teacher/assignments`" class="st-link">Semua tugas →</Link>
+                    <Link href="/teacher/assignments" class="st-link">Semua tugas <ArrowRight :size="14" /></Link>
                 </div>
                 <div v-if="submissions.length" class="st-table-wrap">
                     <table class="st-table">
@@ -126,7 +126,10 @@ function timeAgo(iso) {
                                     <span v-if="row.score != null" class="st-score" :class="row.score >= assignment.min_score ? 'st-score--pass' : 'st-score--fail'">{{ row.score }}%</span>
                                     <span v-else class="st-muted">—</span>
                                 </td>
-                                <td>{{ row.status === 'completed' ? `+${row.xp_earned}` : '—' }}</td>
+                                <td>
+                                    <span v-if="row.status === 'completed'" class="st-badge st-badge--gold">+{{ row.xp_earned }} XP</span>
+                                    <span v-else class="st-muted">—</span>
+                                </td>
                                 <td>{{ timeAgo(row.completed_at) }}</td>
                             </tr>
                         </tbody>
@@ -138,153 +141,3 @@ function timeAgo(iso) {
     </AppLayout>
 </template>
 
-<style scoped>
-/* Baris atas header: tombol kembali + label halaman */
-.ad-topbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
-}
-
-.ad-back {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 32px;
-    padding: 0 12px 0 9px;
-    font-size: 12.5px;
-    font-weight: 700;
-    color: var(--st-text);
-    text-decoration: none;
-    background: #fff;
-    border: 1px solid var(--st-line);
-    border-radius: 999px;
-    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-}
-
-.ad-back:hover {
-    color: var(--st-primary-dark);
-    background: var(--st-primary-soft);
-    border-color: var(--st-primary-line);
-}
-
-.ad-back:hover svg {
-    transform: translateX(-2px);
-}
-
-.ad-back svg {
-    transition: transform 0.15s ease;
-}
-
-.ad-back:focus-visible {
-    outline: 2px solid var(--st-primary);
-    outline-offset: 2px;
-}
-
-.ad-divider {
-    width: 1px;
-    height: 18px;
-    background: var(--st-line);
-}
-
-.ad-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-}
-
-/* Info tugas dalam bentuk chip */
-.ad-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 4px 0 0;
-    padding: 0;
-    list-style: none;
-}
-
-.ad-meta li {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 11px;
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--st-text);
-    background: #fff;
-    border: 1px solid var(--st-line);
-    border-radius: 999px;
-}
-
-.ad-meta li svg {
-    flex-shrink: 0;
-    color: var(--st-muted);
-}
-
-.ad-meta li.is-class {
-    color: var(--st-primary-dark);
-    background: var(--st-primary-soft);
-    border-color: var(--st-primary-line);
-}
-
-.ad-meta li.is-class svg {
-    color: var(--st-primary);
-}
-
-.ad-meta li.is-xp {
-    color: var(--st-gold-dark);
-    background: var(--st-gold-soft);
-    border-color: var(--st-gold-line);
-}
-
-.ad-meta li.is-xp svg {
-    color: var(--st-gold);
-}
-
-@media (max-width: 480px) {
-    .ad-divider {
-        display: none;
-    }
-}
-
-.st-description {
-    margin-top: 14px;
-    background: #fbfdfc;
-    border: 1px solid #e2ede6;
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-size: 13px;
-    color: #41564c;
-}
-
-.st-card-head h2 {
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 16px;
-    font-weight: 800;
-}
-
-.st-score {
-    font-size: 12px;
-    font-weight: 800;
-    padding: 3px 8px;
-    border-radius: 999px;
-}
-
-.st-score--pass { background: #eefaf4; color: #1e7253; }
-.st-score--fail { background: #fdf2f2; color: #d9534f; }
-
-.st-muted { color: #a9bcagb3; color: #a9bcb3; }
-
-.st-empty {
-    padding: 14px;
-    background: #fbfdfc;
-    border: 1px dashed #d5e2dc;
-    border-radius: 12px;
-    color: #52685d;
-    font-size: 13px;
-}
-</style>
