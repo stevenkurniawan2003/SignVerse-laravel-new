@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\AssignmentSubmission;
 use App\Models\Category;
+use App\Models\ChallengeProgress;
 use App\Models\Lesson;
 use App\Models\PracticeSession;
 use App\Models\Student;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -61,6 +64,74 @@ class StudentStatsService
             ->latest('completed_at')
             ->limit($limit)
             ->get();
+    }
+
+    /**
+     * Riwayat perolehan XP siswa dari semua sumber: sesi latihan,
+     * challenge harian yang tuntas, dan tugas guru yang selesai.
+     * Diurutkan dari yang terbaru.
+     *
+     * @return Collection<int, array{id: string, source: string, title: string, detail: string, xp: int, earned_at: CarbonInterface}>
+     */
+    public function xpHistory(Student $student, int $limit = 10): Collection
+    {
+        $practiceEntries = PracticeSession::query()
+            ->where('student_id', $student->id)
+            ->where('status', PracticeSession::STATUS_COMPLETED)
+            ->where('xp_earned', '>', 0)
+            ->with(['lesson.material.category'])
+            ->latest('completed_at')
+            ->limit($limit)
+            ->get()
+            ->map(fn (PracticeSession $session) => [
+                'id' => 'practice-'.$session->id,
+                'source' => 'practice',
+                'title' => $session->lesson?->title ?? 'Latihan',
+                'detail' => 'Sesi latihan · akurasi '.(int) $session->score.'%',
+                'xp' => (int) $session->xp_earned,
+                'earned_at' => $session->completed_at ?? $session->created_at,
+            ]);
+
+        $challengeEntries = ChallengeProgress::query()
+            ->where('user_id', $student->user_id)
+            ->where('completed', true)
+            ->with('challenge')
+            ->orderByDesc('completed_at')
+            ->limit($limit)
+            ->get()
+            ->filter(fn (ChallengeProgress $progress) => $progress->challenge !== null)
+            ->map(fn (ChallengeProgress $progress) => [
+                'id' => 'challenge-'.$progress->challenge_id,
+                'source' => 'challenge',
+                'title' => $progress->challenge->title,
+                'detail' => 'Tantangan harian',
+                'xp' => (int) $progress->challenge->reward_xp,
+                'earned_at' => $progress->completed_at ?? $progress->challenge->challenge_date,
+            ]);
+
+        $assignmentEntries = AssignmentSubmission::query()
+            ->where('student_id', $student->id)
+            ->where('status', AssignmentSubmission::STATUS_COMPLETED)
+            ->where('xp_earned', '>', 0)
+            ->with('assignment')
+            ->orderByDesc('completed_at')
+            ->limit($limit)
+            ->get()
+            ->map(fn (AssignmentSubmission $submission) => [
+                'id' => 'assignment-'.$submission->id,
+                'source' => 'assignment',
+                'title' => $submission->assignment?->title ?? 'Tugas',
+                'detail' => 'Tugas dari guru · skor '.(int) $submission->score.'%',
+                'xp' => (int) $submission->xp_earned,
+                'earned_at' => $submission->completed_at ?? $submission->updated_at,
+            ]);
+
+        return $practiceEntries
+            ->concat($challengeEntries)
+            ->concat($assignmentEntries)
+            ->sortByDesc(fn (array $entry) => $entry['earned_at']?->getTimestamp() ?? 0)
+            ->take($limit)
+            ->values();
     }
 
     /**

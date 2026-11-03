@@ -2,10 +2,14 @@
 
 namespace Tests\Feature\Student;
 
+use App\Models\Assignment;
+use App\Models\AssignmentSubmission;
 use App\Models\Badge;
+use App\Models\Category;
 use App\Models\Challenge;
 use App\Models\ChallengeProgress;
 use App\Models\Lesson;
+use App\Models\Material;
 use App\Models\PracticeSession;
 use App\Models\Student;
 use App\Models\Teacher;
@@ -13,6 +17,7 @@ use App\Models\User;
 use App\Services\ChallengeService;
 use App\Services\Contracts\GestureRecognitionService;
 use App\Services\GamificationService;
+use App\Services\PracticeService;
 use Database\Seeders\BadgeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
@@ -109,18 +114,70 @@ class GamificationTest extends TestCase
         ]);
 
         $teacher = Teacher::factory()->create();
-        $assignment = \App\Models\Assignment::factory()
+        $assignment = Assignment::factory()
             ->for($teacher)->for(Lesson::factory())->create(['xp_reward' => 30]);
-        \App\Models\AssignmentSubmission::create([
+        AssignmentSubmission::create([
             'assignment_id' => $assignment->id,
             'student_id' => $student->id,
-            'status' => \App\Models\AssignmentSubmission::STATUS_COMPLETED,
+            'status' => AssignmentSubmission::STATUS_COMPLETED,
             'score' => 90,
             'xp_earned' => 30,
         ]);
 
         $this->assertSame(150, GamificationService::totalXp($student->user_id));
         $this->assertSame('Beginner', GamificationService::levelFromXp(150)['name']);
+    }
+
+    public function test_dashboard_xp_history_lists_practice_challenge_and_assignment_rewards(): void
+    {
+        $user = $this->studentUser();
+        $student = $user->student;
+
+        PracticeSession::factory()->completed()->for($student)
+            ->for(Lesson::factory()->state(['title' => 'Huruf A']))
+            ->create(['xp_earned' => 15, 'score' => 85, 'completed_at' => now()->subDays(2)]);
+        PracticeSession::factory()->completed()->for($student)->create(['xp_earned' => 0, 'completed_at' => now()]);
+
+        $challenge = Challenge::create([
+            'challenge_date' => today(),
+            'title' => 'Praktik Alfabet',
+            'category' => 'alfabet',
+            'target' => 5,
+            'reward_xp' => 20,
+        ]);
+        ChallengeProgress::create([
+            'user_id' => $user->id,
+            'challenge_id' => $challenge->id,
+            'progress' => 5,
+            'completed' => true,
+            'completed_at' => now()->subHour(),
+        ]);
+
+        $assignment = Assignment::factory()
+            ->for(Teacher::factory())->for(Lesson::factory())->create(['title' => 'Tugas Salam', 'xp_reward' => 30]);
+        AssignmentSubmission::create([
+            'assignment_id' => $assignment->id,
+            'student_id' => $student->id,
+            'status' => AssignmentSubmission::STATUS_COMPLETED,
+            'score' => 90,
+            'xp_earned' => 30,
+            'completed_at' => now()->subDay(),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/dashboard')
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('Dashboard')
+                ->has('xpHistory', 3)
+                ->where('xpHistory.0.source', 'challenge')
+                ->where('xpHistory.0.title', 'Praktik Alfabet')
+                ->where('xpHistory.0.xp', 20)
+                ->where('xpHistory.1.source', 'assignment')
+                ->where('xpHistory.1.title', 'Tugas Salam')
+                ->where('xpHistory.1.xp', 30)
+                ->where('xpHistory.2.source', 'practice')
+                ->where('xpHistory.2.title', 'Huruf A')
+                ->where('xpHistory.2.xp', 15));
     }
 
     /*
@@ -174,8 +231,8 @@ class GamificationTest extends TestCase
         $user = $this->studentUser();
 
         // Material alfabet SIBI + 10 sesi lulus berakurasi tinggi → 3 badge sekaligus.
-        $category = \App\Models\Category::factory()->create(['slug' => 'alphabet']);
-        $material = \App\Models\Material::factory()->for($category)->create(['language' => 'sibi']);
+        $category = Category::factory()->create(['slug' => 'alphabet']);
+        $material = Material::factory()->for($category)->create(['language' => 'sibi']);
         $lesson = Lesson::factory()->for($material)->create();
         PracticeSession::factory()->count(10)->for($user->student)->for($lesson)->create(['score' => 95]);
 
@@ -314,11 +371,11 @@ class GamificationTest extends TestCase
 
         $this->swapRecognizer(['recognized' => 'a', 'confidence' => 95, 'correct' => true]);
 
-        $category = \App\Models\Category::factory()->create(['slug' => 'word-slug']);
-        $material = \App\Models\Material::factory()->for($category)->create();
+        $category = Category::factory()->create(['slug' => 'word-slug']);
+        $material = Material::factory()->for($category)->create();
         $lesson = Lesson::factory()->for($material)->create();
 
-        $service = app(\App\Services\PracticeService::class);
+        $service = app(PracticeService::class);
         $student = $user->student;
         $session = $service->startSession($student, $lesson);
 
@@ -332,8 +389,8 @@ class GamificationTest extends TestCase
         $this->assertContains('first_practice', GamificationService::unlockedKeys($user->id));
 
         // Latihan kategori alfabet (slug 'alphabet') menaikkan challenge alfabet.
-        $alfabetCategory = \App\Models\Category::factory()->create(['slug' => 'alphabet']);
-        $alfabetMaterial = \App\Models\Material::factory()->for($alfabetCategory)->create(['language' => 'sibi']);
+        $alfabetCategory = Category::factory()->create(['slug' => 'alphabet']);
+        $alfabetMaterial = Material::factory()->for($alfabetCategory)->create(['language' => 'sibi']);
         $alfabetLesson = Lesson::factory()->for($alfabetMaterial)->create();
         $session2 = $service->startSession($student, $alfabetLesson);
 
@@ -386,8 +443,8 @@ class GamificationTest extends TestCase
 
         $this->swapRecognizer(['recognized' => 'a', 'confidence' => 95, 'correct' => true]);
 
-        $category = \App\Models\Category::factory()->create(['slug' => 'alphabet']);
-        $material = \App\Models\Material::factory()->for($category)->create();
+        $category = Category::factory()->create(['slug' => 'alphabet']);
+        $material = Material::factory()->for($category)->create();
         $lesson = Lesson::factory()->for($material)->create();
 
         $this->actingAs($user)->get(route('student.practice.start', $lesson));

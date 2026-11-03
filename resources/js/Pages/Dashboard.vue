@@ -11,6 +11,7 @@ import {
     Camera,
     CheckCircle,
     ChevronRight,
+    ClipboardCheck,
     Compass,
     Crown,
     Flame,
@@ -29,6 +30,7 @@ const props = defineProps({
     progress: { type: Array, default: () => [] },
     recentSessions: { type: Array, default: () => [] },
     recommended: { type: Array, default: () => [] },
+    xpHistory: { type: Array, default: () => [] },
     challenges: { type: Array, default: () => [] },
     weekActivity: { type: Array, default: () => [] },
     user: { type: Object, default: () => null },
@@ -260,6 +262,33 @@ const filteredSessions = computed(() => {
     }
     return sessionsList.value;
 });
+
+// Riwayat aktivitas: tampilan sesi latihan atau riwayat perolehan XP
+const activityView = ref('sessions');
+const activityViews = [
+    { value: 'sessions', label: 'Sesi Latihan' },
+    { value: 'xp', label: 'Riwayat XP' },
+];
+const xpFilter = ref('all');
+const xpFilters = [
+    { value: 'all', label: 'Semua' },
+    { value: 'practice', label: 'Latihan' },
+    { value: 'challenge', label: 'Tantangan' },
+    { value: 'assignment', label: 'Tugas Guru' },
+];
+const xpSources = {
+    practice: { label: 'Latihan', icon: Camera, badge: 'st-badge--neutral' },
+    challenge: { label: 'Tantangan Harian', icon: Flame, badge: 'st-badge--primary' },
+    assignment: { label: 'Tugas Guru', icon: ClipboardCheck, badge: 'st-badge--gold' },
+};
+const xpHistoryList = computed(() => Array.isArray(props.xpHistory) ? props.xpHistory : []);
+const filteredXpHistory = computed(() => xpFilter.value === 'all'
+    ? xpHistoryList.value
+    : xpHistoryList.value.filter((entry) => entry.source === xpFilter.value));
+
+function xpSource(source) {
+    return xpSources[source] || xpSources.practice;
+}
 </script>
 
 <template>
@@ -620,14 +649,29 @@ const filteredSessions = computed(() => {
                 </div>
             </section>
 
-            <!-- 6. Riwayat sesi -->
+            <!-- 6. Riwayat aktivitas: sesi latihan & perolehan XP -->
             <section class="st-panel">
                 <div class="st-panel-head">
                     <div>
                         <span class="st-eyebrow">Riwayat Aktivitas</span>
-                        <h2 class="st-panel-title">Sesi Latihan Terakhir</h2>
+                        <h2 class="st-panel-title">{{ activityView === 'xp' ? 'Riwayat Perolehan XP' : 'Sesi Latihan Terakhir' }}</h2>
                     </div>
-                    <div class="st-seg" role="group" aria-label="Filter status sesi">
+                    <div class="st-seg" role="group" aria-label="Pilih jenis riwayat">
+                        <button
+                            v-for="option in activityViews"
+                            :key="option.value"
+                            type="button"
+                            :class="{ 'is-active': activityView === option.value }"
+                            :aria-pressed="activityView === option.value"
+                            @click="activityView = option.value"
+                        >
+                            {{ option.label }}
+                        </button>
+                    </div>
+                </div>
+
+                <template v-if="activityView === 'sessions'">
+                    <div class="activity-filter st-seg" role="group" aria-label="Filter status sesi">
                         <button
                             v-for="option in activityFilters"
                             :key="option.value"
@@ -639,40 +683,93 @@ const filteredSessions = computed(() => {
                             {{ option.label }}
                         </button>
                     </div>
-                </div>
 
-                <div v-if="filteredSessions.length > 0" class="st-table-wrap">
-                    <table class="st-table">
-                        <thead>
-                            <tr>
-                                <th>Materi</th>
-                                <th>Akurasi</th>
-                                <th>XP</th>
-                                <th>Status</th>
-                                <th>Waktu</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="session in filteredSessions" :key="session.id">
-                                <td class="session-title">{{ session.lesson_title }}</td>
-                                <td><b>{{ session.score }}%</b></td>
-                                <td><span class="st-badge st-badge--gold">+{{ session.xp_earned }} XP</span></td>
-                                <td>
-                                    <span v-if="session.passed" class="st-badge st-badge--primary">Tuntas</span>
-                                    <span v-else class="st-badge st-badge--danger">Coba Lagi</span>
-                                </td>
-                                <td class="session-time">{{ session.completed_at }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div v-else class="st-empty">
-                    <span>Belum ada riwayat sesi pada filter ini.</span>
-                    <Link href="/practice" class="st-btn st-btn--outline">
-                        <Camera :size="16" />
-                        <span>Mulai Latihan</span>
-                    </Link>
-                </div>
+                    <div v-if="filteredSessions.length > 0" class="st-table-wrap">
+                        <table class="st-table">
+                            <thead>
+                                <tr>
+                                    <th>Materi</th>
+                                    <th>Akurasi</th>
+                                    <th>XP</th>
+                                    <th>Status</th>
+                                    <th>Waktu</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="session in filteredSessions" :key="session.id">
+                                    <td class="session-title">{{ session.lesson_title }}</td>
+                                    <td><b>{{ session.score }}%</b></td>
+                                    <td><span class="st-badge st-badge--gold">+{{ session.xp_earned }} XP</span></td>
+                                    <td>
+                                        <span v-if="session.passed" class="st-badge st-badge--primary">Tuntas</span>
+                                        <span v-else class="st-badge st-badge--danger">Coba Lagi</span>
+                                    </td>
+                                    <td class="session-time">{{ session.completed_at }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div v-else class="st-empty">
+                        <span>Belum ada riwayat sesi pada filter ini.</span>
+                        <Link href="/practice" class="st-btn st-btn--outline">
+                            <Camera :size="16" />
+                            <span>Mulai Latihan</span>
+                        </Link>
+                    </div>
+                </template>
+
+                <template v-else>
+                    <div class="activity-filter st-seg" role="group" aria-label="Filter sumber XP">
+                        <button
+                            v-for="option in xpFilters"
+                            :key="option.value"
+                            type="button"
+                            :class="{ 'is-active': xpFilter === option.value }"
+                            :aria-pressed="xpFilter === option.value"
+                            @click="xpFilter = option.value"
+                        >
+                            {{ option.label }}
+                        </button>
+                    </div>
+
+                    <div v-if="filteredXpHistory.length > 0" class="st-table-wrap">
+                        <table class="st-table">
+                            <thead>
+                                <tr>
+                                    <th>Aktivitas</th>
+                                    <th>Sumber</th>
+                                    <th>XP</th>
+                                    <th>Waktu</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="entry in filteredXpHistory" :key="entry.id">
+                                    <td>
+                                        <div class="xp-entry">
+                                            <span class="xp-entry-icon" :class="`is-${entry.source}`">
+                                                <component :is="xpSource(entry.source).icon" :size="15" />
+                                            </span>
+                                            <div class="xp-entry-text">
+                                                <b class="session-title">{{ entry.title }}</b>
+                                                <small>{{ entry.detail }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td><span class="st-badge" :class="xpSource(entry.source).badge">{{ xpSource(entry.source).label }}</span></td>
+                                    <td><span class="st-badge st-badge--gold">+{{ entry.xp }} XP</span></td>
+                                    <td class="session-time">{{ entry.earned_at }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div v-else class="st-empty">
+                        <span>Belum ada XP yang didapat dari sumber ini.</span>
+                        <Link href="/challenge" class="st-btn st-btn--outline">
+                            <Flame :size="16" />
+                            <span>Lihat Tantangan</span>
+                        </Link>
+                    </div>
+                </template>
             </section>
         </div>
     </AppLayout>
@@ -1020,6 +1117,55 @@ const filteredSessions = computed(() => {
     font-size: 13px;
     color: var(--st-muted);
     white-space: nowrap;
+}
+
+/* Riwayat aktivitas: filter & entri XP */
+.activity-filter {
+    margin-bottom: 14px;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.xp-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.xp-entry-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--st-radius-sm);
+    color: var(--st-text);
+    background: var(--st-surface);
+    border: 1px solid var(--st-line);
+}
+
+.xp-entry-icon.is-challenge {
+    color: var(--st-primary-dark);
+    background: var(--st-primary-soft);
+    border-color: var(--st-primary-line);
+}
+
+.xp-entry-icon.is-assignment {
+    color: var(--st-gold-dark);
+    background: var(--st-gold-soft);
+    border-color: var(--st-gold-line);
+}
+
+.xp-entry-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.xp-entry-text small {
+    font-size: 12px;
+    color: var(--st-muted);
 }
 
 @media (max-width: 1100px) {

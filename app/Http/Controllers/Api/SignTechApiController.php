@@ -8,7 +8,6 @@ use App\Models\Challenge;
 use App\Models\Lesson;
 use App\Models\PracticeSession;
 use App\Models\Student;
-use App\Models\Teacher;
 use App\Services\AlphabetLessonService;
 use App\Services\ChallengeService;
 use App\Services\Contracts\GestureRecognitionService;
@@ -54,7 +53,7 @@ class SignTechApiController extends Controller
     {
         $student = $this->resolveStudent($request);
 
-        if (!$student) {
+        if (! $student) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Silakan login terlebih dahulu untuk mengakses dashboard belajar.',
@@ -130,6 +129,14 @@ class SignTechApiController extends Controller
                     'attempts' => (int) $s->attempts,
                     'completed_at' => $s->completed_at ? Carbon::parse($s->completed_at)->diffForHumans() : 'Baru saja',
                     'passed' => (int) $s->score >= 60,
+                ]),
+                'xpHistory' => $this->studentStats->xpHistory($student, 10)->map(fn (array $entry) => [
+                    'id' => $entry['id'],
+                    'source' => $entry['source'],
+                    'title' => $entry['title'],
+                    'detail' => $entry['detail'],
+                    'xp' => $entry['xp'],
+                    'earned_at' => $entry['earned_at'] ? Carbon::parse($entry['earned_at'])->diffForHumans() : 'Baru saja',
                 ]),
                 'recommended' => $recommended->map(fn ($l) => [
                     'id' => $l->id,
@@ -211,7 +218,7 @@ class SignTechApiController extends Controller
                 $lesson = Lesson::with(['material.category'])->find((int) $id);
             }
 
-            if (!$lesson) {
+            if (! $lesson) {
                 $clean = preg_replace('/^bisindo-/', '', (string) $id);
                 $lesson = Lesson::with(['material.category'])
                     ->where('title', $clean)
@@ -219,7 +226,7 @@ class SignTechApiController extends Controller
                     ->first();
             }
 
-            if (!$lesson) {
+            if (! $lesson) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Pelajaran tidak ditemukan.',
@@ -262,12 +269,12 @@ class SignTechApiController extends Controller
     public function completeLesson(Request $request, string|int $id): JsonResponse
     {
         $student = $this->resolveStudent($request);
-        if (!$student) {
+        if (! $student) {
             return response()->json(['status' => 'error', 'message' => 'Unauthenticated.'], 401);
         }
 
         $lesson = Lesson::with('material')->find($id);
-        if (!$lesson) {
+        if (! $lesson) {
             return response()->json(['status' => 'error', 'message' => 'Pelajaran tidak ditemukan.'], 404);
         }
 
@@ -278,7 +285,7 @@ class SignTechApiController extends Controller
             ->orderByDesc('score')
             ->first();
 
-        if (!$bestSession) {
+        if (! $bestSession) {
             return response()->json([
                 'status' => 'error',
                 'completed' => false,
@@ -361,14 +368,14 @@ class SignTechApiController extends Controller
     public function attemptPractice(Request $request): JsonResponse
     {
         $lesson = $this->resolvePracticeLesson($request);
-        if (!$lesson) {
+        if (! $lesson) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Target latihan tidak ditemukan untuk sistem isyarat yang dipilih.',
             ], 422);
         }
 
-        if (!PracticeService::isAiSupported($lesson)) {
+        if (! PracticeService::isAiSupported($lesson)) {
             return response()->json([
                 'status' => 'error',
                 'message' => "Isyarat {$lesson->title} belum bisa dinilai AI. Saat ini AI hanya mengenali isyarat huruf alfabet.",
@@ -433,7 +440,7 @@ class SignTechApiController extends Controller
 
         $title = strtoupper(trim((string) $request->input('target_letter', '')));
         $system = strtolower(trim((string) $request->input('system', 'sibi')));
-        if ($title === '' || !in_array($system, [PracticeSession::LANGUAGE_SIBI, PracticeSession::LANGUAGE_BISINDO], true)) {
+        if ($title === '' || ! in_array($system, [PracticeSession::LANGUAGE_SIBI, PracticeSession::LANGUAGE_BISINDO], true)) {
             return null;
         }
 
@@ -449,7 +456,7 @@ class SignTechApiController extends Controller
     public function challenges(Request $request): JsonResponse
     {
         $student = $this->resolveStudent($request);
-        if (!$student) {
+        if (! $student) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Profil siswa tidak ditemukan di database.',
@@ -485,7 +492,7 @@ class SignTechApiController extends Controller
         $challengeId = (int) $request->input('challenge_id', 0);
         $student = $this->resolveStudent($request);
 
-        if (!$student) {
+        if (! $student) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Profil siswa tidak ditemukan di database.',
@@ -493,7 +500,7 @@ class SignTechApiController extends Controller
         }
 
         $challenge = Challenge::find($challengeId);
-        if (!$challenge) {
+        if (! $challenge) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Tantangan tidak ditemukan di database.',
@@ -543,7 +550,7 @@ class SignTechApiController extends Controller
     public function leaderboard(Request $request): JsonResponse
     {
         $student = $this->resolveStudent($request);
-        if (!$student) {
+        if (! $student) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Profil siswa tidak ditemukan di database.',
@@ -563,7 +570,7 @@ class SignTechApiController extends Controller
     public function achievements(Request $request): JsonResponse
     {
         $student = $this->resolveStudent($request);
-        if (!$student) {
+        if (! $student) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Profil siswa tidak ditemukan di database.',
@@ -613,7 +620,7 @@ class SignTechApiController extends Controller
     public function classroom(Request $request): JsonResponse
     {
         $teacherUser = $request->user();
-        if (!$teacherUser || !$teacherUser->isTeacher()) {
+        if (! $teacherUser || ! $teacherUser->isTeacher()) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Halaman ini hanya untuk guru.',
