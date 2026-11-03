@@ -163,6 +163,9 @@ class PracticeService
      *   - lulus bila label AI sama dengan target DAN confidence >= PASS_SCORE
      *   - skor = confidence bila label benar, 0 bila label salah
      *   - XP pelajaran hanya diberikan saat pertama kali lulus (anti-farming)
+     *   - satu peragaan hanya memberi satu jenis XP: bila peragaan menyelesaikan
+     *     tugas guru, XP pelajaran tidak ikut dihitung (hanya XP tugas)
+     *   - xp_earned = total XP yang didapat dari peragaan ini (pelajaran atau tugas)
      *   - challenge harian menghitung huruf berbeda: huruf yang sama hanya sekali
      *     per hari; peragaan ulang tetap dihitung untuk badge
      *
@@ -200,7 +203,7 @@ class PracticeService
         $xp = $passed && ! $alreadyMastered ? (int) $lesson->xp_reward : 0;
         $alreadyPassedToday = $this->hasPassedToday($student, $lesson);
 
-        return DB::transaction(function () use ($student, $lesson, $recognition, $userId, $levelBefore, $passed, $score, $alreadyMastered, $xp, $alreadyPassedToday) {
+        return DB::transaction(function () use ($student, $lesson, $recognition, $userId, $levelBefore, $passed, $score, $alreadyMastered, $xp, $alreadyPassedToday): array {
             $session = PracticeSession::create([
                 'student_id' => $student->id,
                 'lesson_id' => $lesson->id,
@@ -231,6 +234,13 @@ class PracticeService
                 // Tugas guru yang menargetkan lesson ini ikut selesai otomatis.
                 $assignmentsCompleted = $this->assignments->completeFromPractice($student, $session);
 
+                // Satu peragaan hanya memberi satu jenis XP: bila peragaan ini
+                // menyelesaikan tugas guru, yang dihitung hanya XP tugas tersebut.
+                if ($assignmentsCompleted !== [] && $xp > 0) {
+                    $xp = 0;
+                    $session->forceFill(['xp_earned' => 0])->save();
+                }
+
                 // Siswa bisa langsung berlatih tanpa membuka dashboard lebih dulu hari ini.
                 ChallengeService::ensureTodayChallenges();
                 $challengeCompleted = ! $alreadyPassedToday
@@ -251,7 +261,7 @@ class PracticeService
                 'recorded' => true,
                 'passed' => $passed,
                 'score' => $score,
-                'xp_earned' => $xp,
+                'xp_earned' => $xp + array_sum(array_column($assignmentsCompleted, 'xp_earned')),
                 'already_mastered' => $alreadyMastered,
                 'total_xp' => $totalXp,
                 'level' => $level,

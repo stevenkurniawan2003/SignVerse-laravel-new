@@ -90,6 +90,63 @@ class ClassroomAssignmentFlowTest extends TestCase
         $this->assertSame(10 + 25, $user->student->totalXp());
     }
 
+    public function test_first_pass_that_completes_assignment_only_awards_assignment_xp(): void
+    {
+        $teacher = $this->teacher();
+        $classroom = Classroom::factory()->for($teacher)->create();
+        $user = $this->studentUser();
+        app(ClassroomService::class)->addStudent($classroom, $user->student);
+        $lesson = $this->letterLesson('A');
+
+        app(AssignmentService::class)->createAndDistribute([
+            'teacher_id' => $teacher->id,
+            'classroom_id' => $classroom->id,
+            'lesson_id' => $lesson->id,
+            'title' => 'Peragakan huruf A',
+            'min_score' => 60,
+            'xp_reward' => 50,
+        ]);
+
+        $recognizer = \Mockery::mock(GestureRecognitionService::class);
+        $recognizer->shouldReceive('recognize')->andReturn(
+            ['recognized' => 'A', 'confidence' => 90, 'correct' => true, 'message' => 'ok'],
+            ['recognized' => 'A', 'confidence' => 92, 'correct' => true, 'message' => 'ok'],
+        );
+        $this->swap(GestureRecognitionService::class, $recognizer);
+
+        // Huruf belum pernah dikuasai, tapi peragaan ini menyelesaikan tugas: hanya XP tugas.
+        $this->actingAs($user)->postJson('/api/practice/attempt', ['lesson_id' => $lesson->id, 'image' => 'x'])
+            ->assertOk()
+            ->assertJson([
+                'correct' => true,
+                'xp_earned' => 50,
+                'assignments_completed' => [['title' => 'Peragakan huruf A', 'xp_earned' => 50]],
+            ]);
+
+        $this->assertSame(0, (int) $user->student->practiceSessions()->sole()->xp_earned);
+        $this->assertSame(50, $user->student->totalXp());
+
+        // Huruf sudah dikuasai lewat tugas, latihan berikutnya tidak menambah XP pelajaran.
+        $this->actingAs($user)->postJson('/api/practice/attempt', ['lesson_id' => $lesson->id, 'image' => 'x'])
+            ->assertOk()
+            ->assertJson(['correct' => true, 'xp_earned' => 0, 'already_mastered' => true, 'assignments_completed' => []]);
+
+        $this->assertSame(50, $user->student->fresh()->totalXp());
+    }
+
+    public function test_practice_without_assignment_still_awards_lesson_xp(): void
+    {
+        $user = $this->studentUser();
+        $lesson = $this->letterLesson('A');
+
+        $this->swapRecognizer(['recognized' => 'A', 'confidence' => 90, 'correct' => true]);
+        $this->actingAs($user)->postJson('/api/practice/attempt', ['lesson_id' => $lesson->id, 'image' => 'x'])
+            ->assertOk()
+            ->assertJson(['correct' => true, 'xp_earned' => 10, 'assignments_completed' => []]);
+
+        $this->assertSame(10, $user->student->totalXp());
+    }
+
     public function test_assignment_is_not_completed_for_students_outside_the_class(): void
     {
         $teacher = $this->teacher();
