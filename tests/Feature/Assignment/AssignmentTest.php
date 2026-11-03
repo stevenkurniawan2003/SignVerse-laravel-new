@@ -1,13 +1,16 @@
 <?php
 
 namespace Tests\Feature\Assignment;
+
 use App\Models\Assignment;
 use App\Models\AssignmentSubmission;
 use App\Models\Category;
+use App\Models\Classroom;
 use App\Models\Lesson;
 use App\Models\Material;
 use App\Models\PracticeSession;
 use App\Models\Student;
+use App\Models\Teacher;
 use App\Models\User;
 use App\Services\AssignmentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,7 +26,7 @@ class AssignmentTest extends TestCase
 
     private function teacherUser(): User
     {
-        return User::factory()->teacher()->has(\App\Models\Teacher::factory(), 'teacher')->create();
+        return User::factory()->teacher()->has(Teacher::factory(), 'teacher')->create();
     }
 
     private function studentUser(): User
@@ -49,7 +52,7 @@ class AssignmentTest extends TestCase
         $lesson = $this->lesson();
 
         $assignment = $service->createAndDistribute([
-            'teacher_id' => \App\Models\Teacher::factory()->create()->id,
+            'teacher_id' => Teacher::factory()->create()->id,
             'lesson_id' => $lesson->id,
             'title' => 'Tugas Uji',
             'min_score' => 60,
@@ -71,7 +74,7 @@ class AssignmentTest extends TestCase
         $student = Student::factory()->create();
         $lesson = $this->lesson();
         $assignment = $service->createAndDistribute([
-            'teacher_id' => \App\Models\Teacher::factory()->create()->id,
+            'teacher_id' => Teacher::factory()->create()->id,
             'lesson_id' => $lesson->id,
             'title' => 'Tugas Uji',
             'min_score' => 60,
@@ -94,7 +97,7 @@ class AssignmentTest extends TestCase
         $student = Student::factory()->create();
         $lesson = $this->lesson();
         $assignment = $service->createAndDistribute([
-            'teacher_id' => \App\Models\Teacher::factory()->create()->id,
+            'teacher_id' => Teacher::factory()->create()->id,
             'lesson_id' => $lesson->id,
             'title' => 'Tugas Uji',
             'min_score' => 60,
@@ -118,7 +121,7 @@ class AssignmentTest extends TestCase
         $student = Student::factory()->create();
         $lesson = $this->lesson();
         $assignment = $service->createAndDistribute([
-            'teacher_id' => \App\Models\Teacher::factory()->create()->id,
+            'teacher_id' => Teacher::factory()->create()->id,
             'lesson_id' => $lesson->id,
             'title' => 'Tugas Uji',
             'min_score' => 60,
@@ -145,7 +148,7 @@ class AssignmentTest extends TestCase
 
         $lesson = $this->lesson();
         $assignment = $service->createAndDistribute([
-            'teacher_id' => \App\Models\Teacher::factory()->create()->id,
+            'teacher_id' => Teacher::factory()->create()->id,
             'lesson_id' => $lesson->id,
             'title' => 'Tugas Uji',
             'min_score' => 60,
@@ -170,7 +173,7 @@ class AssignmentTest extends TestCase
     public function test_teacher_can_create_and_distribute_assignment_via_http(): void
     {
         $teacher = $this->teacherUser();
-        $classroom = \App\Models\Classroom::factory()->for($teacher->teacher)->create();
+        $classroom = Classroom::factory()->for($teacher->teacher)->create();
         $classroom->students()->attach(Student::factory()->count(2)->create());
         $lesson = $this->lesson();
 
@@ -258,6 +261,21 @@ class AssignmentTest extends TestCase
         // Tugas hanya terdistribusi via submissions — user ini tidak punya baris.
 
         $this->actingAs($user)->get(route('student.assignments.show', $assignment))->assertNotFound();
+    }
+
+    public function test_student_opening_assignment_goes_to_lesson_in_assignment_mode(): void
+    {
+        $teacher = $this->teacherUser();
+        $user = $this->studentUser();
+        $assignment = Assignment::factory()->for($teacher->teacher)->for($this->lesson())->create();
+        AssignmentSubmission::create([
+            'assignment_id' => $assignment->id,
+            'student_id' => $user->student->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('student.assignments.show', $assignment))
+            ->assertRedirect(route('vue.lesson', ['id' => $assignment->lesson_id, 'tugas' => $assignment->id]));
     }
 
     /*

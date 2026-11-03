@@ -121,9 +121,24 @@ const nextLesson = computed(() => {
     return position >= 0 ? related.value[position + 1] ?? null : null;
 });
 
-const continueLabel = computed(() => (nextLesson.value ? `Lanjut ke Huruf ${nextLesson.value.title}` : 'Kembali ke Materi'));
+// Dibuka dari tugas guru (?tugas=ID): tugas hanya untuk huruf ini,
+// jadi setelah berhasil siswa kembali ke daftar tugas, bukan lanjut ke huruf berikutnya.
+const page = usePage();
+const isAssignmentMode = computed(() => {
+    const query = String(page.url || '').split('?')[1] || '';
+    return new URLSearchParams(query).has('tugas');
+});
+
+const continueLabel = computed(() => {
+    if (isAssignmentMode.value) return 'Kembali ke Tugas';
+    return nextLesson.value ? `Lanjut ke Huruf ${nextLesson.value.title}` : 'Kembali ke Materi';
+});
 
 function continueLesson() {
+    if (isAssignmentMode.value) {
+        router.visit('/student/assignments');
+        return;
+    }
     router.visit(nextLesson.value ? `/lesson/${nextLesson.value.id}` : '/learn');
 }
 

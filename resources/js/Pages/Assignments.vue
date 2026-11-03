@@ -148,7 +148,7 @@ const earnedXp = computed(() => props.completed.reduce((sum, task) => sum + (tas
                                 <span :class="{ 'sa-tag-late': task.is_overdue }"><CalendarClock :size="12" /> {{ dueLabel(task) }}</span>
                             </div>
                         </div>
-                        <Link v-if="!task.is_overdue" :href="`/lesson/${task.lesson_id}`" class="st-btn st-btn--primary sa-do">Kerjakan</Link>
+                        <Link v-if="!task.is_overdue" :href="`/lesson/${task.lesson_id}?tugas=${task.id}`" class="st-btn st-btn--primary sa-do">Kerjakan</Link>
                         <span v-else class="sa-closed">Ditutup</span>
                     </article>
                 </div>

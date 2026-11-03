@@ -1,7 +1,7 @@
 <script setup>
-import { onMounted, onBeforeUnmount, ref } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, ClipboardList, Gauge, Trophy, UserRound } from '@lucide/vue';
+import { ArrowLeft, CalendarClock, ClipboardList, Gauge, Hand, School, Star, Target, Trophy, UserRound } from '@lucide/vue';
 import AppLayout from '../../Layouts/AppLayout.vue';
 
 const props = defineProps({
@@ -9,6 +9,10 @@ const props = defineProps({
     stats: { type: Object, default: () => ({}) },
     submissions: { type: Array, default: () => [] },
 });
+
+const dueLabel = computed(() => (props.assignment.due_at
+    ? `Deadline ${new Date(props.assignment.due_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}`
+    : 'Tanpa batas waktu'));
 
 const stats = ref({ ...props.stats });
 const submissions = ref([...props.submissions]);
@@ -46,14 +50,28 @@ function timeAgo(iso) {
         <div class="st-page">
             <header class="st-page-header st-page-header--tinted">
                 <div class="st-page-header-main">
-                    <Link href="/teacher/assignments" class="st-back"><ArrowLeft :size="14" /> Kembali ke daftar tugas</Link>
-                    <span class="st-badge st-badge--primary">Detail Tugas</span>
+                    <div class="ad-topbar">
+                        <Link href="/teacher/assignments" class="ad-back">
+                            <ArrowLeft :size="15" />
+                            <span>Kembali ke daftar tugas</span>
+                        </Link>
+                        <span class="ad-divider" aria-hidden="true"></span>
+                        <span class="st-badge st-badge--primary ad-badge">
+                            <ClipboardList :size="13" />
+                            Detail Tugas
+                        </span>
+                    </div>
+
                     <h1>{{ assignment.title }}</h1>
-                    <p>
-                        <span class="st-chip">{{ assignment.classroom }}</span>
-                        {{ assignment.lesson }} ({{ assignment.language }}) · skor minimal {{ assignment.min_score }}% · bonus +{{ assignment.xp_reward }} XP
-                        · deadline {{ assignment.due_at ? new Date(assignment.due_at).toLocaleDateString('id-ID') : 'tanpa batas' }}
-                    </p>
+
+                    <ul class="ad-meta" aria-label="Informasi tugas">
+                        <li class="is-class"><School :size="14" /> {{ assignment.classroom }}</li>
+                        <li><Hand :size="14" /> Isyarat {{ assignment.lesson }} · {{ assignment.language }}</li>
+                        <li><Target :size="14" /> Skor minimal {{ assignment.min_score }}%</li>
+                        <li class="is-xp"><Star :size="14" /> +{{ assignment.xp_reward }} XP</li>
+                        <li><CalendarClock :size="14" /> {{ dueLabel }}</li>
+                    </ul>
+
                     <p v-if="assignment.description" class="st-description">{{ assignment.description }}</p>
                 </div>
                 <div class="st-page-header-aside st-summary-box">
@@ -121,18 +139,117 @@ function timeAgo(iso) {
 </template>
 
 <style scoped>
-.st-back {
+/* Baris atas header: tombol kembali + label halaman */
+.ad-topbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.ad-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 0 12px 0 9px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--st-text);
+    text-decoration: none;
+    background: #fff;
+    border: 1px solid var(--st-line);
+    border-radius: 999px;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.ad-back:hover {
+    color: var(--st-primary-dark);
+    background: var(--st-primary-soft);
+    border-color: var(--st-primary-line);
+}
+
+.ad-back:hover svg {
+    transform: translateX(-2px);
+}
+
+.ad-back svg {
+    transition: transform 0.15s ease;
+}
+
+.ad-back:focus-visible {
+    outline: 2px solid var(--st-primary);
+    outline-offset: 2px;
+}
+
+.ad-divider {
+    width: 1px;
+    height: 18px;
+    background: var(--st-line);
+}
+
+.ad-badge {
     display: inline-flex;
     align-items: center;
     gap: 5px;
+}
+
+/* Info tugas dalam bentuk chip */
+.ad-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ad-meta li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
     font-size: 12.5px;
-    font-weight: 700;
-    color: #1e7253;
-    text-decoration: none;
-    margin-bottom: 6px;
+    font-weight: 600;
+    color: var(--st-text);
+    background: #fff;
+    border: 1px solid var(--st-line);
+    border-radius: 999px;
+}
+
+.ad-meta li svg {
+    flex-shrink: 0;
+    color: var(--st-muted);
+}
+
+.ad-meta li.is-class {
+    color: var(--st-primary-dark);
+    background: var(--st-primary-soft);
+    border-color: var(--st-primary-line);
+}
+
+.ad-meta li.is-class svg {
+    color: var(--st-primary);
+}
+
+.ad-meta li.is-xp {
+    color: var(--st-gold-dark);
+    background: var(--st-gold-soft);
+    border-color: var(--st-gold-line);
+}
+
+.ad-meta li.is-xp svg {
+    color: var(--st-gold);
+}
+
+@media (max-width: 480px) {
+    .ad-divider {
+        display: none;
+    }
 }
 
 .st-description {
+    margin-top: 14px;
     background: #fbfdfc;
     border: 1px solid #e2ede6;
     border-radius: 10px;
@@ -148,18 +265,6 @@ function timeAgo(iso) {
     gap: 8px;
     font-size: 16px;
     font-weight: 800;
-}
-
-.st-chip {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    background: #eefaf4;
-    color: #1e7253;
-    border: 1px solid #d5f3e5;
-    border-radius: 999px;
-    padding: 2px 8px;
-    margin-right: 6px;
 }
 
 .st-score {

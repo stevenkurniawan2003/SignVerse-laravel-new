@@ -72,7 +72,7 @@ class AssignmentController extends Controller
         $student = $this->stats->forUser($request->user());
         abort_unless($assignment->submissions()->where('student_id', $student->id)->exists(), 404);
 
-        return redirect()->route('vue.lesson', $assignment->lesson_id);
+        return redirect()->route('vue.lesson', ['id' => $assignment->lesson_id, 'tugas' => $assignment->id]);
     }
 
     /**
