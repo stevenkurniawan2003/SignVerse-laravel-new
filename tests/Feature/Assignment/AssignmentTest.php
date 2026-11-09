@@ -175,7 +175,9 @@ class AssignmentTest extends TestCase
         $teacher = $this->teacherUser();
         $classroom = Classroom::factory()->for($teacher->teacher)->create();
         $classroom->students()->attach(Student::factory()->count(2)->create());
-        $lesson = $this->lesson();
+        $lesson = Lesson::factory()
+            ->for(Material::factory()->for(Category::factory()->state(['slug' => 'alphabet'])))
+            ->create(['title' => 'A', 'gesture_label' => 'a']);
 
         $response = $this->actingAs($teacher)->post(route('teacher.assignments.store'), [
             'classroom_id' => $classroom->id,

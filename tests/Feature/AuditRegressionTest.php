@@ -470,13 +470,31 @@ class AuditRegressionTest extends TestCase
         $student = $this->studentUser()->student;
         $letter = $this->letterLesson();
         $number = $this->numberLesson();
+        $wordCategory = Category::factory()->create(['slug' => 'word', 'name' => 'Word']);
+        $wordMaterial = Material::factory()->for($wordCategory)->create();
+        $word = Lesson::factory()->for($wordMaterial)->create(['title' => 'Aku', 'difficulty' => 1]);
+        $invalidWord = Lesson::factory()->for($wordMaterial)->create(['title' => 'Halo!', 'difficulty' => 1]);
+        $phraseCategory = Category::factory()->create(['slug' => 'phrase', 'name' => 'Phrase']);
+        $phrase = Lesson::factory()
+            ->for(Material::factory()->for($phraseCategory))
+            ->create(['title' => 'Apa Kabar', 'difficulty' => 1]);
         $service = app(StudentStatsService::class);
 
-        $recommended = $service->recommendedLessons($student, 5)->pluck('id')->all();
+        $recommended = $service->recommendedLessons($student, 10)->pluck('id')->all();
 
         $this->assertContains($letter->id, $recommended);
+        $this->assertContains($word->id, $recommended);
+        $this->assertContains($phrase->id, $recommended);
         $this->assertNotContains($number->id, $recommended);
-        $this->assertSame(1, $service->dashboardSummary($student)['lessons_total']);
+        $this->assertNotContains($invalidWord->id, $recommended);
+
+        PracticeSession::factory()->completed()->for($student)->for($word)->create(['score' => 90]);
+        PracticeSession::factory()->completed()->for($student)->for($number)->create(['score' => 90]);
+        PracticeSession::factory()->completed()->for($student)->for($invalidWord)->create(['score' => 90]);
+
+        $summary = $service->dashboardSummary($student);
+        $this->assertSame(3, $summary['lessons_total']);
+        $this->assertSame(1, $summary['lessons_mastered']);
     }
 
     public function test_report_export_neutralizes_spreadsheet_formulas(): void

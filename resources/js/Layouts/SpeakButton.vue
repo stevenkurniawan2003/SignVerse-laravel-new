@@ -12,9 +12,12 @@ const props = defineProps({
     label: { type: String, default: 'Dengarkan' },
     iconOnly: { type: Boolean, default: false },
     variant: { type: String, default: 'soft' },
+    // Teks lain milik langkah yang sama (mis. umpan balik jawaban kuis). Selama
+    // salah satunya dibacakan, tombol ini tampil "Berhenti" dan bisa menghentikannya.
+    relatedTexts: { type: Array, default: () => [] },
 });
 
-const active = computed(() => isSpeaking(props.text));
+const active = computed(() => isSpeaking(props.text) || props.relatedTexts.some((text) => text && isSpeaking(text)));
 
 const title = computed(() => {
     if (active.value) return 'Hentikan suara';

@@ -60,6 +60,7 @@ class AssignmentController extends Controller
                 ->with('material:id,title,language,category_id', 'material.category:id,slug')
                 ->whereHas('material.category', fn ($query) => $query->whereIn('slug', PracticeService::AI_SUPPORTED_CATEGORIES))
                 ->get()
+                ->filter(fn (Lesson $lesson) => PracticeService::isAiSupported($lesson))
                 ->sortBy(fn (Lesson $lesson) => $lesson->material->language.$lesson->title)
                 ->map(fn (Lesson $lesson) => [
                     'id' => $lesson->id,
@@ -76,7 +77,19 @@ class AssignmentController extends Controller
 
         $validated = $request->validate([
             'classroom_id' => ['required', Rule::exists('classrooms', 'id')->where('teacher_id', $teacher->id)],
-            'lesson_id' => ['required', 'exists:lessons,id'],
+            'lesson_id' => [
+                'bail',
+                'required',
+                'integer',
+                'exists:lessons,id',
+                function (string $attribute, mixed $value, \Closure $fail) {
+                    $lesson = Lesson::query()->with('material.category')->find($value);
+
+                    if ($lesson !== null && ! PracticeService::isAiSupported($lesson)) {
+                        $fail('Pelajaran ini belum didukung oleh latihan AI.');
+                    }
+                },
+            ],
             'title' => ['required', 'string', 'max:200'],
             'description' => ['nullable', 'string', 'max:2000'],
             'min_score' => ['required', 'integer', 'min:'.PracticeService::PASS_SCORE, 'max:100'],

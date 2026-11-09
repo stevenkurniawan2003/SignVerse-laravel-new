@@ -24,6 +24,8 @@ class ModuleController extends Controller
 {
     private const ALPHABET_LOCKED_MESSAGE = 'Huruf A–Z selalu tersedia di AI Practice untuk SIBI dan BISINDO, jadi tidak bisa dihapus, diganti, atau dipindahkan. XP dan tingkat kesulitannya tetap bisa diubah.';
 
+    private const SPELLING_CATEGORIES = ['word', 'phrase'];
+
     public function index(): Response
     {
         AlphabetLessonService::ensureComplete();
@@ -176,15 +178,17 @@ class ModuleController extends Controller
     }
 
     /**
-     * Pelajaran alfabet harus satu huruf A–Z (label yang dikenali AI), sedangkan
-     * kosakata disimpan sesuai ketikan guru. Keduanya tidak boleh dobel dalam
-     * kategori dan sistem isyarat yang sama.
+     * Pelajaran alfabet harus satu huruf A–Z (label yang dikenali AI). Judul
+     * kata dan frasa hanya boleh berisi huruf ASCII dan spasi agar setiap huruf
+     * bisa dieja. Judul tidak boleh dobel dalam kategori dan sistem isyarat
+     * yang sama.
      *
      * @return array{title: string, xp_reward?: int, difficulty?: int}
      */
     private function validateLesson(Request $request, Material $material, ?Lesson $ignore = null): array
     {
         $isAlphabet = $material->category?->slug === AlphabetLessonService::CATEGORY_SLUG;
+        $isSpelling = in_array($material->category?->slug, self::SPELLING_CATEGORIES, true);
         $title = trim((string) $request->input('title'));
         $request->merge(['title' => $isAlphabet ? strtoupper($title) : $title]);
 
@@ -194,6 +198,7 @@ class ModuleController extends Controller
                 'string',
                 'max:100',
                 ...($isAlphabet ? ['regex:/^[A-Z]$/'] : []),
+                ...($isSpelling ? ['regex:/\A[A-Za-z\s]+\z/'] : []),
                 function (string $attribute, string $value, \Closure $fail) use ($material, $ignore) {
                     $duplicate = Lesson::query()
                         ->whereRaw('LOWER(title) = ?', [mb_strtolower($value)])
@@ -211,7 +216,9 @@ class ModuleController extends Controller
             'xp_reward' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'difficulty' => ['sometimes', 'integer', 'min:1', 'max:3'],
         ], [
-            'title.regex' => 'Pelajaran alfabet harus berupa satu huruf A–Z agar bisa dinilai AI.',
+            'title.regex' => $isAlphabet
+                ? 'Pelajaran alfabet harus berupa satu huruf A–Z agar bisa dinilai AI.'
+                : 'Judul kata atau frasa hanya boleh berisi huruf A–Z dan spasi agar bisa dieja.',
         ]);
     }
 

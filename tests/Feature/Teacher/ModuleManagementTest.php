@@ -33,6 +33,13 @@ class ModuleManagementTest extends TestCase
         return Material::factory()->for($this->wordCategory())->create(['language' => $language]);
     }
 
+    private function phraseMaterial(string $language = 'sibi'): Material
+    {
+        $category = Category::factory()->create(['name' => 'Phrase', 'slug' => 'phrase']);
+
+        return Material::factory()->for($category)->create(['language' => $language]);
+    }
+
     public function test_teacher_adds_module_without_difficulty_field(): void
     {
         $category = $this->wordCategory();
@@ -100,6 +107,74 @@ class ModuleManagementTest extends TestCase
 
         $student = User::factory()->student()->has(Student::factory(), 'student')->create();
         $this->actingAs($student)->get('/learn')->assertOk()->assertSee('Terima Kasih Banyak');
+    }
+
+    public function test_new_phrase_accepts_ascii_letters_and_whitespace(): void
+    {
+        $material = $this->phraseMaterial();
+
+        $this->actingAs($this->teacherUser())->post(route('teacher.modules.lessons.store', $material), [
+            'title' => '  Apa Kabar  ',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('lessons', [
+            'material_id' => $material->id,
+            'title' => 'Apa Kabar',
+            'gesture_label' => 'apa_kabar',
+        ]);
+    }
+
+    public function test_word_and_phrase_titles_reject_non_ascii_letters_and_empty_whitespace(): void
+    {
+        $teacher = $this->teacherUser();
+        $materials = [$this->wordMaterial(), $this->phraseMaterial()];
+
+        foreach ($materials as $material) {
+            foreach (['Halo 2', 'Apa?', 'Aku @ Kamu', 'Café', '   '] as $title) {
+                $this->actingAs($teacher)
+                    ->post(route('teacher.modules.lessons.store', $material), ['title' => $title])
+                    ->assertSessionHasErrors('title');
+            }
+
+            $this->assertSame(0, $material->lessons()->count());
+        }
+    }
+
+    public function test_word_and_phrase_titles_cannot_be_updated_to_invalid_spelling(): void
+    {
+        $teacher = $this->teacherUser();
+        $lessons = [
+            Lesson::factory()->for($this->wordMaterial())->create(['title' => 'Aku']),
+            Lesson::factory()->for($this->phraseMaterial())->create(['title' => 'Apa Kabar']),
+        ];
+
+        foreach ($lessons as $lesson) {
+            foreach (['Halo 2', 'Apa?', 'Aku @ Kamu', 'Café', '   '] as $title) {
+                $this->actingAs($teacher)
+                    ->put(route('teacher.modules.lessons.update', $lesson), ['title' => $title])
+                    ->assertSessionHasErrors('title');
+            }
+        }
+
+        $this->assertSame('Aku', $lessons[0]->fresh()->title);
+        $this->assertSame('Apa Kabar', $lessons[1]->fresh()->title);
+    }
+
+    public function test_material_with_invalid_existing_title_cannot_be_changed_into_spelling_category(): void
+    {
+        $number = Category::factory()->create(['name' => 'Number', 'slug' => 'number']);
+        $word = $this->wordCategory();
+        $material = Material::factory()->for($number)->create(['language' => 'sibi']);
+        Lesson::factory()->for($material)->create(['title' => '123']);
+
+        $this->actingAs($this->teacherUser())->put(route('teacher.modules.update', $material), [
+            'category_id' => $word->id,
+            'title' => 'Modul Angka',
+            'language' => 'sibi',
+            'description' => null,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame($number->id, $material->fresh()->category_id);
     }
 
     public function test_duplicate_vocabulary_is_rejected_regardless_of_case(): void

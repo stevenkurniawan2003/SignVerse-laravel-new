@@ -79,17 +79,45 @@ function completedCountOf(category) {
     );
 }
 
-// AI baru mengenali huruf alfabet; kosakata lain dilatih bersama guru
-function isAiGraded(category) {
-    return category.slug === 'alphabet';
+function isVocabularyCategory(category) {
+    return ['word', 'phrase'].includes(String(category?.slug || '').toLowerCase());
+}
+
+function hasValidSpellingTitle(lesson) {
+    return /^[A-Z]+(?:\s+[A-Z]+)*$/.test(String(lesson?.title || '').trim().toUpperCase());
+}
+
+function isAiGraded(lesson, category) {
+    if (isVocabularyCategory(category) && !hasValidSpellingTitle(lesson)) return false;
+    if (typeof lesson?.ai_supported === 'boolean') return lesson.ai_supported;
+    if (category?.slug === 'alphabet') return true;
+
+    // Menjaga data katalog lama tetap bisa dibuka saat payload belum memuat flag per lesson.
+    return isVocabularyCategory(category) && hasValidSpellingTitle(lesson);
+}
+
+function isFingerspellingLesson(lesson, category) {
+    return isVocabularyCategory(category) && isAiGraded(lesson, category);
+}
+
+function lessonStatus(lesson, category) {
+    if (isLessonCompleted(lesson)) return 'Selesai';
+    if (isFingerspellingLesson(lesson, category)) return `Ejaan jari · +${lesson.xp_reward || 10} XP`;
+    if (isAiGraded(lesson, category)) return `+${lesson.xp_reward} XP`;
+    return 'Latihan bersama guru';
 }
 
 function openLesson(lesson, material, category) {
+    const fingerspelling = isFingerspellingLesson(lesson, category);
     selectedLesson.value = {
         ...lesson,
         materialTitle: material.title,
         language: material.language,
-        aiGraded: isAiGraded(category),
+        categorySlug: category.slug,
+        aiGraded: isAiGraded(lesson, category),
+        fingerspelling,
+        spellingKind: category.slug === 'phrase' ? 'frasa' : 'kata',
+        displayTitle: fingerspelling ? String(lesson.title).trim().toUpperCase() : lesson.title,
     };
 }
 
@@ -168,7 +196,7 @@ const totalCompletedCount = computed(() => categoryList.value.reduce((acc, cat) 
                             </span>
                             <span class="lesson-tile-copy">
                                 <b>{{ lesson.title }}</b>
-                                <small>{{ isLessonCompleted(lesson) ? 'Selesai' : isAiGraded(cat) ? `+${lesson.xp_reward} XP` : 'Latihan bersama guru' }}</small>
+                                <small>{{ lessonStatus(lesson, cat) }}</small>
                             </span>
                         </button>
                     </div>
@@ -185,12 +213,17 @@ const totalCompletedCount = computed(() => categoryList.value.reduce((acc, cat) 
                         <span class="st-badge st-badge--primary">{{ String(selectedLesson.language || 'SIBI').toUpperCase() }}</span>
                         <span v-if="selectedLesson.aiGraded" class="st-badge st-badge--gold">+{{ selectedLesson.xp_reward || 10 }} XP</span>
                     </div>
-                    <h2 id="lesson-modal-title">Isyarat {{ selectedLesson.title }}</h2>
-                    <p>{{ selectedLesson.materialTitle }} — {{ selectedLesson.aiGraded ? 'pelajari dan peragakan bentuk isyarat ini dengan bantuan deteksi AI.' : 'pelajari isyarat ini dan latih bersama guru. AI belum bisa menilai isyarat ini.' }}</p>
+                    <h2 id="lesson-modal-title">
+                        {{ selectedLesson.fingerspelling ? `Ejaan ${selectedLesson.spellingKind} ${selectedLesson.displayTitle}` : `Isyarat ${selectedLesson.displayTitle}` }}
+                    </h2>
+                    <p v-if="selectedLesson.fingerspelling">
+                        {{ selectedLesson.materialTitle }} — eja huruf demi huruf dengan kamera. AI menilai setiap huruf, bukan satu isyarat {{ selectedLesson.spellingKind }} utuh.
+                    </p>
+                    <p v-else>{{ selectedLesson.materialTitle }} — {{ selectedLesson.aiGraded ? 'pelajari dan peragakan bentuk isyarat ini dengan bantuan deteksi AI.' : 'pelajari isyarat ini dan latih bersama guru. AI belum bisa menilai isyarat ini.' }}</p>
 
                     <div class="modal-meta">
                         <span><Clock3 :size="16" /> ± 5 menit</span>
-                        <span><Target :size="16" /> {{ selectedLesson.aiGraded ? 'Deteksi AI' : 'Latihan bersama guru' }}</span>
+                        <span><Target :size="16" /> {{ selectedLesson.fingerspelling ? 'Ejaan jari dengan AI' : selectedLesson.aiGraded ? 'Deteksi AI' : 'Latihan bersama guru' }}</span>
                     </div>
 
                     <Link
@@ -308,6 +341,10 @@ const totalCompletedCount = computed(() => categoryList.value.reduce((acc, cat) 
     justify-content: center;
     gap: 8px;
     margin-bottom: 8px;
+}
+
+.lesson-modal h2 {
+    overflow-wrap: anywhere;
 }
 
 .modal-meta svg {

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { Camera, CameraOff, RefreshCw, RotateCcw, Timer, X } from '@lucide/vue';
 
@@ -9,6 +9,8 @@ const props = defineProps({
     system: { type: String, default: 'SIBI' },
     attempted: { type: Boolean, default: false },
     disabled: { type: Boolean, default: false },
+    progressToken: { type: String, default: null },
+    spellingMode: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['result']);
@@ -20,6 +22,8 @@ const cameraActive = ref(false);
 const cameraStarting = ref(false);
 const cameraError = ref('');
 let mediaStream = null;
+let activeRequestController = null;
+let cameraGeneration = 0;
 
 async function startCamera() {
     if (cameraActive.value || cameraStarting.value) return;
@@ -31,36 +35,46 @@ async function startCamera() {
     }
 
     cameraStarting.value = true;
+    const generation = cameraGeneration;
     try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({
+        const stream = await navigator.mediaDevices.getUserMedia({
             video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
             audio: false,
         });
+        if (generation !== cameraGeneration || !videoRef.value) {
+            stream.getTracks().forEach((track) => track.stop());
+            return;
+        }
+
+        mediaStream = stream;
         if (videoRef.value) {
-            videoRef.value.srcObject = mediaStream;
+            videoRef.value.srcObject = stream;
             await videoRef.value.play().catch(() => {});
-            cameraActive.value = true;
+            if (generation === cameraGeneration) cameraActive.value = true;
         } else {
             mediaStream.getTracks().forEach((track) => track.stop());
             mediaStream = null;
         }
     } catch (err) {
+        if (generation !== cameraGeneration) return;
         cameraError.value = err?.name === 'NotAllowedError'
             ? 'Izin kamera ditolak. Klik ikon kamera di address bar browser, pilih "Izinkan", lalu tekan tombol di bawah.'
             : 'Kamera tidak dapat dibuka. Pastikan kamera terpasang dan tidak sedang dipakai aplikasi lain.';
     } finally {
-        cameraStarting.value = false;
+        if (generation === cameraGeneration) cameraStarting.value = false;
     }
 }
 
 function stopCamera() {
-    cancelCountdown();
+    cameraGeneration += 1;
+    reset();
     mediaStream?.getTracks().forEach((track) => track.stop());
     mediaStream = null;
     if (videoRef.value) {
         videoRef.value.srcObject = null;
     }
     cameraActive.value = false;
+    cameraStarting.value = false;
 }
 
 // Timer hitung mundur agar siswa sempat menyiapkan bentuk tangan
@@ -100,21 +114,26 @@ const confusableNote = computed(() =>
         : ''
 );
 
-function startDetection() {
+/**
+ * @param {{ automatic?: boolean, minimumSeconds?: number }} options
+ *   minimumSeconds: jeda persiapan minimal, misalnya saat lanjut ke huruf ejaan berikutnya
+ */
+function startDetection({ automatic = false, minimumSeconds = 0 } = {}) {
+    if (busy.value || props.disabled || !props.lessonId || !props.letter) return;
+
     frameError.value = '';
 
     if (!cameraActive.value) {
-        startCamera();
+        if (!automatic) startCamera();
         return;
     }
-    if (busy.value || props.disabled) return;
-
-    if (selectedTimer.value === 0) {
+    const preparationSeconds = Math.max(selectedTimer.value, automatic ? 1 : 0, minimumSeconds);
+    if (preparationSeconds === 0) {
         performDetection();
         return;
     }
 
-    countdown.value = selectedTimer.value;
+    countdown.value = preparationSeconds;
     countdownInterval = setInterval(() => {
         countdown.value -= 1;
         if (countdown.value <= 0) {
@@ -127,15 +146,17 @@ function startDetection() {
 function captureFrame() {
     const video = videoRef.value;
     const canvas = canvasRef.value;
-    if (!cameraActive.value || !video || !canvas) return null;
+    if (!cameraActive.value || !video || !canvas || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return null;
 
     // Potong persegi dari tengah agar yang dinilai AI sama dengan bingkai kamera di layar
-    const width = video.videoWidth || 640;
-    const height = video.videoHeight || 480;
+    const width = video.videoWidth;
+    const height = video.videoHeight;
     const side = Math.min(width, height);
     canvas.width = side;
     canvas.height = side;
-    canvas.getContext('2d').drawImage(video, (width - side) / 2, (height - side) / 2, side, side, 0, 0, side, side);
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+    context.drawImage(video, (width - side) / 2, (height - side) / 2, side, side, 0, 0, side, side);
     return canvas.toDataURL('image/jpeg', 0.85);
 }
 
@@ -150,6 +171,7 @@ function failedResult(lessonId, letter, system, message) {
         evaluated: false,
         recognized: null,
         confidence: 0,
+        passScore: 60,
         message,
         xp: 0,
         alreadyMastered: false,
@@ -158,47 +180,89 @@ function failedResult(lessonId, letter, system, message) {
         levelName: '',
         challengeCompleted: false,
         assignmentsCompleted: [],
+        requestFailed: true,
+        httpStatus: 0,
+        attemptedLetter: letter,
+        attemptedIndex: null,
+        spelling: null,
+    };
+}
+
+function spellingStateFromResponse(data) {
+    const source = data?.spelling && typeof data.spelling === 'object' ? data.spelling : data;
+    if (!source || !Array.isArray(source.letters)) return null;
+
+    return {
+        word: source.word,
+        letters: source.letters,
+        letter_index: source.letter_index,
+        letters_done: source.letters_done,
+        current_letter: source.current_letter,
+        word_completed: source.word_completed,
+        progress_token: source.progress_token ?? null,
+        expires_at: source.expires_at ?? null,
     };
 }
 
 async function performDetection() {
-    const frame = captureFrame();
+    if (scanning.value || props.disabled || !props.lessonId || !props.letter) return;
+
+    let frame = null;
+    try {
+        frame = captureFrame();
+    } catch {
+        frame = null;
+    }
     if (!frame) {
         frameError.value = 'Gagal mengambil gambar dari kamera. Pastikan kamera menyala dengan baik.';
         return;
     }
 
-    const { lessonId, letter, system } = props;
+    const { lessonId, letter, system, progressToken } = props;
     scanning.value = true;
+    const requestController = new AbortController();
+    activeRequestController = requestController;
 
     try {
+        const payload = { lesson_id: lessonId, image: frame, mirrored: true };
+        if (progressToken) payload.progress_token = progressToken;
+
         const res = await fetch('/api/practice/attempt', {
             method: 'POST',
             credentials: 'same-origin',
+            signal: requestController.signal,
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': window.csrfToken || '',
             },
-            body: JSON.stringify({ lesson_id: lessonId, image: frame, mirrored: true }),
+            body: JSON.stringify(payload),
         });
 
         const data = await res.json().catch(() => null);
-        if (!res.ok || !data) {
-            throw new Error(data?.message || `Respons server status ${res.status}`);
-        }
+        if (
+            requestController.signal.aborted
+            || activeRequestController !== requestController
+            || props.lessonId !== lessonId
+            || props.system !== system
+            || props.progressToken !== progressToken
+        ) return;
 
-        const success = Boolean(data.correct);
+        if (!data) throw new Error(`Respons server status ${res.status}`);
+
+        const responseSpelling = spellingStateFromResponse(data);
+        const success = res.ok && Boolean(data.correct);
         emit('result', {
             success,
             lessonId,
             letter,
             system,
-            detectionStatus: data.detection_status || '',
+            detectionStatus: data.detection_status || (res.status === 409 ? 'stale_progress' : (res.ok ? '' : `http_${res.status}`)),
             streak: Number(data.streak || 0),
             evaluated: Boolean(data.evaluated),
             recognized: data.recognized ? String(data.recognized).toUpperCase() : null,
             confidence: Number(data.confidence || 0),
+            passScore: Number(data.pass_score || 60),
             message: data.message || '',
             xp: Number(data.xp_earned || 0),
             alreadyMastered: Boolean(data.already_mastered),
@@ -207,27 +271,47 @@ async function performDetection() {
             levelName: data.level?.name || '',
             challengeCompleted: Boolean(data.challenge_completed),
             assignmentsCompleted: Array.isArray(data.assignments_completed) ? data.assignments_completed : [],
+            requestFailed: !res.ok,
+            httpStatus: res.status,
+            attemptedLetter: data.attempted_letter ? String(data.attempted_letter).toUpperCase() : letter,
+            attemptedIndex: data.attempted_index !== null
+                && data.attempted_index !== undefined
+                && Number.isInteger(Number(data.attempted_index))
+                ? Number(data.attempted_index)
+                : null,
+            spelling: responseSpelling,
         });
 
-        if (success) {
+        if (success && (!progressToken || responseSpelling?.word_completed)) {
             router.reload({ only: ['auth'] });
         }
     } catch (e) {
+        if (e.name === 'AbortError' || requestController.signal.aborted || activeRequestController !== requestController) return;
         emit('result', failedResult(lessonId, letter, system, `Koneksi ke sistem deteksi terganggu: ${e.message}`));
     } finally {
-        scanning.value = false;
+        if (activeRequestController === requestController) {
+            activeRequestController = null;
+            scanning.value = false;
+        }
     }
 }
 
 function reset() {
     cancelCountdown();
+    activeRequestController?.abort();
+    activeRequestController = null;
+    scanning.value = false;
     frameError.value = '';
 }
 
 onMounted(startCamera);
 onBeforeUnmount(stopCamera);
+watch(() => [props.lessonId, props.system], reset);
+watch(() => props.disabled, (disabled) => {
+    if (disabled) cancelCountdown();
+});
 
-defineExpose({ busy, scanning, startDetection, reset });
+defineExpose({ busy, scanning, startDetection, cancelCountdown, reset });
 </script>
 
 <template>
@@ -262,14 +346,14 @@ defineExpose({ busy, scanning, startDetection, reset });
                         </button>
                     </template>
 
-                    <div v-if="countdown > 0" class="ps-overlay">
+                    <div v-if="countdown > 0" class="ps-overlay" role="status" aria-live="polite">
                         <span class="ps-count">{{ countdown }}</span>
                         <b>Tahan bentuk tangan huruf {{ letter }}</b>
                         <button type="button" class="ps-cancel" @click="cancelCountdown"><X :size="13" /> Batal</button>
                     </div>
-                    <div v-else-if="scanning" class="ps-overlay">
+                    <div v-else-if="scanning" class="ps-overlay" role="status">
                         <RefreshCw :size="34" class="ps-spin" />
-                        <b>AI sedang memeriksa isyaratmu...</b>
+                        <b>{{ spellingMode ? `AI sedang memeriksa huruf ${letter}...` : 'AI sedang memeriksa isyaratmu...' }}</b>
                     </div>
                 </div>
 
@@ -305,7 +389,7 @@ defineExpose({ busy, scanning, startDetection, reset });
                 <ol class="ps-steps">
                     <li><span>1</span><p>Posisikan tangan di dalam kotak panduan.</p></li>
                     <li><span>2</span><p>Tekan <b>Mulai Peragaan</b>, lalu tahan bentuk tangan.</p></li>
-                    <li><span>3</span><p>AI menilai otomatis. Benar = huruf dikuasai.</p></li>
+                    <li><span>3</span><p>{{ spellingMode ? 'AI menilai satu huruf. Benar = lanjut ke huruf berikutnya.' : 'AI menilai otomatis. Benar = huruf dikuasai.' }}</p></li>
                 </ol>
     </div>
 </template>

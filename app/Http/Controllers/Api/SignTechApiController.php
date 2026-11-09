@@ -186,6 +186,15 @@ class SignTechApiController extends Controller
                 ->orderBy('order')
                 ->get();
 
+            foreach ($categories as $category) {
+                foreach ($category->materials as $material) {
+                    foreach ($material->lessons as $lesson) {
+                        $lesson->setAttribute('ai_supported', in_array($category->slug, PracticeService::AI_SUPPORTED_CATEGORIES, true)
+                            && ($category->slug === 'alphabet' || PracticeService::spelledLetters($lesson) !== []));
+                    }
+                }
+            }
+
             $student = $this->resolveStudent($request);
             $completedLessonIds = $student
                 ? $student->practiceSessions()
@@ -255,6 +264,7 @@ class SignTechApiController extends Controller
                 'relatedLessons' => $relatedLessons,
                 'is_completed' => $isCompleted,
                 'ai_supported' => PracticeService::isAiSupported($lesson),
+                'spelling' => $student ? $this->practice->spellingProgress($student, $lesson) : null,
             ]);
         } catch (Throwable $e) {
             return $this->serverError($e);
@@ -318,7 +328,7 @@ class SignTechApiController extends Controller
                 ->with('material.category')
                 ->join('materials', 'materials.id', '=', 'lessons.material_id')
                 ->join('categories', 'categories.id', '=', 'materials.category_id')
-                ->whereIn('categories.slug', PracticeService::AI_SUPPORTED_CATEGORIES)
+                ->where('categories.slug', 'alphabet')
                 ->orderBy('lessons.id')
                 ->get()
                 ->filter(fn (Lesson $l) => preg_match('/^[A-Z]$/', strtoupper(trim($l->title))) === 1)
@@ -367,6 +377,20 @@ class SignTechApiController extends Controller
      */
     public function attemptPractice(Request $request): JsonResponse
     {
+        $student = $this->resolveStudent($request);
+        if (! $student) {
+            return response()->json(['status' => 'error', 'message' => 'Latihan hanya tersedia untuk siswa.'], 403);
+        }
+
+        $request->validate([
+            'lesson_id' => ['nullable', 'integer'],
+            'target_letter' => ['nullable', 'string', 'max:150'],
+            'system' => ['nullable', 'string', 'in:sibi,bisindo'],
+            'image' => ['nullable', 'string', 'max:8192000'],
+            'frame' => ['nullable', 'string', 'max:8192000'],
+            'progress_token' => ['nullable', 'string', 'max:100'],
+        ]);
+
         $lesson = $this->resolvePracticeLesson($request);
         if (! $lesson) {
             return response()->json([
@@ -378,30 +402,56 @@ class SignTechApiController extends Controller
         if (! PracticeService::isAiSupported($lesson)) {
             return response()->json([
                 'status' => 'error',
-                'message' => "Isyarat {$lesson->title} belum bisa dinilai AI. Saat ini AI hanya mengenali isyarat huruf alfabet.",
+                'message' => "Isyarat {$lesson->title} belum bisa dinilai AI. Latihan mendukung alfabet serta ejaan kata/frasa yang hanya berisi huruf A-Z dan spasi.",
             ], 422);
         }
 
         $imageData = $request->input('image') ?? $request->input('frame');
         $mirrored = $request->boolean('mirrored');
+        $spelling = [];
+        $expected = $lesson->title;
 
-        // Evaluasi gesture via Live AI Service (https://ai.signtech.tech)
-        $recognition = $this->recognizer->recognize($lesson->title, $imageData, $lesson->material->language, $mirrored);
+        if (PracticeService::isSpellingLesson($lesson)) {
+            $attempt = $this->practice->attemptSpelling($student, $lesson, $imageData, $mirrored, $request->input('progress_token'));
+            $spelling = $attempt['spelling'] ?? [];
+
+            if ($attempt['status_code'] !== 200) {
+                return response()->json([
+                    'status' => 'error',
+                    'lesson_id' => $lesson->id,
+                    'correct' => false,
+                    'evaluated' => false,
+                    'message' => $attempt['message'],
+                    ...$spelling,
+                ], $attempt['status_code']);
+            }
+
+            $recognition = $attempt['recognition'];
+            $outcome = $attempt['outcome'];
+            $expected = $attempt['attempted_letter'];
+            $spelling['attempted_letter'] = $expected;
+            $spelling['attempted_index'] = $attempt['attempted_index'];
+        } else {
+            $recognition = $this->recognizer->recognize($expected, $imageData, $lesson->material->language, $mirrored);
+            $outcome = $this->practice->recordVerifiedAttempt($student, $lesson, $recognition);
+        }
+
         $confidence = (int) ($recognition['confidence'] ?? 0);
         $recognized = $recognition['recognized'] ?? null;
         $message = $recognition['message'] ?? '';
 
-        if ($recognized !== null && ($recognition['correct'] ?? false) && $confidence < PracticeService::PASS_SCORE) {
-            $message = "Bentuk tangan mirip isyarat {$lesson->title}, tetapi belum cukup jelas (akurasi {$confidence}%, minimal "
+        if ($recognized !== null && strtoupper(trim((string) $recognized)) === strtoupper($expected) && $confidence < PracticeService::PASS_SCORE) {
+            $message = "Bentuk tangan mirip isyarat {$expected}, tetapi belum cukup jelas (akurasi {$confidence}%, minimal "
                 .PracticeService::PASS_SCORE.'%). Tahan posisi tangan lebih stabil lalu coba lagi.';
         }
 
-        $student = $this->resolveStudent($request);
-        $outcome = $student
-            ? $this->practice->recordVerifiedAttempt($student, $lesson, $recognition)
-            : null;
-
         $passed = $outcome['passed'] ?? ($recognized !== null && ($recognition['correct'] ?? false) && $confidence >= PracticeService::PASS_SCORE);
+
+        if ($passed && $spelling !== []) {
+            $message = $spelling['word_completed']
+                ? 'Ejaan '.$spelling['word'].' berhasil diselesaikan.'
+                : "Huruf {$expected} benar. Lanjutkan ke huruf {$spelling['current_letter']}.";
+        }
 
         return response()->json([
             'status' => 'success',
@@ -416,7 +466,7 @@ class SignTechApiController extends Controller
             'score' => $outcome['score'] ?? 0,
             'xp_earned' => $outcome['xp_earned'] ?? 0,
             'already_mastered' => $outcome['already_mastered'] ?? false,
-            'total_xp' => $outcome['total_xp'] ?? 0,
+            'total_xp' => $outcome['total_xp'] ?? $student->totalXp(),
             'level' => $outcome['level'] ?? null,
             'leveled_up' => $outcome['leveled_up'] ?? false,
             'new_badges' => $outcome['new_badges'] ?? [],
@@ -424,6 +474,7 @@ class SignTechApiController extends Controller
             'assignments_completed' => $outcome['assignments_completed'] ?? [],
             'streak' => $outcome['streak'] ?? 0,
             'source' => $recognition['source'] ?? 'signtech_ai_service',
+            ...$spelling,
         ]);
     }
 
@@ -447,6 +498,7 @@ class SignTechApiController extends Controller
         return Lesson::with('material.category')
             ->where('title', $title)
             ->whereHas('material', fn ($q) => $q->where('language', $system))
+            ->whereHas('material.category', fn ($q) => $q->where('slug', 'alphabet'))
             ->first();
     }
 

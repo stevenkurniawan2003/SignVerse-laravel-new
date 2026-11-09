@@ -4,12 +4,15 @@ namespace Tests\Feature\Teacher;
 
 use App\Models\Assignment;
 use App\Models\AssignmentSubmission;
+use App\Models\Category;
 use App\Models\Classroom;
 use App\Models\Lesson;
+use App\Models\Material;
 use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 /**
@@ -97,7 +100,7 @@ class TeacherClassroomTest extends TestCase
             ->assertSessionHas('status');
 
         $student->refresh();
-        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('sandidiperbarui1', $student->password));
+        $this->assertTrue(Hash::check('sandidiperbarui1', $student->password));
     }
 
     public function test_assignment_distributed_to_class_appears_only_for_members(): void
@@ -108,7 +111,9 @@ class TeacherClassroomTest extends TestCase
         $outsider = User::factory()->student()->has(Student::factory(), 'student')->create();
         $classroom->students()->attach($member->student);
 
-        $lesson = Lesson::factory()->for(\App\Models\Material::factory()->for(\App\Models\Category::factory()))->create();
+        $lesson = Lesson::factory()
+            ->for(Material::factory()->for(Category::factory()->state(['slug' => 'alphabet'])))
+            ->create(['title' => 'A', 'gesture_label' => 'a']);
 
         $this->actingAs($teacher)->post(route('teacher.assignments.store'), [
             'classroom_id' => $classroom->id,
@@ -142,7 +147,7 @@ class TeacherClassroomTest extends TestCase
         $this->actingAs($other)->get(route('teacher.classes.show', $classroom))->assertForbidden();
 
         $assignment = Assignment::factory()->for($owner->teacher)
-            ->for(Lesson::factory()->for(\App\Models\Material::factory()->for(\App\Models\Category::factory())))
+            ->for(Lesson::factory()->for(Material::factory()->for(Category::factory())))
             ->create(['classroom_id' => $classroom->id]);
         $this->actingAs($other)->get(route('teacher.assignments.show', $assignment))->assertForbidden();
     }

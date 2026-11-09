@@ -27,7 +27,8 @@ function toggle() {
         :class="{ 'is-on': autoSpeechEnabled }"
         role="switch"
         :aria-checked="autoSpeechEnabled"
-        :title="autoSpeechEnabled ? 'Suara otomatis aktif — hasil latihan dibacakan' : 'Suara otomatis mati'"
+        :aria-label="autoSpeechEnabled ? 'Matikan suara otomatis' : 'Aktifkan suara otomatis'"
+        :title="autoSpeechEnabled ? 'Suara otomatis aktif, hasil latihan dibacakan' : 'Suara otomatis mati'"
         @click="toggle"
     >
         <Volume2 v-if="autoSpeechEnabled" :size="16" />

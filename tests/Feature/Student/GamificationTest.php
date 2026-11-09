@@ -328,8 +328,28 @@ class GamificationTest extends TestCase
         $first = ChallengeService::ensureTodayChallenges();
         $second = ChallengeService::ensureTodayChallenges();
 
-        $this->assertSame(1, Challenge::count());
+        $this->assertSame(2, Challenge::count());
+        $this->assertEqualsCanonicalizing(['alfabet', 'kosakata'], $first->pluck('category')->all());
         $this->assertSame($first->pluck('id')->all(), $second->pluck('id')->all());
+    }
+
+    public function test_spelling_challenge_target_follows_available_spellable_lessons(): void
+    {
+        $category = Category::create(['name' => 'Word', 'slug' => 'word', 'order' => 2]);
+        $material = $category->materials()->create([
+            'title' => 'Kosakata Uji',
+            'slug' => 'kosakata-uji',
+            'language' => Material::LANGUAGE_SIBI,
+        ]);
+        $material->lessons()->create(['title' => 'Aku', 'gesture_label' => 'aku']);
+        $material->lessons()->create(['title' => 'Kamu', 'gesture_label' => 'kamu']);
+        $material->lessons()->create(['title' => 'Umur 10', 'gesture_label' => 'umur_10']);
+
+        ChallengeService::ensureTodayChallenges();
+
+        $spellingChallenge = Challenge::where('category', 'kosakata')->firstOrFail();
+        $this->assertSame(2, (int) $spellingChallenge->target);
+        $this->assertSame('Eja 2 kata atau frasa', $spellingChallenge->title);
     }
 
     public function test_bump_challenge_progresses_and_completes_with_xp(): void

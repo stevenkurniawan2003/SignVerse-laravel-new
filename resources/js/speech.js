@@ -52,7 +52,12 @@ export function setAutoSpeech(enabled) {
 
 /** Daftar suara dimuat asinkron oleh browser, jadi dipilih ulang setiap kali berubah. */
 function refreshVoices() {
-    const voices = window.speechSynthesis.getVoices();
+    let voices = [];
+    try {
+        voices = window.speechSynthesis.getVoices();
+    } catch {
+        // Browser dapat menyediakan TTS tanpa daftar suara yang siap digunakan.
+    }
     indonesianVoice = voices.find((voice) => voice.lang === SPEECH_LANG)
         || voices.find((voice) => voice.lang?.toLowerCase().replace('_', '-').startsWith('id'))
         || null;
@@ -72,11 +77,17 @@ export function speak(text, { auto = false } = {}) {
     if (auto && !autoSpeechEnabled.value) return false;
 
     const synth = window.speechSynthesis;
-    synth.cancel();
-    // Chrome kadang tertahan dalam status "paused" setelah tab berpindah
-    synth.resume();
-
-    const utterance = new SpeechSynthesisUtterance(content);
+    let utterance;
+    try {
+        utterance = new window.SpeechSynthesisUtterance(content);
+        synth.cancel();
+        // Chrome kadang tertahan dalam status "paused" setelah tab berpindah.
+        synth.resume();
+    } catch {
+        currentUtterance = null;
+        speakingText.value = null;
+        return false;
+    }
     utterance.lang = SPEECH_LANG;
     utterance.rate = SPEECH_RATE;
     if (indonesianVoice) {
@@ -96,16 +107,38 @@ export function speak(text, { auto = false } = {}) {
     // Referensi disimpan agar ucapan tidak dibersihkan garbage collector sebelum selesai
     currentUtterance = utterance;
     speakingText.value = content;
-    synth.speak(utterance);
+    try {
+        synth.speak(utterance);
+    } catch {
+        finish();
+        return false;
+    }
 
     return true;
+}
+
+function cancelSynth() {
+    try {
+        window.speechSynthesis.cancel();
+    } catch {
+        // Kegagalan mesin suara tidak boleh menghentikan latihan.
+    }
 }
 
 export function stopSpeech() {
     if (!isSpeechSupported) return;
     currentUtterance = null;
     speakingText.value = null;
-    window.speechSynthesis.cancel();
+    cancelSynth();
+
+    // Beberapa suara Chrome (terutama suara online) tetap berbunyi sesaat setelah
+    // cancel(). Batalkan sekali lagi bila belum ada ucapan baru yang dimulai.
+    setTimeout(() => {
+        const synth = globalThis.window?.speechSynthesis;
+        if (currentUtterance === null && synth?.speaking) {
+            cancelSynth();
+        }
+    }, 120);
 }
 
 export function isSpeaking(text) {
@@ -125,9 +158,13 @@ export function percentText(value) {
 function unlockOnFirstInteraction() {
     if (unlocked) return;
     unlocked = true;
-    const silent = new SpeechSynthesisUtterance('');
-    silent.volume = 0;
-    window.speechSynthesis.speak(silent);
+    try {
+        const silent = new window.SpeechSynthesisUtterance('');
+        silent.volume = 0;
+        window.speechSynthesis.speak(silent);
+    } catch {
+        // Tombol Dengarkan tetap dapat mencoba mesin suara secara langsung.
+    }
     window.removeEventListener('pointerdown', unlockOnFirstInteraction);
     window.removeEventListener('keydown', unlockOnFirstInteraction);
 }

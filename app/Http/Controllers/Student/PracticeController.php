@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\Lesson;
 use App\Models\PracticeSession;
 use App\Services\PracticeService;
 use App\Services\StudentStatsService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -34,7 +36,7 @@ class PracticeController extends Controller
     {
         $student = $this->stats->forUser($request->user());
 
-        $categories = \App\Models\Category::query()
+        $categories = Category::query()
             ->with(['materials.lessons' => fn ($query) => $query->orderBy('order')])
             ->orderBy('order')
             ->get();
@@ -58,6 +60,10 @@ class PracticeController extends Controller
      */
     public function start(Request $request, Lesson $lesson): RedirectResponse
     {
+        if (PracticeService::isSpellingLesson($lesson)) {
+            return redirect()->route('vue.lesson', ['id' => $lesson->id]);
+        }
+
         $student = $this->stats->forUser($request->user());
 
         $session = $this->practice->startSession($student, $lesson);
@@ -85,10 +91,11 @@ class PracticeController extends Controller
     /**
      * Simpan satu attempt dari frame kamera (AJAX, returns JSON).
      */
-    public function attempt(Request $request, PracticeSession $session): \Illuminate\Http\JsonResponse
+    public function attempt(Request $request, PracticeSession $session): JsonResponse
     {
         abort_unless($session->student_id === $request->user()->student?->id, 403);
         abort_unless($session->status === PracticeSession::STATUS_IN_PROGRESS, 422, 'Sesi sudah selesai.');
+        abort_if(PracticeService::isSpellingLesson($session->lesson), 422, 'Kata dan frasa harus diselesaikan melalui latihan ejaan berurutan.');
 
         $validated = $request->validate([
             'image' => ['nullable', 'string'],
@@ -111,6 +118,7 @@ class PracticeController extends Controller
     public function complete(Request $request, PracticeSession $session): RedirectResponse
     {
         abort_unless($session->student_id === $request->user()->student?->id, 403);
+        abort_if(PracticeService::isSpellingLesson($session->lesson), 422, 'Kata dan frasa harus diselesaikan melalui latihan ejaan berurutan.');
 
         $outcome = $this->practice->complete($session);
 

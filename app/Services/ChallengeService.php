@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Challenge;
+use App\Models\Lesson;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -25,9 +26,9 @@ class ChallengeService
 
     /**
      * Kategori challenge yang bisa diselesaikan lewat peragaan yang dinilai AI.
-     * AI baru mengenali huruf alfabet; angka & kosakata belum bisa diverifikasi.
+     * Kosakata mencakup kata dan frasa yang diselesaikan melalui ejaan huruf.
      */
-    public const ACTIVE_CATEGORIES = ['alfabet'];
+    public const ACTIVE_CATEGORIES = ['alfabet', 'kosakata'];
 
     /** Ambil daftar tantangan pada tanggal tertentu (default hari ini). */
     public static function todayChallenges(?string $date = null): Collection
@@ -48,8 +49,10 @@ class ChallengeService
     public static function ensureTodayChallenges(?string $date = null): Collection
     {
         $today = now()->toDateString();
+        $spellingTarget = self::spellingChallengeTarget();
         $rows = [
             [$today, 'Praktik 5 huruf', 'Peragakan 5 huruf berbeda dengan benar hari ini.', 'alfabet', 5],
+            [$today, "Eja {$spellingTarget} kata atau frasa", "Selesaikan ejaan {$spellingTarget} kata atau frasa berbeda hari ini.", 'kosakata', $spellingTarget],
         ];
 
         foreach ($rows as [$date, $title, $description, $category, $target]) {
@@ -60,6 +63,22 @@ class ChallengeService
         }
 
         return self::todayChallenges($date);
+    }
+
+    /**
+     * Target challenge kosakata mengikuti jumlah kata/frasa yang bisa dieja AI
+     * (maksimal 5), karena progres hanya dihitung sekali per kata per hari.
+     */
+    private static function spellingChallengeTarget(): int
+    {
+        $spellableCount = Lesson::query()
+            ->with('material.category')
+            ->whereHas('material.category', fn ($query) => $query->whereIn('slug', ['word', 'phrase']))
+            ->get()
+            ->filter(fn (Lesson $lesson) => PracticeService::isAiSupported($lesson))
+            ->count();
+
+        return max(1, min(5, $spellableCount));
     }
 
     /**

@@ -9,7 +9,9 @@ use App\Models\Student;
 use App\Services\Contracts\GestureRecognitionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Lifecycle sesi latihan (phase 4):
@@ -29,21 +31,173 @@ class PracticeService
     public const PASS_SCORE = 60;
 
     /**
-     * Kategori yang bisa dinilai AI Service. Model hanya mengenali pose huruf
-     * alfabet statis (lihat docs/API_CONTRACT.md di repo sibi-bisindo-mediapipe);
-     * isyarat angka belum punya kelas sehingga tidak bisa diverifikasi.
+     * Kata dan frasa dinilai lewat ejaan huruf, bukan pengenalan isyarat utuh.
+     * Isyarat angka belum memiliki kelas pada model AI.
      */
-    public const AI_SUPPORTED_CATEGORIES = ['alphabet'];
+    public const AI_SUPPORTED_CATEGORIES = ['alphabet', 'word', 'phrase'];
+
+    public const SPELLING_TTL_MINUTES = 30;
 
     public static function isAiSupported(Lesson $lesson): bool
     {
-        return in_array($lesson->material?->category?->slug, self::AI_SUPPORTED_CATEGORIES, true);
+        return $lesson->material?->category?->slug === 'alphabet'
+            || (self::isSpellingLesson($lesson) && self::spelledLetters($lesson) !== []);
+    }
+
+    public static function isSpellingLesson(Lesson $lesson): bool
+    {
+        return in_array($lesson->material?->category?->slug, ['word', 'phrase'], true);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function spelledLetters(Lesson $lesson): array
+    {
+        $word = strtoupper(preg_replace('/\s+/', '', (string) $lesson->title) ?? '');
+
+        return preg_match('/\A[A-Z]+\z/', $word) === 1 ? str_split($word) : [];
     }
 
     public function __construct(
         private GestureRecognitionService $recognizer,
         private AssignmentService $assignments,
     ) {}
+
+    /**
+     * @return array{word: string, letters: list<string>, letter_index: int, letters_done: int, current_letter: ?string, word_completed: bool, progress_token: ?string, expires_at: string}|null
+     */
+    public function spellingProgress(Student $student, Lesson $lesson): ?array
+    {
+        if (! self::isSpellingLesson($lesson) || ! self::isAiSupported($lesson)) {
+            return null;
+        }
+
+        $key = $this->spellingCacheKey($student, $lesson);
+        $progress = Cache::get($key);
+
+        if ($progress === null) {
+            $initial = [
+                'confidences' => [],
+                'progress_token' => Str::random(40),
+                'expires_at' => CarbonImmutable::now()->addMinutes(self::SPELLING_TTL_MINUTES)->toIso8601String(),
+            ];
+            Cache::add($key, $initial, self::SPELLING_TTL_MINUTES * 60);
+            $progress = Cache::get($key, $initial);
+        }
+
+        return $this->spellingState($lesson, $progress);
+    }
+
+    /**
+     * Token hanya mengikat request ke posisi saat ini; target dan skor tetap dari server.
+     * Lock mencakup inferensi agar request paralel tidak menilai posisi yang berbeda.
+     *
+     * @return array{status_code: int, spelling: array<string, mixed>|null, message?: string, recognition?: array<string, mixed>, outcome?: array<string, mixed>|null, attempted_letter?: string, attempted_index?: int}
+     */
+    public function attemptSpelling(Student $student, Lesson $lesson, ?string $imageData, bool $mirrored, ?string $progressToken): array
+    {
+        $key = $this->spellingCacheKey($student, $lesson);
+        $lockSeconds = max(60, (int) config('services.ai.timeout', 15) + 30);
+
+        $result = Cache::lock($key.':lock', $lockSeconds)->get(function () use ($student, $lesson, $imageData, $mirrored, $progressToken, $key): array {
+            $state = $this->spellingProgress($student, $lesson);
+
+            if ($state === null || $progressToken === null || ! hash_equals($state['progress_token'], $progressToken)) {
+                return [
+                    'status_code' => 409,
+                    'spelling' => $state,
+                    'message' => 'Progres ejaan telah berubah atau kedaluwarsa. Lanjutkan dari huruf yang ditampilkan.',
+                ];
+            }
+
+            $progress = Cache::get($key);
+            if ($progress === null || ! hash_equals($progress['progress_token'], $progressToken)) {
+                return [
+                    'status_code' => 409,
+                    'spelling' => $this->spellingProgress($student, $lesson),
+                    'message' => 'Progres ejaan telah kedaluwarsa. Mulai lagi dari huruf yang ditampilkan.',
+                ];
+            }
+
+            $expected = $state['current_letter'];
+            $recognition = $this->recognizer->recognize($expected, $imageData, $lesson->material->language, $mirrored);
+            $confidence = max(0, min(100, (int) ($recognition['confidence'] ?? 0)));
+            $correct = strtoupper(trim((string) ($recognition['recognized'] ?? ''))) === $expected
+                && ($recognition['correct'] ?? false)
+                && $confidence >= self::PASS_SCORE;
+
+            $recognition['correct'] = $correct;
+            $recognition['confidence'] = $confidence;
+
+            if ($correct) {
+                $progress['confidences'][] = $confidence;
+            }
+
+            $expiresAt = CarbonImmutable::now()->addMinutes(self::SPELLING_TTL_MINUTES);
+            $progress['expires_at'] = $expiresAt->toIso8601String();
+            $progress['progress_token'] = Str::random(40);
+            $nextState = $this->spellingState($lesson, $progress);
+            $outcome = null;
+
+            if ($nextState['word_completed']) {
+                $average = (int) round(array_sum($progress['confidences']) / count($progress['confidences']));
+                $outcome = $this->recordVerifiedAttempt($student, $lesson, [
+                    'recognized' => $nextState['word'],
+                    'confidence' => $average,
+                    'correct' => true,
+                ]);
+                $recognition['confidence'] = $average;
+                Cache::forget($key);
+            } else {
+                Cache::put($key, $progress, $expiresAt);
+            }
+
+            return [
+                'status_code' => 200,
+                'spelling' => $nextState,
+                'recognition' => $recognition,
+                'outcome' => $outcome,
+                'attempted_letter' => $expected,
+                'attempted_index' => $state['letter_index'],
+            ];
+        });
+
+        return $result === false ? [
+            'status_code' => 409,
+            'spelling' => $this->spellingProgress($student, $lesson),
+            'message' => 'Peragaan sebelumnya masih diperiksa. Tunggu sebentar lalu coba lagi.',
+        ] : $result;
+    }
+
+    private function spellingCacheKey(Student $student, Lesson $lesson): string
+    {
+        $version = hash('sha256', $lesson->title.'|'.$lesson->material->language.'|'.$lesson->material->category->slug);
+
+        return 'practice-spelling:'.$student->id.':'.$lesson->id.':'.$version;
+    }
+
+    /**
+     * @param  array{confidences: list<int>, progress_token: string, expires_at: string}  $progress
+     * @return array{word: string, letters: list<string>, letter_index: int, letters_done: int, current_letter: ?string, word_completed: bool, progress_token: ?string, expires_at: string}
+     */
+    private function spellingState(Lesson $lesson, array $progress): array
+    {
+        $letters = self::spelledLetters($lesson);
+        $done = count($progress['confidences']);
+        $completed = $done === count($letters);
+
+        return [
+            'word' => strtoupper(trim($lesson->title)),
+            'letters' => $letters,
+            'letter_index' => $done,
+            'letters_done' => $done,
+            'current_letter' => $letters[$done] ?? null,
+            'word_completed' => $completed,
+            'progress_token' => $completed ? null : $progress['progress_token'],
+            'expires_at' => $progress['expires_at'],
+        ];
+    }
 
     /**
      * Mulai sesi baru untuk lesson, atau lanjutkan sesi in_progress yang ada.
@@ -199,11 +353,14 @@ class PracticeService
         $isCorrectLabel = (bool) ($recognition['correct'] ?? false);
         $passed = $isCorrectLabel && $confidence >= self::PASS_SCORE;
         $score = $isCorrectLabel ? $confidence : 0;
-        $alreadyMastered = $this->hasMastered($student, $lesson);
-        $xp = $passed && ! $alreadyMastered ? (int) $lesson->xp_reward : 0;
-        $alreadyPassedToday = $this->hasPassedToday($student, $lesson);
 
-        return DB::transaction(function () use ($student, $lesson, $recognition, $userId, $levelBefore, $passed, $score, $alreadyMastered, $xp, $alreadyPassedToday): array {
+        return DB::transaction(function () use ($student, $lesson, $recognition, $userId, $passed, $score): array {
+            $student = Student::query()->lockForUpdate()->findOrFail($student->id);
+            $levelBefore = GamificationService::levelFromXp($student->totalXp());
+            $alreadyMastered = $this->hasMastered($student, $lesson);
+            $xp = $passed && ! $alreadyMastered ? (int) $lesson->xp_reward : 0;
+            $alreadyPassedToday = $this->hasPassedToday($student, $lesson);
+
             $session = PracticeSession::create([
                 'student_id' => $student->id,
                 'lesson_id' => $lesson->id,

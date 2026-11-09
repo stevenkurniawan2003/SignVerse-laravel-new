@@ -185,6 +185,7 @@ class StudentStatsService
             ->where('student_id', $student->id)
             ->where('status', PracticeSession::STATUS_COMPLETED)
             ->where('score', '>=', 60)
+            ->whereIn('lesson_id', $this->aiVerifiableLessons()->pluck('id'))
             ->distinct('lesson_id')
             ->count('lesson_id');
     }
@@ -202,39 +203,45 @@ class StudentStatsService
             ->groupBy('lesson_id')
             ->pluck('best_score', 'lesson_id');
 
-        $attemptedFailing = $this->aiVerifiableLessons()
+        $lessons = $this->aiVerifiableLessons();
+        $attemptedFailing = $lessons
             ->whereIn('id', $scores->filter(fn ($score) => $score < 60)->keys())
-            ->with('material.category')
-            ->orderBy('difficulty')
-            ->limit($limit)
-            ->get();
+            ->sortBy('difficulty')
+            ->take($limit)
+            ->values();
 
         if ($attemptedFailing->count() >= $limit) {
             return $attemptedFailing;
         }
 
-        $fresh = $this->aiVerifiableLessons()
+        $fresh = $lessons
             ->whereNotIn('id', $scores->keys())
-            ->with('material.category')
-            ->orderBy('difficulty')
-            ->orderBy('order')
-            ->limit($limit - $attemptedFailing->count())
-            ->get();
+            ->sort(function (Lesson $first, Lesson $second): int {
+                return ((int) $first->difficulty <=> (int) $second->difficulty)
+                    ?: ((int) $first->order <=> (int) $second->order);
+            })
+            ->take($limit - $attemptedFailing->count())
+            ->values();
 
-        return $attemptedFailing->concat($fresh);
+        return $attemptedFailing->concat($fresh)->values();
     }
 
     /**
      * Lesson yang bisa diselesaikan siswa, yaitu yang peragaannya bisa dinilai AI.
      *
-     * @return Builder<Lesson>
+     * @return Collection<int, Lesson>
      */
-    private function aiVerifiableLessons(): Builder
+    private function aiVerifiableLessons(): Collection
     {
-        return Lesson::query()->whereHas(
-            'material.category',
-            fn (Builder $query) => $query->whereIn('slug', PracticeService::AI_SUPPORTED_CATEGORIES),
-        );
+        return Lesson::query()
+            ->with('material.category')
+            ->whereHas(
+                'material.category',
+                fn (Builder $query) => $query->whereIn('slug', PracticeService::AI_SUPPORTED_CATEGORIES),
+            )
+            ->get()
+            ->filter(fn (Lesson $lesson) => PracticeService::isAiSupported($lesson))
+            ->values();
     }
 
     /**

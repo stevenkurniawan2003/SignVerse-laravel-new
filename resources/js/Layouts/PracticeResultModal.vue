@@ -20,12 +20,22 @@ const props = defineProps({
     open: { type: Boolean, default: false },
     result: { type: Object, default: null },
     nextLabel: { type: String, default: '' },
+    repeatAction: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['close', 'retry', 'next']);
+const emit = defineEmits(['close', 'retry', 'repeat', 'next']);
 
 const retryButtonRef = ref(null);
 const nextButtonRef = ref(null);
+const modalRef = ref(null);
+let previousFocus = null;
+const isSpellingAttempt = computed(() => Boolean(props.result?.spelling?.word));
+const isSpellingComplete = computed(() => isSpellingAttempt.value && props.result.spelling.word_completed === true);
+// Satu huruf benar di tengah ejaan (bukan huruf terakhir)
+const isLetterStep = computed(() => Boolean(props.result?.success && props.result?.letterStep && isSpellingAttempt.value && !isSpellingComplete.value));
+const spellingKindTitle = computed(() => (props.result?.spellingKind === 'frasa' ? 'Frasa' : 'Kata'));
+const passScore = computed(() => Number(props.result?.passScore) || 60);
+const wordSpeech = computed(() => String(props.result?.spelling?.word || '').toLowerCase());
 
 /**
  * Penjelasan kegagalan untuk pop-up: apa yang salah + tips perbaikan,
@@ -35,12 +45,21 @@ const failure = computed(() => {
     const r = props.result;
     if (!r || r.success) return null;
 
-    const unreachable = ['service_unreachable', 'http_error'].includes(r.detectionStatus) || r.detectionStatus.startsWith('http_');
+    const detectionStatus = String(r.detectionStatus || '');
+    const unreachable = ['service_unreachable', 'http_error'].includes(detectionStatus) || Number(r.httpStatus) >= 500;
     if (unreachable) {
         return {
             title: 'AI sedang tidak bisa dihubungi',
             reason: 'Isyaratmu belum sempat dinilai karena layanan AI tidak merespons. Ini bukan kesalahanmu.',
             tips: ['Periksa koneksi internet.', 'Tunggu sebentar, lalu coba lagi.'],
+        };
+    }
+
+    if (r.requestFailed) {
+        return {
+            title: 'Latihan belum dapat diproses',
+            reason: r.message || 'Server menolak percobaan ini, jadi huruf belum dinilai.',
+            tips: ['Muat ulang materi bila sesi ejaan sudah lama terbuka.', 'Pastikan kamu berlatih dari akun siswa yang benar, lalu coba lagi.'],
         };
     }
 
@@ -77,7 +96,7 @@ const failure = computed(() => {
 
     return {
         title: 'Hampir benar!',
-        reason: `Bentuk tanganmu mirip huruf ${r.letter}, tetapi akurasinya baru ${r.confidence}% (minimal 60%).`,
+        reason: `Bentuk tanganmu mirip huruf ${r.letter}, tetapi akurasinya baru ${r.confidence}% (minimal ${passScore.value}%).`,
         tips: ['Tahan tangan lebih stabil tanpa bergerak.', 'Hadapkan telapak tangan dengan jelas ke kamera.'],
     };
 });
@@ -93,15 +112,27 @@ const resultSpeech = computed(() => {
     const r = props.result;
     if (!r) return '';
 
+    if (isLetterStep.value) {
+        return `Huruf ${r.letter} benar! Akurasi ${percentText(r.confidence)}. `
+            + `${r.spelling.letters_done} dari ${r.spelling.letters.length} huruf selesai. Berikutnya huruf ${r.spelling.current_letter}.`;
+    }
+
     if (r.success) {
-        const parts = [
-            `Isyaratmu terbaca huruf ${r.letter}. Benar!`,
-            `Akurasi ${percentText(r.confidence)}.`,
-        ];
+        const parts = isSpellingComplete.value
+            ? [
+                `${spellingKindTitle.value} ${r.spelling.word} berhasil dieja.`,
+                `Semua ${r.spelling.letters.length} huruf sudah benar.`,
+                `Rata-rata akurasi ${percentText(r.confidence)}.`,
+                `AI menilai setiap huruf dalam ejaan jari, bukan satu isyarat ${r.spellingKind || 'kata'} utuh.`,
+            ]
+            : [
+                `Isyaratmu terbaca huruf ${r.letter}. Benar!`,
+                `Akurasi ${percentText(r.confidence)}.`,
+            ];
         if (r.xp > 0) parts.push(`Kamu mendapat ${r.xp} XP.`);
-        else if (r.alreadyMastered) parts.push('Huruf ini sudah kamu kuasai sebelumnya.');
+        else if (r.alreadyMastered) parts.push(isSpellingAttempt.value ? `${spellingKindTitle.value} ini sudah kamu kuasai sebelumnya.` : 'Huruf ini sudah kamu kuasai sebelumnya.');
         if (r.leveledUp && r.levelName) parts.push(`Selamat, kamu naik level menjadi ${r.levelName}.`);
-        r.assignmentsCompleted.forEach((task) => parts.push(`Tugas ${task.title} selesai.`));
+        (r.assignmentsCompleted || []).forEach((task) => parts.push(`Tugas ${task.title} selesai.`));
         if (r.challengeCompleted) parts.push('Tantangan harian selesai.');
         return parts.join(' ');
     }
@@ -114,7 +145,7 @@ const resultSpeech = computed(() => {
         return `Isyaratmu terbaca huruf ${r.recognized}, padahal targetnya huruf ${r.letter}. ${firstTip}`;
     }
     if (r.recognized) {
-        return `Isyaratmu terbaca huruf ${r.recognized}, tetapi akurasinya baru ${percentText(r.confidence)}. Minimal 60 persen. ${firstTip}`;
+        return `Isyaratmu terbaca huruf ${r.recognized}, tetapi akurasinya baru ${percentText(r.confidence)}. Minimal ${passScore.value} persen. ${firstTip}`;
     }
     return `${info.title}. ${info.reason} ${firstTip}`;
 });
@@ -123,18 +154,48 @@ function onNext() {
     emit(props.nextLabel ? 'next' : 'close');
 }
 
+function onRepeat() {
+    emit(props.repeatAction ? 'repeat' : 'close');
+}
+
 function onKeydown(event) {
-    if (event.key === 'Escape' && props.open) {
+    if (!props.open) return;
+
+    if (event.key === 'Escape') {
+        event.preventDefault();
         emit('close');
+        return;
+    }
+
+    if (event.key !== 'Tab' || !modalRef.value) return;
+
+    const buttons = modalRef.value.querySelectorAll('button:not(:disabled), a[href], [tabindex="0"]');
+    const first = buttons[0];
+    const last = buttons[buttons.length - 1];
+    if (!first) return;
+
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && (document.activeElement === last || !modalRef.value.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
     }
 }
 
 watch(() => props.open, async (open) => {
     if (!open) {
         stopSpeech();
+        await nextTick();
+        if (!props.open) {
+            if (previousFocus?.isConnected) previousFocus.focus();
+            previousFocus = null;
+        }
         return;
     }
+    previousFocus = document.activeElement;
     await nextTick();
+    if (!props.open) return;
     (props.result?.success ? nextButtonRef.value : retryButtonRef.value)?.focus();
     speak(resultSpeech.value, { auto: true });
 });
@@ -152,6 +213,7 @@ onBeforeUnmount(() => {
         <Transition name="ps-pop">
             <div v-if="open && result" class="ps-modal-backdrop" @click.self="emit('close')">
                 <div
+                    ref="modalRef"
                     class="ps-modal"
                     :class="[result.success ? 'is-success' : 'is-retry', result.system === 'BISINDO' ? 'ps--bisindo' : 'ps--sibi']"
                     role="dialog"
@@ -162,14 +224,78 @@ onBeforeUnmount(() => {
                         <X :size="18" />
                     </button>
 
-                    <!-- Benar -->
-                    <template v-if="result.success">
+                    <!-- Satu huruf benar di tengah ejaan: jeda sebelum huruf berikutnya -->
+                    <template v-if="isLetterStep">
                         <span class="ps-modal-icon"><Check :size="40" /></span>
-                        <h2 id="ps-modal-title">Hebat! Isyarat {{ result.letter }} benar</h2>
-                        <p class="ps-modal-sub">AI mengenali isyarat huruf {{ result.letter }} ({{ result.system }}) kamu.</p>
+                        <h2 id="ps-modal-title">Huruf {{ result.letter }} benar!</h2>
+                        <p class="ps-modal-sub">
+                            Ejaan {{ result.spellingKind || 'kata' }} {{ result.spelling.word }} ·
+                            {{ result.spelling.letters_done }} dari {{ result.spelling.letters.length }} huruf selesai
+                        </p>
+
+                        <div class="ps-spelling-summary">
+                            <div class="ps-spelling-letters" :aria-label="`Progres ejaan ${result.spelling.word}`">
+                                <span
+                                    v-for="(letter, index) in result.spelling.letters"
+                                    :key="index"
+                                    :class="{
+                                        'is-pending': index > result.spelling.letter_index,
+                                        'is-next': index === result.spelling.letter_index,
+                                    }"
+                                >
+                                    {{ letter }} <Check v-if="index < result.spelling.letters_done" :size="11" aria-hidden="true" />
+                                </span>
+                            </div>
+                            <b>Berikutnya: huruf {{ result.spelling.current_letter }}</b>
+                        </div>
 
                         <div class="ps-modal-voice">
-                            <div v-if="result.recognized" class="ps-voice-read">
+                            <SpeakButton :text="resultSpeech" label="Bacakan hasil" />
+                        </div>
+
+                        <div class="ps-modal-stats ps-modal-stats--single">
+                            <div>
+                                <CheckCircle :size="20" />
+                                <b>{{ result.confidence }}%</b>
+                                <small>Akurasi huruf {{ result.letter }}</small>
+                            </div>
+                        </div>
+
+                        <div class="ps-modal-actions">
+                            <button type="button" class="st-btn st-btn--secondary" @click="emit('close')">
+                                Kembali
+                            </button>
+                            <button ref="nextButtonRef" type="button" class="st-btn st-btn--primary" @click="onNext">
+                                {{ nextLabel }} <ArrowRight :size="16" />
+                            </button>
+                        </div>
+                    </template>
+
+                    <!-- Benar -->
+                    <template v-else-if="result.success">
+                        <span class="ps-modal-icon"><Check :size="40" /></span>
+                        <h2 id="ps-modal-title">
+                            {{ isSpellingComplete ? `${spellingKindTitle} ${result.spelling.word} berhasil dieja!` : `Hebat! Isyarat ${result.letter} benar` }}
+                        </h2>
+                        <p class="ps-modal-sub">
+                            {{ isSpellingComplete
+                                ? `AI menilai setiap huruf ejaan jari ${result.system} kamu, bukan satu isyarat ${result.spellingKind || 'kata'} utuh.`
+                                : `AI mengenali isyarat huruf ${result.letter} (${result.system}) kamu.`
+                            }}
+                        </p>
+
+                        <div v-if="isSpellingComplete" class="ps-spelling-summary">
+                            <b>{{ result.spelling.letters_done }} / {{ result.spelling.letters.length }} huruf selesai</b>
+                            <div class="ps-spelling-letters" :aria-label="`Ejaan ${result.spelling.word} selesai`">
+                                <span v-for="(letter, index) in result.spelling.letters" :key="index">
+                                    {{ letter }} <Check :size="11" aria-hidden="true" />
+                                </span>
+                            </div>
+                            <SpeakButton :text="wordSpeech" :label="`Ucapkan ${result.spellingKind || 'kata'}`" />
+                        </div>
+
+                        <div class="ps-modal-voice">
+                            <div v-if="result.recognized && !isSpellingAttempt" class="ps-voice-read">
                                 <span class="ps-voice-letter">{{ result.recognized }}</span>
                                 <div>
                                     <small>Isyaratmu terbaca</small>
@@ -184,7 +310,7 @@ onBeforeUnmount(() => {
                             <div>
                                 <CheckCircle :size="20" />
                                 <b>{{ result.confidence }}%</b>
-                                <small>Akurasi</small>
+                                <small>{{ isSpellingComplete ? 'Rata-rata akurasi' : 'Akurasi' }}</small>
                             </div>
                             <div>
                                 <Star :size="20" />
@@ -203,16 +329,16 @@ onBeforeUnmount(() => {
                             </div>
                         </div>
 
-                        <ul v-if="result.alreadyMastered || result.challengeCompleted || result.newBadges.length || result.leveledUp || result.assignmentsCompleted.length" class="ps-modal-list">
+                        <ul v-if="result.alreadyMastered || result.challengeCompleted || result.newBadges?.length || result.leveledUp || result.assignmentsCompleted?.length" class="ps-modal-list">
                             <li v-if="result.leveledUp" class="highlight"><Trophy :size="16" /> Naik level! Sekarang kamu <b>{{ result.levelName }}</b>.</li>
                             <li v-for="badge in result.newBadges" :key="badge" class="highlight"><Award :size="16" /> Lencana baru terbuka: <b>{{ badge }}</b></li>
                             <li v-for="task in result.assignmentsCompleted" :key="task.title" class="highlight"><ClipboardCheck :size="16" /> Tugas guru selesai: <b>{{ task.title }}</b> (+{{ task.xp_earned }} XP)</li>
                             <li v-if="result.challengeCompleted"><Trophy :size="16" /> Tantangan harian selesai! Bonus XP sudah ditambahkan.</li>
-                            <li v-if="result.alreadyMastered && result.xp === 0"><Star :size="16" /> Huruf ini sudah kamu kuasai sebelumnya, jadi XP tidak bertambah lagi.</li>
+                            <li v-if="result.alreadyMastered && result.xp === 0"><Star :size="16" /> {{ isSpellingAttempt ? `${spellingKindTitle} ini` : 'Huruf ini' }} sudah kamu kuasai sebelumnya, jadi XP tidak bertambah lagi.</li>
                         </ul>
 
                         <div class="ps-modal-actions">
-                            <button type="button" class="st-btn st-btn--secondary" @click="emit('close')">
+                            <button type="button" class="st-btn st-btn--secondary" @click="onRepeat">
                                 <RotateCcw :size="16" /> Latih Lagi
                             </button>
                             <button ref="nextButtonRef" type="button" class="st-btn st-btn--primary" @click="onNext">
@@ -225,7 +351,11 @@ onBeforeUnmount(() => {
                     <template v-else-if="failure">
                         <span class="ps-modal-icon"><X :size="40" /></span>
                         <h2 id="ps-modal-title">{{ failure.title }}</h2>
-                        <p class="ps-modal-sub">Target: huruf <b>{{ result.letter }}</b> ({{ result.system }})</p>
+                        <p class="ps-modal-sub">
+                            <template v-if="isSpellingAttempt">Target ejaan {{ result.spellingKind || 'kata' }} {{ result.spelling.word }}: </template>
+                            Huruf <b>{{ result.letter }}</b> ({{ result.system }})
+                        </p>
+                        <p v-if="isSpellingAttempt" class="ps-modal-sub">Posisi {{ result.spelling.letter_index + 1 }} dari {{ result.spelling.letters.length }}. Huruf yang sudah benar tetap tersimpan.</p>
 
                         <div class="ps-modal-voice">
                             <div v-if="result.recognized" class="ps-voice-read is-miss">
@@ -341,12 +471,51 @@ onBeforeUnmount(() => {
     font-weight: 800;
     line-height: 1.25;
     color: var(--st-ink);
+    overflow-wrap: anywhere;
 }
 
 .ps-modal-sub {
     margin: -6px 0 0;
     font-size: 14px;
     color: var(--st-muted);
+}
+
+.ps-spelling-summary {
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px;
+    color: var(--sys-dark);
+    background: var(--sys-soft);
+    border: 1px solid var(--sys-line);
+    border-radius: 14px;
+}
+
+.ps-spelling-summary > b {
+    font-size: 14px;
+}
+
+.ps-spelling-letters {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+}
+
+.ps-spelling-letters span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 34px;
+    min-height: 36px;
+    padding: 4px;
+    font-size: 17px;
+    font-weight: 800;
+    color: #fff;
+    background: var(--sys-dark);
+    border-radius: 8px;
 }
 
 /* Isyarat → suara: huruf yang terbaca + tombol bacakan */
@@ -425,6 +594,21 @@ onBeforeUnmount(() => {
     background: var(--sys-soft);
     border: 1px solid var(--sys-line);
     border-radius: 14px;
+}
+
+.ps-modal-stats--single {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.ps-spelling-letters span.is-next {
+    color: #795a16;
+    background: #fff8e8;
+    box-shadow: inset 0 0 0 2px #c29b40;
+}
+
+.ps-spelling-letters span.is-pending {
+    color: #9aaba2;
+    background: #f1f5f3;
 }
 
 .ps-modal-stats svg {
