@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, useSlots } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import {
     ArrowRight,
@@ -25,8 +25,10 @@ import {
 } from '@lucide/vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import SpeechToggle from './SpeechToggle.vue';
+import SidebarMascotCard from '../Components/SidebarMascotCard.vue';
 import { shouldAnimatePageEntry } from '../pageTransition';
 
+const slots = useSlots();
 const page = usePage();
 const isPageEntering = ref(shouldAnimatePageEntry(page.url));
 const menuOpen = ref(false);
@@ -83,6 +85,8 @@ onBeforeUnmount(() => {
 });
 
 const isTeacher = computed(() => userRole.value === 'teacher');
+const hasCustomRightPanel = computed(() => !!slots['right-panel']);
+const showRightPanel = computed(() => hasCustomRightPanel.value || !isTeacher.value);
 
 const teacherNav = [
     { to: '/teacher/dashboard', label: 'Dashboard Guru', icon: LayoutDashboard },
@@ -202,6 +206,9 @@ const streakWeek = computed(() => {
             </nav>
 
             <div class="sidebar-bottom">
+                <!-- Playful Mascot CTA Card -->
+                <SidebarMascotCard :is-teacher="isTeacher" />
+
                 <div v-if="authUser" class="mini-user-container">
                     <Link href="/profile" class="mini-user" @click="menuOpen = false">
                         <div class="avatar">{{ userInitials }}</div>
@@ -294,70 +301,72 @@ const streakWeek = computed(() => {
         </ConfirmDialog>
 
         <!-- Right Insights Sidebar Panel -->
-        <aside v-if="!isTeacher" class="right-panel">
-            <div class="panel-heading">
-                <span>Aktivitas Belajar</span>
-            </div>
+        <aside v-if="showRightPanel" class="right-panel" :class="{ 'is-custom-panel': hasCustomRightPanel }">
+            <slot name="right-panel">
+                <div class="panel-heading">
+                    <span>Aktivitas Belajar</span>
+                </div>
 
-            <!-- Streak Card -->
-            <section class="side-card streak-card">
-                <div class="side-card-top">
-                    <span class="streak-icon">
-                        <Flame :size="18" />
-                    </span>
-                    <span class="eyebrow">Konsistensi Harian</span>
-                </div>
-                <div class="streak-number">
-                    {{ currentStreak }} <small>hari aktif</small>
-                </div>
-                <p>Pertahankan ritme harianmu untuk mempercepat penguasaan isyarat.</p>
-                <div class="week-dots">
-                    <span
-                        v-for="(day, index) in streakWeek"
-                        :key="index"
-                        :class="{ 'day-done': day.done, 'day-today': day.isToday }"
-                    >
-                        {{ day.label }}
-                    </span>
-                </div>
-            </section>
+                <!-- Streak Card -->
+                <section class="side-card streak-card">
+                    <div class="side-card-top">
+                        <span class="streak-icon">
+                            <Flame :size="18" />
+                        </span>
+                        <span class="eyebrow">Konsistensi Harian</span>
+                    </div>
+                    <div class="streak-number">
+                        {{ currentStreak }} <small>hari aktif</small>
+                    </div>
+                    <p>Pertahankan ritme harianmu untuk mempercepat penguasaan isyarat.</p>
+                    <div class="week-dots">
+                        <span
+                            v-for="(day, index) in streakWeek"
+                            :key="index"
+                            :class="{ 'day-done': day.done, 'day-today': day.isToday }"
+                        >
+                            {{ day.label }}
+                        </span>
+                    </div>
+                </section>
 
-            <!-- Daily Challenge Quest Card -->
-            <Link v-if="page.url !== '/challenge'" href="/challenge" class="side-card quest-card">
-                <div class="side-card-top">
-                    <span class="quest-icon">
-                        <Target :size="18" />
-                    </span>
-                    <span class="eyebrow">Tantangan Harian</span>
-                    <ArrowRight :size="14" class="muted-icon" />
-                </div>
-                <b>Selesaikan Misi Harian</b>
-                <p>Latih gesture hari ini untuk mendapatkan bonus XP.</p>
-                <small class="quest-reward">+20 XP bonus harian</small>
-            </Link>
+                <!-- Daily Challenge Quest Card -->
+                <Link v-if="page.url !== '/challenge'" href="/challenge" class="side-card quest-card">
+                    <div class="side-card-top">
+                        <span class="quest-icon">
+                            <Target :size="18" />
+                        </span>
+                        <span class="eyebrow">Tantangan Harian</span>
+                        <ArrowRight :size="14" class="muted-icon" />
+                    </div>
+                    <b>Selesaikan Misi Harian</b>
+                    <p>Latih gesture hari ini untuk mendapatkan bonus XP.</p>
+                    <small class="quest-reward">+20 XP bonus harian</small>
+                </Link>
 
-            <!-- Level Card -->
-            <section class="side-card level-card">
-                <div class="side-card-top">
-                    <span class="level-icon">
-                        <Award :size="18" />
-                    </span>
-                    <span class="eyebrow">Peringkat Level</span>
-                </div>
-                <div class="level-title">{{ level.name }}</div>
-                <div class="level-xp">
-                    {{ totalXp }} <span>XP Total</span>
-                </div>
-                <div class="progress-track">
-                    <i
-                        class="accent-progress"
-                        :style="{ width: `${level.next_xp ? level.pct || 0 : 100}%` }"
-                    ></i>
-                </div>
-                <small>
-                    {{ level.next_xp ? `${Math.max(0, level.next_xp - totalXp)} XP lagi menuju level berikutnya` : 'Peringkat tertinggi tercapai!' }}
-                </small>
-            </section>
+                <!-- Level Card -->
+                <section class="side-card level-card">
+                    <div class="side-card-top">
+                        <span class="level-icon">
+                            <Award :size="18" />
+                        </span>
+                        <span class="eyebrow">Peringkat Level</span>
+                    </div>
+                    <div class="level-title">{{ level.name }}</div>
+                    <div class="level-xp">
+                        {{ totalXp }} <span>XP Total</span>
+                    </div>
+                    <div class="progress-track">
+                        <i
+                            class="accent-progress"
+                            :style="{ width: `${level.next_xp ? level.pct || 0 : 100}%` }"
+                        ></i>
+                    </div>
+                    <small>
+                        {{ level.next_xp ? `${Math.max(0, level.next_xp - totalXp)} XP lagi menuju level berikutnya` : 'Peringkat tertinggi tercapai!' }}
+                    </small>
+                </section>
+            </slot>
         </aside>
 
         <!-- Mobile Bottom Nav -->

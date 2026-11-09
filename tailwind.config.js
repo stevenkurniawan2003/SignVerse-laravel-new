@@ -13,9 +13,9 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['"Poppins"', ...defaultTheme.fontFamily.sans],
-                display: ['"Poppins"', ...defaultTheme.fontFamily.sans],
-                heading: ['"Poppins"', ...defaultTheme.fontFamily.sans],
+                sans: ['"Giphurs"', '"Poppins"', ...defaultTheme.fontFamily.sans],
+                display: ['"Giphurs"', '"Poppins"', ...defaultTheme.fontFamily.sans],
+                heading: ['"Giphurs"', '"Poppins"', ...defaultTheme.fontFamily.sans],
             },
             colors: {
                 // Design tokens SignTech — #34B182, #C29B40, #5FAB6F

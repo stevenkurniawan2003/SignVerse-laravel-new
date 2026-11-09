@@ -173,6 +173,39 @@ class TeacherStatsService
     }
 
     /**
+     * Aktivitas latihan 7 hari terakhir dari seluruh siswa kelas milik guru.
+     *
+     * @return array<int, array{date: string, label: string, count: int, isToday: bool}>
+     */
+    public function weeklyActivity(Teacher $teacher): array
+    {
+        $studentIds = $teacher->studentsQuery()->pluck('students.id');
+
+        $days = DB::table('practice_sessions')
+            ->whereIn('student_id', $studentIds)
+            ->where('status', PracticeSession::STATUS_COMPLETED)
+            ->selectRaw('DATE(created_at) as d, COUNT(*) as count')
+            ->groupBy('d')
+            ->pluck('count', 'd')
+            ->all();
+
+        $weekDays = [];
+        $dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = \Carbon\CarbonImmutable::today()->subDays($i);
+            $key = $date->toDateString();
+            $weekDays[] = [
+                'date' => $key,
+                'label' => $dayNames[$date->dayOfWeek],
+                'count' => (int) ($days[$key] ?? 0),
+                'isToday' => $i === 0,
+            ];
+        }
+
+        return $weekDays;
+    }
+
+    /**
      * Tabel siswa guru (opsional satu kelas) dengan agregat dalam satu query:
      * jumlah latihan, rata-rata skor, huruf dikuasai, XP, streak, aktivitas terakhir.
      *
