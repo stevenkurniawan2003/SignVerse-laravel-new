@@ -156,3 +156,4 @@ const trendPercent = computed(() => {
     min-height: 250px;
 }
 </style>
+

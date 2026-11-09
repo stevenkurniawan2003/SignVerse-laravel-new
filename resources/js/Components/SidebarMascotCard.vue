@@ -9,6 +9,10 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    collapsed: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const title = computed(() => (props.isTeacher ? 'Kelola Kelas & Tugas' : 'Latihan Mandiri AI'));
@@ -22,7 +26,19 @@ const ctaLink = computed(() => (props.isTeacher ? '/teacher/assignments' : '/pra
 </script>
 
 <template>
-    <div class="sidebar-mascot-wrapper relative mt-auto pt-10 px-2 pb-2">
+    <!-- Collapsed View (Rail Icon Mode) -->
+    <div v-if="collapsed" class="py-3 flex justify-center">
+        <Link
+            :href="ctaLink"
+            class="w-11 h-11 rounded-2xl bg-gradient-to-b from-[#18483e] to-[#0d2a24] text-[#C29B40] flex items-center justify-center border border-[#23584c] shadow-md hover:scale-105 transition-all"
+            :title="`${title} — ${ctaLabel}`"
+        >
+            <Sparkles :size="18" class="text-[#f4cd6f]" />
+        </Link>
+    </div>
+
+    <!-- Expanded View (Full Card Mode) -->
+    <div v-else class="sidebar-mascot-wrapper relative mt-auto pt-10 px-2 pb-2">
         <!-- Floating mascot character popping up from top edge -->
         <div class="mascot-pop absolute -top-12 left-1/2 -translate-x-1/2 pointer-events-none z-10">
             <MascotIllustration :variant="isTeacher ? 'teacher' : 'student'" size="md" />

@@ -348,3 +348,4 @@ const dimensions = computed(() => {
     transform: scale(1.04) translateY(-3px);
 }
 </style>
+

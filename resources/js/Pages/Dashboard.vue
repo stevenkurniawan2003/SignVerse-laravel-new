@@ -201,9 +201,9 @@ onBeforeUnmount(() => {
     <AppLayout>
         <Head title="Dashboard Siswa — SignTech" />
 
-        <div class="dashboard-container space-y-6 sm:space-y-7 pb-10">
+        <div class="dashboard-shell space-y-6 max-w-full">
             <!-- Top Greeting & Search Pill Bar -->
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-1">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 class="font-display font-extrabold text-2xl sm:text-3xl text-[#14221d] tracking-tight">
                         Welcome back, {{ userName }} 👋
@@ -213,162 +213,166 @@ onBeforeUnmount(() => {
                     </p>
                 </div>
 
-                <!-- Search Pill Input (Dribbble shot matching) -->
+                <!-- Search Pill Input -->
                 <div class="relative w-full md:w-80">
                     <Search :size="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7f958e]" />
                     <input
                         v-model="searchQuery"
                         type="text"
                         placeholder="Cari materi atau huruf isyarat..."
-                        class="w-full pl-9 pr-4 py-2.5 rounded-full bg-white border border-[#e2ece6] text-xs font-semibold text-[#14221d] placeholder-[#8ea39c] focus:outline-none focus:ring-2 focus:ring-[#34B182] shadow-sm transition-all"
+                        class="w-full pl-9 pr-4 py-2.5 rounded-full bg-white border border-[#e2ece6] text-xs font-semibold text-[#14221d] placeholder-[#8ea39c] focus:outline-none focus:ring-2 focus:ring-[#34B182] shadow-xs transition-all"
                     />
                 </div>
             </div>
 
-            <!-- Row 1: Activity Bar Chart (7-day Pill Bars) & Progress Overview Card -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
-                <!-- Activity Card -->
-                <ActivityBarChart
-                    :week-activity="props.weekActivity"
-                    title="Aktivitas Belajar"
-                    period-label="Minggu ini"
-                    stat-label="sesi latihan"
-                />
+            <!-- Unified 12-Column Grid (shadcn Fluid Dashboard Style) -->
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                <!-- Main Area (8 cols on desktop: col-span-12 xl:col-span-8) -->
+                <div class="xl:col-span-8 flex flex-col gap-6 min-w-0">
+                    <!-- Row 1: Activity Bar Chart (7-day Pill Bars) & Progress Overview Card -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+                        <!-- Activity Card -->
+                        <ActivityBarChart
+                            :week-activity="props.weekActivity"
+                            title="Aktivitas Belajar"
+                            period-label="Minggu ini"
+                            stat-label="sesi latihan"
+                        />
 
-                <!-- Progress Card -->
-                <ProgressOverviewCard
-                    title="Kemajuan Isyarat"
-                    period-label="Bulan ini"
-                    :percent="avgScore || 78"
-                    ring-label="Akurasi"
-                    trend-text="+12% peningkatan dari awal"
-                    :tiles="studentTiles"
-                />
-            </div>
-
-            <!-- Row 2: Courses in Progress (3 Card Grid) -->
-            <CoursesInProgress
-                title="Materi Sedang Berjalan"
-                :categories="props.progress"
-                :is-teacher="false"
-            />
-
-            <!-- Row 3: Leaderboard / Peringkat Belajar (Realtime Gamification) -->
-            <div class="leaderboard-card bg-white rounded-[24px] p-5 sm:p-6 border border-[#e8efe9] shadow-sm">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-8 h-8 rounded-xl bg-[#fdf5e7] text-[#C29B40] flex items-center justify-center">
-                            <Trophy :size="18" class="stroke-[2.2]" />
-                        </div>
-                        <div>
-                            <h3 class="font-display font-extrabold text-[17px] text-[#14221d] tracking-tight">
-                                Peringkat Kelas Realtime
-                            </h3>
-                            <p class="text-[11px] text-[#738881]">
-                                Diperbarui otomatis berdasarkan perolehan XP latihan
-                            </p>
-                        </div>
+                        <!-- Progress Card -->
+                        <ProgressOverviewCard
+                            title="Kemajuan Isyarat"
+                            period-label="Bulan ini"
+                            :percent="avgScore || 78"
+                            ring-label="Akurasi"
+                            trend-text="+12% peningkatan dari awal"
+                            :tiles="studentTiles"
+                        />
                     </div>
 
-                    <Link
-                        href="/achievement"
-                        class="inline-flex items-center gap-1 text-xs font-bold text-[#1b735a] hover:text-[#34B182] transition-colors"
-                    >
-                        <span>Semua Peringkat</span>
-                        <ArrowRight :size="13" class="stroke-[2.5]" />
-                    </Link>
-                </div>
+                    <!-- Row 2: Courses in Progress (3 Card Grid) -->
+                    <CoursesInProgress
+                        title="Materi Sedang Berjalan"
+                        :categories="props.progress"
+                        :is-teacher="false"
+                    />
 
-                <!-- Leaderboard Table / Rows -->
-                <div v-if="boardEntries.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <div
-                        v-for="entry in boardEntries.slice(0, 3)"
-                        :key="entry.user_id"
-                        class="flex items-center gap-3 p-3 rounded-2xl border transition-all duration-200"
-                        :class="[
-                            entry.rank === 1
-                                ? 'bg-gradient-to-r from-[#fefbf3] to-[#fdf6e6] border-[#f6e1ba]'
-                                : entry.rank === 2
-                                ? 'bg-[#f8faf9] border-[#e5ece8]'
-                                : 'bg-[#fafcfb] border-[#e8efe9]',
-                        ]"
-                    >
-                        <!-- Rank Medal / Number -->
-                        <div
-                            class="w-8 h-8 rounded-xl font-display font-black text-sm flex items-center justify-center shrink-0 shadow-sm"
-                            :class="[
-                                entry.rank === 1
-                                    ? 'bg-[#C29B40] text-white ring-2 ring-[#C29B40]/30'
-                                    : entry.rank === 2
-                                    ? 'bg-[#94a8a0] text-white'
-                                    : 'bg-[#b8a07a] text-white',
-                            ]"
-                        >
-                            {{ entry.rank }}
+                    <!-- Row 3: Leaderboard / Peringkat Belajar (Realtime Gamification) -->
+                    <div class="leaderboard-card bg-white rounded-[24px] p-5 sm:p-6 border border-[#e8efe9] shadow-sm">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-xl bg-[#fdf5e7] text-[#C29B40] flex items-center justify-center">
+                                    <Trophy :size="18" class="stroke-[2.2]" />
+                                </div>
+                                <div>
+                                    <h3 class="font-display font-extrabold text-[17px] text-[#14221d] tracking-tight">
+                                        Peringkat Kelas Realtime
+                                    </h3>
+                                    <p class="text-[11px] text-[#738881]">
+                                        Diperbarui otomatis berdasarkan perolehan XP latihan siswa
+                                    </p>
+                                </div>
+                            </div>
+
+                            <Link
+                                href="/achievement"
+                                class="inline-flex items-center gap-1 text-xs font-bold text-[#1b735a] hover:text-[#34B182] transition-colors"
+                            >
+                                <span>Semua Peringkat</span>
+                                <ArrowRight :size="13" class="stroke-[2.5]" />
+                            </Link>
                         </div>
 
-                        <!-- Name and XP -->
-                        <div class="min-w-0 flex-1">
-                            <div class="font-display font-bold text-[13px] text-[#14221d] truncate">
-                                {{ entry.name }}
-                                <span v-if="entry.is_me" class="text-[10px] text-[#34B182] font-extrabold ml-1">(Kamu)</span>
-                            </div>
-                            <div class="flex items-center gap-1.5 text-[11px] text-[#738881]">
-                                <Star :size="11" class="fill-[#C29B40] text-[#C29B40]" />
-                                <span class="font-bold text-[#14221d]">{{ entry.xp }} XP</span>
-                                <span>• {{ entry.level }}</span>
+                        <!-- Leaderboard Table / Rows -->
+                        <div v-if="boardEntries.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div
+                                v-for="entry in boardEntries.slice(0, 3)"
+                                :key="entry.user_id"
+                                class="flex items-center gap-3 p-3 rounded-2xl border transition-all duration-200"
+                                :class="[
+                                    entry.rank === 1
+                                        ? 'bg-gradient-to-r from-[#fefbf3] to-[#fdf6e6] border-[#f6e1ba]'
+                                        : entry.rank === 2
+                                        ? 'bg-[#f8faf9] border-[#e5ece8]'
+                                        : 'bg-[#fafcfb] border-[#e8efe9]',
+                                ]"
+                            >
+                                <!-- Rank Medal / Number -->
+                                <div
+                                    class="w-8 h-8 rounded-xl font-display font-black text-sm flex items-center justify-center shrink-0 shadow-sm"
+                                    :class="[
+                                        entry.rank === 1
+                                            ? 'bg-[#C29B40] text-white ring-2 ring-[#C29B40]/30'
+                                            : entry.rank === 2
+                                            ? 'bg-[#94a8a0] text-white'
+                                            : 'bg-[#b8a07a] text-white',
+                                    ]"
+                                >
+                                    {{ entry.rank }}
+                                </div>
+
+                                <!-- Name and XP -->
+                                <div class="min-w-0 flex-1">
+                                    <div class="font-display font-bold text-[13px] text-[#14221d] truncate">
+                                        {{ entry.name }}
+                                        <span v-if="entry.is_me" class="text-[10px] text-[#34B182] font-extrabold ml-1">(Kamu)</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 text-[11px] text-[#738881]">
+                                        <Star :size="11" class="fill-[#C29B40] text-[#C29B40]" />
+                                        <span class="font-bold text-[#14221d]">{{ entry.xp }} XP</span>
+                                        <span>• {{ entry.level }}</span>
+                                    </div>
+                                </div>
+
+                                <!-- Rank change indicator -->
+                                <div v-if="rankChanges[entry.user_id]" class="shrink-0">
+                                    <ArrowUp
+                                        v-if="rankChanges[entry.user_id] === 'up'"
+                                        :size="15"
+                                        class="text-[#34B182] animate-bounce"
+                                    />
+                                    <ArrowDown
+                                        v-else
+                                        :size="15"
+                                        class="text-[#e25353] animate-bounce"
+                                    />
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Rank change indicator -->
-                        <div v-if="rankChanges[entry.user_id]" class="shrink-0">
-                            <ArrowUp
-                                v-if="rankChanges[entry.user_id] === 'up'"
-                                :size="15"
-                                class="text-[#34B182] animate-bounce"
-                            />
-                            <ArrowDown
-                                v-else
-                                :size="15"
-                                class="text-[#e25353] animate-bounce"
-                            />
+                        <!-- Empty state -->
+                        <div v-else class="text-center py-6 text-xs text-[#738881]">
+                            Belum ada data peringkat latihan hari ini.
                         </div>
                     </div>
                 </div>
 
-                <!-- Empty state -->
-                <div v-else class="text-center py-6 text-xs text-[#738881]">
-                    Belum ada data peringkat latihan hari ini.
+                <!-- Right Insights Column (4 cols on desktop: col-span-12 xl:col-span-4) -->
+                <div class="xl:col-span-4 flex flex-col gap-5 min-w-0">
+                    <!-- 1. Profile Overview Card with Avatar Arc -->
+                    <ProfileOverviewCard
+                        :user="props.user"
+                        :summary="props.summary"
+                        :is-teacher="false"
+                    />
+
+                    <!-- 2. Mini Calendar with elevated today pill -->
+                    <MiniCalendar />
+
+                    <!-- 3. To Do List (Misi & Tugas Siswa) -->
+                    <TodoTasksCard
+                        title="Daftar Tugas & Misi"
+                        :tasks="tasksList"
+                        :is-teacher="false"
+                    />
                 </div>
             </div>
         </div>
-
-        <!-- Custom Dribbble Right Panel Slot (Profile + Calendar + Tasks) -->
-        <template #right-panel>
-            <div class="flex flex-col gap-5">
-                <!-- 1. Profile Overview Card with Avatar Arc -->
-                <ProfileOverviewCard
-                    :user="props.user"
-                    :summary="props.summary"
-                    :is-teacher="false"
-                />
-
-                <!-- 2. Mini Calendar with elevated today pill -->
-                <MiniCalendar />
-
-                <!-- 3. To Do List (Misi & Tugas Siswa) -->
-                <TodoTasksCard
-                    title="Daftar Tugas & Misi"
-                    :tasks="tasksList"
-                    :is-teacher="false"
-                />
-            </div>
-        </template>
     </AppLayout>
 </template>
 
 <style scoped>
-.dashboard-container {
+.dashboard-shell {
     font-family: 'Giphurs', 'Poppins', system-ui, sans-serif;
 }
 </style>

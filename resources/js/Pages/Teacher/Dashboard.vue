@@ -212,9 +212,9 @@ const filteredClasses = computed(() => {
     <AppLayout>
         <Head title="Dashboard Guru — SignTech" />
 
-        <div class="teacher-dashboard space-y-6 sm:space-y-7 pb-10">
+        <div class="teacher-dashboard space-y-6 max-w-full">
             <!-- Top Greeting & Action Pills Bar -->
-            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-1">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
                     <h1 class="font-display font-extrabold text-2xl sm:text-3xl text-[#14221d] tracking-tight">
                         Welcome back, Bu/Pak {{ teacherName }} 👋
@@ -233,14 +233,14 @@ const filteredClasses = computed(() => {
                             v-model="searchQuery"
                             type="text"
                             placeholder="Cari kelas atau siswa..."
-                            class="w-full pl-9 pr-3.5 py-2 rounded-full bg-white border border-[#e2ece6] text-xs font-semibold text-[#14221d] placeholder-[#8ea39c] focus:outline-none focus:ring-2 focus:ring-[#34B182] shadow-sm transition-all"
+                            class="w-full pl-9 pr-3.5 py-2 rounded-full bg-white border border-[#e2ece6] text-xs font-semibold text-[#14221d] placeholder-[#8ea39c] focus:outline-none focus:ring-2 focus:ring-[#34B182] shadow-xs transition-all"
                         />
                     </div>
 
                     <!-- Quick Action Buttons -->
                     <Link
                         href="/teacher/classes"
-                        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#143d34] hover:bg-[#1a4a40] text-white text-xs font-bold shadow-sm transition-colors"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#143d34] hover:bg-[#1a4a40] text-white text-xs font-bold shadow-xs transition-colors"
                     >
                         <Plus :size="14" class="stroke-[2.5]" />
                         <span>Buat Kelas</span>
@@ -248,7 +248,7 @@ const filteredClasses = computed(() => {
 
                     <Link
                         href="/teacher/assignments"
-                        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#e8f7f0] hover:bg-[#34B182] text-[#1b735a] hover:text-white text-xs font-bold shadow-sm transition-colors"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#e8f7f0] hover:bg-[#34B182] text-[#1b735a] hover:text-white text-xs font-bold shadow-xs transition-colors"
                     >
                         <ClipboardList :size="14" class="stroke-[2.5]" />
                         <span>Beri Tugas</span>
@@ -256,201 +256,204 @@ const filteredClasses = computed(() => {
                 </div>
             </div>
 
-            <!-- Row 1: Student Activity Bar Chart (7-day Pill Bars) & Class Performance Card -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
-                <!-- Activity Bar Chart for Students in Teacher's Classes -->
-                <ActivityBarChart
-                    :week-activity="weekActivity"
-                    title="Aktivitas Latihan Siswa"
-                    period-label="7 Hari Terakhir"
-                    stat-label="latihan siswa"
-                />
+            <!-- Unified 12-Column Grid (shadcn Fluid Dashboard Style) -->
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                <!-- Main Area: 8 cols on desktop (col-span-12 xl:col-span-8) -->
+                <div class="xl:col-span-8 flex flex-col gap-6 min-w-0">
+                    <!-- Row 1: Student Activity Bar Chart & Class Performance Card -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+                        <!-- Activity Bar Chart for Students in Teacher's Classes -->
+                        <ActivityBarChart
+                            :week-activity="weekActivity"
+                            title="Aktivitas Latihan Siswa"
+                            period-label="7 Hari Terakhir"
+                            stat-label="latihan siswa"
+                        />
 
-                <!-- Class Performance Overview Card -->
-                <ProgressOverviewCard
-                    title="Kinerja Rata-rata Kelas"
-                    period-label="Bulan ini"
-                    :percent="overview.avg_score || 0"
-                    ring-label="Akurasi Kelas"
-                    trend-text="Rata-rata evaluasi siswa"
-                    :tiles="teacherTiles"
-                />
-            </div>
-
-            <!-- Row 2: Active Classrooms (Playful Cards Grid) -->
-            <div class="classrooms-section">
-                <div class="flex items-center justify-between gap-3 mb-4">
-                    <div>
-                        <h3 class="font-display font-extrabold text-xl text-[#14221d] tracking-tight">
-                            Ruang Kelas Dikelola
-                        </h3>
-                        <p class="text-xs text-[#738881]">
-                            Bagikan kode kelas ke siswa agar langsung terhubung dengan akun guru.
-                        </p>
+                        <!-- Class Performance Overview Card -->
+                        <ProgressOverviewCard
+                            title="Kinerja Rata-rata Kelas"
+                            period-label="Bulan ini"
+                            :percent="overview.avg_score || 0"
+                            ring-label="Akurasi Kelas"
+                            trend-text="Rata-rata evaluasi siswa"
+                            :tiles="teacherTiles"
+                        />
                     </div>
 
-                    <Link
-                        href="/teacher/classes"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-[#e8f7f0] text-[#1b735a] hover:bg-[#34B182] hover:text-white transition-colors"
-                    >
-                        <span>Kelola Semua Kelas</span>
-                        <ArrowRight :size="13" class="stroke-[2.5]" />
-                    </Link>
-                </div>
-
-                <!-- Classroom Cards Grid -->
-                <div v-if="filteredClasses.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                    <div
-                        v-for="cls in filteredClasses"
-                        :key="cls.id"
-                        class="classroom-card bg-white rounded-[24px] p-5 sm:p-6 border border-[#e8efe9] shadow-sm flex flex-col justify-between transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group"
-                    >
-                        <div>
-                            <!-- Header: Code pill & Copy button -->
-                            <div class="flex items-center justify-between gap-2 mb-3">
-                                <span class="px-2.5 py-1 rounded-xl text-[11px] font-extrabold tracking-wider bg-[#e8f7f0] text-[#18755c]">
-                                    KELAS SLB
-                                </span>
-
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all"
-                                    :class="[
-                                        copiedCode === cls.code
-                                            ? 'bg-[#34B182] text-white shadow-sm'
-                                            : 'bg-[#f4f8f5] text-[#18755c] hover:bg-[#e6f4ed]',
-                                    ]"
-                                    :title="`Salin kode: ${cls.code}`"
-                                    @click="copyCode(cls.code)"
-                                >
-                                    <Check v-if="copiedCode === cls.code" :size="12" class="stroke-[3]" />
-                                    <Copy v-else :size="12" />
-                                    <span>{{ copiedCode === cls.code ? 'Tersalin!' : cls.code }}</span>
-                                </button>
+                    <!-- Row 2: Active Classrooms (Playful Cards Grid) -->
+                    <div class="classrooms-section">
+                        <div class="flex items-center justify-between gap-3 mb-4">
+                            <div>
+                                <h3 class="font-display font-extrabold text-xl text-[#14221d] tracking-tight">
+                                    Ruang Kelas Dikelola
+                                </h3>
+                                <p class="text-xs text-[#738881]">
+                                    Bagikan kode kelas ke siswa agar langsung terhubung dengan akun guru.
+                                </p>
                             </div>
 
-                            <!-- Class Name -->
-                            <h4 class="font-display font-extrabold text-[17px] text-[#14221d] leading-snug group-hover:text-[#18755c] transition-colors mb-3">
-                                {{ cls.name }}
-                            </h4>
+                            <Link
+                                href="/teacher/classes"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-[#e8f7f0] text-[#1b735a] hover:bg-[#34B182] hover:text-white transition-colors"
+                            >
+                                <span>Kelola Semua Kelas</span>
+                                <ArrowRight :size="13" class="stroke-[2.5]" />
+                            </Link>
+                        </div>
 
-                            <!-- Class stats row -->
-                            <div class="flex items-center gap-3 text-[11px] font-semibold text-[#667e76] mb-5">
-                                <div class="flex items-center gap-1">
-                                    <Users :size="13" class="text-[#34B182]" />
-                                    <span>{{ cls.students_count ?? 0 }} Siswa</span>
+                        <!-- Classroom Cards Grid -->
+                        <div v-if="filteredClasses.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                            <div
+                                v-for="cls in filteredClasses"
+                                :key="cls.id"
+                                class="classroom-card bg-white rounded-[24px] p-5 sm:p-6 border border-[#e8efe9] shadow-sm flex flex-col justify-between transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group"
+                            >
+                                <div>
+                                    <!-- Header: Code pill & Copy button -->
+                                    <div class="flex items-center justify-between gap-2 mb-3">
+                                        <span class="px-2.5 py-1 rounded-xl text-[11px] font-extrabold tracking-wider bg-[#e8f7f0] text-[#18755c]">
+                                            KELAS SLB
+                                        </span>
+
+                                        <button
+                                            type="button"
+                                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all"
+                                            :class="[
+                                                copiedCode === cls.code
+                                                    ? 'bg-[#34B182] text-white shadow-sm'
+                                                    : 'bg-[#f4f8f5] text-[#18755c] hover:bg-[#e6f4ed]',
+                                            ]"
+                                            :title="`Salin kode: ${cls.code}`"
+                                            @click="copyCode(cls.code)"
+                                        >
+                                            <Check v-if="copiedCode === cls.code" :size="12" class="stroke-[3]" />
+                                            <Copy v-else :size="12" />
+                                            <span>{{ copiedCode === cls.code ? 'Tersalin!' : cls.code }}</span>
+                                        </button>
+                                    </div>
+
+                                    <!-- Class Name -->
+                                    <h4 class="font-display font-extrabold text-[17px] text-[#14221d] leading-snug group-hover:text-[#18755c] transition-colors mb-3">
+                                        {{ cls.name }}
+                                    </h4>
+
+                                    <!-- Class stats row -->
+                                    <div class="flex items-center gap-3 text-[11px] font-semibold text-[#667e76] mb-5">
+                                        <div class="flex items-center gap-1">
+                                            <Users :size="13" class="text-[#34B182]" />
+                                            <span>{{ cls.students_count ?? 0 }} Siswa</span>
+                                        </div>
+                                        <div class="flex items-center gap-1">
+                                            <ClipboardList :size="13" class="text-[#C29B40]" />
+                                            <span>{{ cls.assignments_count ?? 0 }} Tugas</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="flex items-center gap-1">
-                                    <ClipboardList :size="13" class="text-[#C29B40]" />
-                                    <span>{{ cls.assignments_count ?? 0 }} Tugas</span>
+
+                                <!-- Card Footer: Action Link -->
+                                <div class="pt-3 border-t border-[#f0f5f2] flex items-center justify-between">
+                                    <span class="text-[11px] font-bold text-[#8ba098]">Status: Aktif</span>
+                                    <Link
+                                        :href="`/teacher/classes/${cls.id}`"
+                                        class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#f4f8f5] hover:bg-[#34B182] text-[#196b54] hover:text-white font-bold text-xs transition-colors"
+                                    >
+                                        <span>Buka Kelas</span>
+                                        <ArrowRight :size="12" class="stroke-[2.5]" />
+                                    </Link>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Card Footer: Action Link -->
-                        <div class="pt-3 border-t border-[#f0f5f2] flex items-center justify-between">
-                            <span class="text-[11px] font-bold text-[#8ba098]">Status: Aktif</span>
+                        <!-- Empty state -->
+                        <div v-else class="text-center py-10 bg-white rounded-[24px] border border-dashed border-[#d9e5df]">
+                            <School :size="32" class="mx-auto text-[#94a8a0] mb-2" />
+                            <p class="text-sm font-bold text-[#14221d] mb-1">Belum ada kelas yang dibuat.</p>
+                            <p class="text-xs text-[#738881] mb-4">Buat ruang kelas pertama Anda untuk mengundang siswa.</p>
                             <Link
-                                :href="`/teacher/classes/${cls.id}`"
-                                class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#f4f8f5] hover:bg-[#34B182] text-[#196b54] hover:text-white font-bold text-xs transition-colors"
+                                href="/teacher/classes"
+                                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#34B182] text-white text-xs font-bold shadow-md shadow-[#34B182]/25"
                             >
-                                <span>Buka Kelas</span>
-                                <ArrowRight :size="12" class="stroke-[2.5]" />
+                                <Plus :size="14" class="stroke-[2.5]" />
+                                <span>Buat Kelas Sekarang</span>
                             </Link>
                         </div>
                     </div>
-                </div>
 
-                <!-- Empty state -->
-                <div v-else class="text-center py-10 bg-white rounded-[24px] border border-dashed border-[#d9e5df]">
-                    <School :size="32" class="mx-auto text-[#94a8a0] mb-2" />
-                    <p class="text-sm font-bold text-[#14221d] mb-1">Belum ada kelas yang dibuat.</p>
-                    <p class="text-xs text-[#738881] mb-4">Buat ruang kelas pertama Anda untuk mengundang siswa.</p>
-                    <Link
-                        href="/teacher/classes"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#34B182] text-white text-xs font-bold shadow-md shadow-[#34B182]/25"
-                    >
-                        <Plus :size="14" class="stroke-[2.5]" />
-                        <span>Buat Kelas Sekarang</span>
-                    </Link>
-                </div>
-            </div>
-
-            <!-- Row 3: Gesture Error Analysis / Tantangan Isyarat Siswa -->
-            <div class="error-analysis-section bg-white rounded-[24px] p-5 sm:p-6 border border-[#e8efe9] shadow-sm">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-8 h-8 rounded-xl bg-[#fef1f0] text-[#e25353] flex items-center justify-center">
-                            <AlertTriangle :size="18" class="stroke-[2.2]" />
-                        </div>
-                        <div>
-                            <h3 class="font-display font-extrabold text-[17px] text-[#14221d] tracking-tight">
-                                Analisis Kesalahan Gesture Siswa
-                            </h3>
-                            <p class="text-[11px] text-[#738881]">
-                                Gesture yang paling sering salah saat latihan AI real-time, perlu evaluasi tambahan.
-                            </p>
-                        </div>
-                    </div>
-
-                    <Link
-                        href="/teacher/reports"
-                        class="inline-flex items-center gap-1 text-xs font-bold text-[#1b735a] hover:text-[#34B182] transition-colors"
-                    >
-                        <span>Laporan Lengkap</span>
-                        <ArrowRight :size="13" class="stroke-[2.5]" />
-                    </Link>
-                </div>
-
-                <!-- Error cards grid -->
-                <div v-if="errorAnalysis.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <div
-                        v-for="err in errorAnalysis"
-                        :key="err.label"
-                        class="p-3.5 rounded-2xl bg-[#fdfaf8] border border-[#f5e6dc] flex items-start gap-3"
-                    >
-                        <!-- Letter badge -->
-                        <div class="w-10 h-10 rounded-xl bg-[#e25353] text-white font-display font-extrabold text-base flex items-center justify-center shrink-0 shadow-sm">
-                            {{ err.label }}
-                        </div>
-                        <div class="min-w-0 flex-1">
-                            <div class="font-display font-bold text-xs text-[#14221d] mb-0.5">
-                                Huruf / Isyarat "{{ err.label }}"
+                    <!-- Row 3: Gesture Error Analysis / Tantangan Isyarat Siswa -->
+                    <div class="error-analysis-section bg-white rounded-[24px] p-5 sm:p-6 border border-[#e8efe9] shadow-sm">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-xl bg-[#fef1f0] text-[#e25353] flex items-center justify-center">
+                                    <AlertTriangle :size="18" class="stroke-[2.2]" />
+                                </div>
+                                <div>
+                                    <h3 class="font-display font-extrabold text-[17px] text-[#14221d] tracking-tight">
+                                        Analisis Kesalahan Gesture Siswa
+                                    </h3>
+                                    <p class="text-[11px] text-[#738881]">
+                                        Gesture yang paling sering salah saat latihan AI real-time, perlu evaluasi tambahan.
+                                    </p>
+                                </div>
                             </div>
-                            <div class="text-[11px] text-[#7a8c85]">
-                                Tingkat Kesalahan: <b class="text-[#e25353]">{{ err.wrong ?? 0 }}x</b> dari {{ err.total ?? 0 }} percobaan
+
+                            <Link
+                                href="/teacher/reports"
+                                class="inline-flex items-center gap-1 text-xs font-bold text-[#1b735a] hover:text-[#34B182] transition-colors"
+                            >
+                                <span>Laporan Lengkap</span>
+                                <ArrowRight :size="13" class="stroke-[2.5]" />
+                            </Link>
+                        </div>
+
+                        <!-- Error cards grid -->
+                        <div v-if="errorAnalysis.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div
+                                v-for="err in errorAnalysis"
+                                :key="err.label"
+                                class="p-3.5 rounded-2xl bg-[#fdfaf8] border border-[#f5e6dc] flex items-start gap-3"
+                            >
+                                <div class="w-10 h-10 rounded-xl bg-[#e25353] text-white font-display font-extrabold text-base flex items-center justify-center shrink-0 shadow-sm">
+                                    {{ err.label }}
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="font-display font-bold text-xs text-[#14221d] mb-0.5">
+                                        Huruf / Isyarat "{{ err.label }}"
+                                    </div>
+                                    <div class="text-[11px] text-[#7a8c85]">
+                                        Tingkat Kesalahan: <b class="text-[#e25353]">{{ err.wrong ?? 0 }}x</b> dari {{ err.total ?? 0 }} percobaan
+                                    </div>
+                                </div>
                             </div>
+                        </div>
+
+                        <div v-else class="text-center py-6 text-xs text-[#738881]">
+                            Belum ada rekaman kesalahan signifikan dari siswa. Semua latihan berjalan lancar!
                         </div>
                     </div>
                 </div>
 
-                <div v-else class="text-center py-6 text-xs text-[#738881]">
-                    Belum ada rekaman kesalahan signifikan dari siswa. Semua latihan berjalan lancar!
+                <!-- Right Insights Area: 4 cols on desktop (col-span-12 xl:col-span-4) -->
+                <div class="xl:col-span-4 flex flex-col gap-5 min-w-0">
+                    <!-- 1. Teacher Profile Overview Card -->
+                    <ProfileOverviewCard
+                        :user="page.props.auth?.user"
+                        :summary="overview"
+                        :is-teacher="true"
+                    />
+
+                    <!-- 2. Mini Calendar -->
+                    <MiniCalendar />
+
+                    <!-- 3. Teacher To-Do List (Assignments & Follow-ups) -->
+                    <TodoTasksCard
+                        title="Tugas & Perhatian Siswa"
+                        :tasks="teacherTasks"
+                        :is-teacher="true"
+                    />
                 </div>
             </div>
         </div>
-
-        <!-- Custom Dribbble Right Panel Slot for Teacher -->
-        <template #right-panel>
-            <div class="flex flex-col gap-5">
-                <!-- 1. Teacher Profile Overview Card -->
-                <ProfileOverviewCard
-                    :user="page.props.auth?.user"
-                    :summary="overview"
-                    :is-teacher="true"
-                />
-
-                <!-- 2. Mini Calendar -->
-                <MiniCalendar />
-
-                <!-- 3. Teacher To-Do List (Assignments & Follow-ups) -->
-                <TodoTasksCard
-                    title="Tugas & Perhatian Siswa"
-                    :tasks="teacherTasks"
-                    :is-teacher="true"
-                />
-            </div>
-        </template>
     </AppLayout>
 </template>
 
