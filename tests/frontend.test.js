@@ -48,6 +48,10 @@ function createNode(type, text = '') {
             return Boolean(this.connected || this.parent?.isConnected);
         },
         focus() { document.activeElement = this; },
+        // Dipakai direktif v-model; event input tidak disimulasikan di test ini
+        addEventListener() {},
+        removeEventListener() {},
+        options: [],
         contains(node) { return walk(this).includes(node); },
         querySelectorAll() { return walk(this).filter((node) => node.type === 'button' && !node.props.disabled); },
         readyState: 4, videoWidth: 640, videoHeight: 480,
@@ -107,7 +111,7 @@ function mount(t, file, initialProps, { speech: speechOverrides = {} } = {}) {
     const root = Object.assign(createNode('root'), { connected: true });
     const body = Object.assign(createNode('body'), { connected: true });
     const cameraCalls = { startDetection: t.mock.fn(), cancelCountdown: t.mock.fn(), reset: t.mock.fn() };
-    const page = Vue.reactive({ url: '/lesson/1' });
+    const page = Vue.reactive({ url: '/lesson/1', props: {} });
     const inertia = { usePage: () => page, router: { reload: t.mock.fn(), visit: t.mock.fn(), on: t.mock.fn() } };
     const speech = {
         speak: t.mock.fn(() => true),
@@ -720,4 +724,190 @@ test('browsers without speech synthesis keep a working silent mode', (t) => {
     assert.equal(speech.isSpeechSupported, false);
     assert.equal(speech.speak('Halo'), false);
     assert.doesNotThrow(() => speech.stopSpeech());
+});
+
+function leaderboardEntry(rank, name, xp, isMe = false) {
+    return { rank, user_id: rank, name, initials: name.slice(0, 2).toUpperCase(), xp, level: 'Pemula', streak: 1, is_me: isMe };
+}
+
+test('dashboard "Semua Peringkat" opens the full leaderboard including my position outside the top list', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+    const entries = Array.from({ length: 10 }, (_, index) => leaderboardEntry(index + 1, `Siswa ${index + 1}`, 500 - index * 20));
+    const me = leaderboardEntry(12, 'Saya Sendiri', 250, true);
+    const fixture = mount(t, 'Pages/Dashboard.vue', { leaderboard: { entries, me, total: 15 } });
+    const names = () => fixture.nodes().map(textOf).join(' ');
+
+    assert.equal(fixture.state.showAllRanks, false);
+    assert.ok(names().includes('Siswa 3'));
+    assert.equal(names().includes('Siswa 4'), false, 'tampilan ringkas hanya 3 besar');
+
+    const toggle = fixture.nodes().find((node) => node.type === 'button' && textOf(node).includes('Semua Peringkat'));
+    toggle.props.onClick();
+    await flush();
+
+    assert.equal(fixture.state.showAllRanks, true);
+    assert.ok(names().includes('Siswa 10'));
+    assert.ok(names().includes('Peringkatmu dari 15 siswa'));
+    assert.equal(fixture.state.meOutsideTop, true);
+    assert.deepEqual(fixture.state.xpToNextRank, { name: 'Siswa 10', xp: 71 });
+
+    fixture.nodes().find((node) => node.type === 'button' && textOf(node).includes('Tampilkan 3 Besar')).props.onClick();
+    await flush();
+    assert.equal(names().includes('Siswa 4'), false);
+});
+
+test('in-progress material cards show self practice instead of a teacher name', (t) => {
+    const fixture = mount(t, 'Components/CoursesInProgress.vue', {
+        categories: [{ id: 1, slug: 'alphabet', name: 'Alphabet', total: 26, done: 5 }],
+    });
+    const text = fixture.nodes().map(textOf).join(' ');
+    assert.ok(text.includes('Latihan Mandiri'));
+    assert.equal(/Bu Siti|Pak Rahmat|Bu Ratna|Guru Pembimbing/.test(text), false);
+});
+
+test('mini calendar loads the visible week, marks practice and deadline days, and shows the clicked date', async (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 10, 10, 10, 0, 0) });
+    const requests = [];
+    t.mock.method(globalThis, 'fetch', async (url) => {
+        requests.push(url);
+        return response({
+            status: 'success',
+            days: url.includes('start=2026-11-08') ? {
+                '2026-11-09': { practice: { sessions: 2, passed: 1, xp: 10, lessons: ['Aku'] }, deadlines: [] },
+                '2026-11-12': {
+                    practice: null,
+                    deadlines: [{ id: 7, title: 'Eja Aku', lesson_title: 'Aku', due_time: '15:30', completed: false, overdue: false, status_label: 'Belum dikerjakan', link: '/student/assignments/7' }],
+                },
+            } : {},
+        });
+    });
+
+    const fixture = mount(t, 'Components/MiniCalendar.vue', { todayDate: new Date(2026, 10, 10, 10, 0, 0) });
+    await flush();
+    await flush();
+
+    assert.equal(requests[0], '/api/calendar?start=2026-11-08&end=2026-11-14');
+    const days = Object.fromEntries(fixture.state.weekDays.map((day) => [day.key, day]));
+    assert.equal(days['2026-11-09'].hasPractice, true);
+    assert.equal(days['2026-11-12'].hasDeadline, true);
+    assert.equal(days['2026-11-12'].hasOpenDeadline, true);
+    assert.equal(days['2026-11-10'].hasPractice, false);
+    assert.equal(fixture.state.selectedDay.isToday, true);
+
+    fixture.state.selectDay(days['2026-11-12']);
+    await flush();
+    const text = fixture.nodes().map(textOf).join(' ');
+    assert.ok(text.includes('Kamis, 12 November'));
+    assert.ok(text.includes('Eja Aku'));
+    assert.ok(text.includes('Pukul 15:30'));
+
+    fixture.state.selectDay(days['2026-11-09']);
+    await flush();
+    assert.ok(fixture.nodes().map(textOf).join(' ').includes('2 latihan · 1 berhasil'));
+
+    fixture.state.nextWeek();
+    await flush();
+    assert.equal(requests.at(-1), '/api/calendar?start=2026-11-15&end=2026-11-21');
+    fixture.state.prevWeek();
+    await flush();
+    assert.equal(requests.length, 2, 'minggu yang sudah dimuat tidak diminta ulang');
+});
+
+test('todo checkmarks follow server completion and cannot be toggled by hand', async (t) => {
+    const fixture = mount(t, 'Components/TodoTasksCard.vue', {
+        tasks: [
+            { id: 'a', title: 'Tugas: Eja Aku', completed: false, link: '/student/assignments/1' },
+            { id: 'b', title: 'Praktik 5 huruf', completed: true, progress: 5, target: 5, link: '/challenge' },
+            { id: 'c', title: 'Eja 1 kata', completed: false, progress: 0, target: 1, link: '/challenge' },
+        ],
+    });
+
+    assert.deepEqual(fixture.state.counts, { all: 3, open: 2, done: 1 });
+    const buttons = fixture.nodes().filter((node) => node.type === 'button').map(textOf);
+    assert.ok(buttons.every((label) => /Semua|Buka|Selesai/.test(label)), 'hanya tombol filter yang bisa diklik');
+    assert.equal(fixture.nodes().filter((node) => node.props['aria-label'] === 'Sudah selesai').length, 1);
+
+    // Server menandai tugas selesai → centang ikut berubah tanpa interaksi
+    fixture.props.tasks = fixture.props.tasks.map((task) => (task.id === 'a' ? { ...task, completed: true } : task));
+    await flush();
+    assert.deepEqual(fixture.state.counts, { all: 3, open: 1, done: 2 });
+    assert.equal(fixture.nodes().filter((node) => node.props['aria-label'] === 'Sudah selesai').length, 2);
+});
+
+test('student dashboard tasks combine teacher assignments, challenges and recommendations without dummy tasks', (t) => {
+    t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+    const fixture = mount(t, 'Pages/Dashboard.vue', {
+        assignments: [
+            { id: 1, title: 'Eja Aku', lesson_title: 'Aku', classroom: 'Kelas A', due_at: '2026-11-12T15:00:00+07:00', overdue: false, completed: false, xp_reward: 35, link: '/student/assignments/1' },
+            { id: 2, title: 'Huruf A', completed: true, overdue: false, xp_reward: 20, link: '/student/assignments/2' },
+        ],
+        challenges: [{ id: 9, title: 'Praktik 5 huruf', progress: 5, target: 5, completed: true, reward_xp: 20 }],
+        recommended: [{ id: 63, title: 'Aku', material_title: 'Kosakata', xp_reward: 10 }],
+    });
+
+    const tasks = fixture.state.tasksList;
+    assert.deepEqual(tasks.map((task) => [task.id, task.completed]), [
+        ['assignment_1', false], ['assignment_2', true], ['challenge_9', true], ['rec_63', false],
+    ]);
+    assert.equal(tasks[0].link, '/student/assignments/1');
+    assert.equal(tasks[2].target, 5);
+    assert.equal(tasks[3].link, '/lesson/63');
+});
+
+test('student dashboard shows no fake tasks when there is nothing to do', (t) => {
+    t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+    const fixture = mount(t, 'Pages/Dashboard.vue', {});
+    assert.deepEqual(fixture.state.tasksList, []);
+});
+
+test('teacher dashboard error cards show the sign, language and the sign it is confused with', (t) => {
+    t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+    const fixture = mount(t, 'Pages/Teacher/Dashboard.vue', {
+        errorAnalysis: [
+            { lesson_id: 1, lesson: 'K', gesture: 'k', language: 'SIBI', wrong: 4, total: 5, accuracy: 20, confused_with: 'V' },
+            { lesson_id: 2, lesson: 'Aku', gesture: 'aku', language: 'BISINDO', wrong: 1, total: 4, accuracy: 75, confused_with: null },
+        ],
+    });
+    const text = fixture.nodes().map(textOf).join(' ');
+
+    assert.ok(text.includes('Huruf K'));
+    assert.ok(text.includes('Kata Aku'));
+    assert.ok(text.includes('Sering tertukar dengan'));
+    assert.ok(text.includes('Perlu bimbingan'));
+    assert.ok(text.includes('Hampir dikuasai'));
+    assert.equal(fixture.state.errorSeverity({ accuracy: 55 }).label, 'Cukup sulit');
+});
+
+test('teacher report shows hardest signs and assignment status clearly', (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 10, 10, 10, 0, 0) });
+    const fixture = mount(t, 'Pages/Teacher/Reports.vue', {
+        report: {
+            period: { from: '2026-11-04', to: '2026-11-10', days: 7 },
+            classroom: null,
+            summary: { students: 2, active_students: 1, sessions: 3, pass_rate: 33, avg_score: 50, letters_mastered: 1, assignment_completion: 50 },
+            daily: [],
+            students: [],
+            letters: [
+                { letter: 'K', language: 'SIBI', attempts: 4, passed: 1, pass_rate: 25 },
+                { letter: 'Terima kasih', language: 'BISINDO', attempts: 2, passed: 2, pass_rate: 100 },
+            ],
+            assignments: [
+                { id: 1, title: 'Eja Aku', classroom: 'Kelas A', lesson: 'Aku', language: 'SIBI', due_at: '2026-11-12T10:00:00+07:00', total: 2, completed: 2, avg_score: 88 },
+                { id: 2, title: 'Huruf B', classroom: 'Kelas A', lesson: 'B', language: 'SIBI', due_at: '2026-11-01T10:00:00+07:00', total: 2, completed: 1, avg_score: 70 },
+                { id: 3, title: 'Huruf C', classroom: 'Kelas A', lesson: 'C', language: 'SIBI', due_at: null, total: 0, completed: 0, avg_score: null },
+            ],
+        },
+        filters: { classroom_id: null, range: '7d', from: '2026-11-04', to: '2026-11-10' },
+    });
+    const text = fixture.nodes().map(textOf).join(' ');
+
+    assert.ok(text.includes('Huruf K'));
+    assert.ok(text.includes('Kata Terima kasih'));
+    assert.ok(text.includes('1 dari 4 percobaan berhasil'));
+    assert.deepEqual(
+        fixture.props.report.assignments.map((task) => fixture.state.taskStatus(task).label),
+        ['Tuntas', 'Terlewat', 'Belum dibagikan'],
+    );
+    assert.ok(text.includes('Tanpa tenggat'));
+    assert.equal(fixture.state.difficulty(25).label, 'perlu bimbingan');
 });

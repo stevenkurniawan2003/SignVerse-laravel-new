@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Assignment;
+use App\Models\AssignmentSubmission;
 use App\Models\Category;
 use App\Models\Challenge;
 use App\Models\Lesson;
 use App\Models\PracticeSession;
 use App\Models\Student;
 use App\Services\AlphabetLessonService;
+use App\Services\AssignmentService;
+use App\Services\CalendarService;
 use App\Services\ChallengeService;
 use App\Services\Contracts\GestureRecognitionService;
 use App\Services\GamificationService;
@@ -29,6 +33,7 @@ class SignTechApiController extends Controller
         private TeacherStatsService $teacherStats,
         private GestureRecognitionService $recognizer,
         private PracticeService $practice,
+        private AssignmentService $assignments,
     ) {}
 
     /**
@@ -154,6 +159,7 @@ class SignTechApiController extends Controller
                     'completed' => (bool) $c->completed,
                     'reward_xp' => (int) $c->reward_xp,
                 ]),
+                'assignments' => $this->dashboardAssignments($student),
                 'badgeCount' => [
                     'unlocked' => count($unlockedBadges),
                     'total' => count($achievements),
@@ -613,6 +619,85 @@ class SignTechApiController extends Controller
             'status' => 'success',
             ...GamificationService::rankings($student->user_id),
             'generated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * Tugas guru untuk daftar "Tugas & Misi" di dashboard: semua yang belum selesai
+     * (termasuk yang terlewat) lalu beberapa yang terakhir selesai. Status selesai
+     * diambil dari pengumpulan siswa, jadi centang di dashboard otomatis.
+     *
+     * @return list<array{id: int, title: string, lesson_title: ?string, classroom: ?string, due_at: ?string, overdue: bool, completed: bool, xp_reward: int, link: string}>
+     */
+    private function dashboardAssignments(Student $student, int $recentCompleted = 3): array
+    {
+        $this->assignments->distributeActiveTo($student);
+
+        $present = function (Assignment $assignment): array {
+            $submission = $assignment->submissions->first();
+            $isCompleted = $submission?->status === AssignmentSubmission::STATUS_COMPLETED;
+
+            return [
+                'id' => $assignment->id,
+                'title' => $assignment->title,
+                'lesson_title' => $assignment->lesson?->title,
+                'classroom' => $assignment->classroom?->name,
+                'due_at' => $assignment->due_at?->toIso8601String(),
+                'overdue' => ! $isCompleted && $assignment->due_at !== null && $assignment->due_at->isPast(),
+                'completed' => $isCompleted,
+                'xp_reward' => (int) $assignment->xp_reward,
+                'link' => "/student/assignments/{$assignment->id}",
+            ];
+        };
+
+        $completed = $this->assignments->completedFor($student)
+            ->sortByDesc(fn (Assignment $assignment) => $assignment->submissions->first()?->completed_at)
+            ->take($recentCompleted);
+
+        return $this->assignments->pendingFor($student)
+            ->concat($completed)
+            ->map($present)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Kalender dashboard: latihan selesai dan tenggat tugas per tanggal dalam rentang
+     * start–end (format Y-m-d, maksimal CalendarService::MAX_RANGE_DAYS hari).
+     */
+    public function calendar(Request $request, CalendarService $calendar): JsonResponse
+    {
+        $validated = $request->validate([
+            'start' => ['required', 'date_format:Y-m-d'],
+            'end' => ['required', 'date_format:Y-m-d', 'after_or_equal:start'],
+        ]);
+
+        $start = CarbonImmutable::createFromFormat('Y-m-d', $validated['start'])->startOfDay();
+        $end = CarbonImmutable::createFromFormat('Y-m-d', $validated['end'])->startOfDay();
+
+        if ($start->diffInDays($end) >= CalendarService::MAX_RANGE_DAYS) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Rentang kalender maksimal '.CalendarService::MAX_RANGE_DAYS.' hari.',
+            ], 422);
+        }
+
+        $user = $request->user();
+        $student = $this->resolveStudent($request);
+
+        if ($student) {
+            $days = $calendar->forStudent($student, $start, $end);
+        } elseif ($user?->isTeacher() && $user->teacher) {
+            $days = $calendar->forTeacher($user->teacher, $start, $end);
+        } else {
+            return response()->json(['status' => 'error', 'message' => 'Profil pengguna tidak ditemukan.'], 404);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'start' => $start->toDateString(),
+            'end' => $end->toDateString(),
+            'days' => (object) $days,
         ]);
     }
 

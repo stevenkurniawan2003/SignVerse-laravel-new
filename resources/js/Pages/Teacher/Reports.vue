@@ -119,6 +119,29 @@ const statusCounts = computed(() =>
 function statusClass(status) {
     return { Aktif: 'is-good', 'Kurang aktif': 'is-warn', 'Tidak berlatih': 'is-bad' }[status];
 }
+
+/* ---------- Huruf tersulit & rekap tugas ---------- */
+/** Judul lebih dari satu huruf (mis. "Aku") ditampilkan sebagai kata. */
+function isWordSign(title) {
+    return /[A-Za-z]{2,}/.test(String(title || ''));
+}
+
+function difficulty(passRate) {
+    if (passRate < 40) return { tone: 'is-bad', label: 'perlu bimbingan' };
+    if (passRate < 70) return { tone: 'is-warn', label: 'cukup sulit' };
+    return { tone: 'is-good', label: 'hampir dikuasai' };
+}
+
+function completionPercent(task) {
+    return task.total ? Math.round((task.completed / task.total) * 100) : 0;
+}
+
+function taskStatus(task) {
+    if (!task.total) return { tone: 'is-muted', label: 'Belum dibagikan' };
+    if (task.completed === task.total) return { tone: 'is-good', label: 'Tuntas' };
+    if (task.due_at && new Date(task.due_at) < new Date()) return { tone: 'is-bad', label: 'Terlewat' };
+    return { tone: 'is-warn', label: 'Berjalan' };
+}
 </script>
 
 <template>
@@ -329,18 +352,23 @@ function statusClass(status) {
                         <h2><AlertTriangle :size="18" /> Huruf Tersulit</h2>
                         <small>tingkat berhasil terendah</small>
                     </div>
-                    <ul v-if="report.letters.length" class="rp-letters">
-                        <li v-for="row in report.letters" :key="`${row.language}-${row.letter}`">
-                            <span class="rp-letter">{{ row.letter }}</span>
-                            <div>
-                                <div class="rp-letter-top">
-                                    <b>{{ row.language }}</b>
-                                    <span>{{ row.passed }}/{{ row.attempts }} berhasil · {{ row.pass_rate }}%</span>
+                    <ol v-if="report.letters.length" class="rp-hard">
+                        <li v-for="(row, index) in report.letters" :key="`${row.language}-${row.letter}`">
+                            <span class="rp-rank">{{ index + 1 }}</span>
+                            <span class="rp-sign" :class="[difficulty(row.pass_rate).tone, { 'is-word': isWordSign(row.letter) }]" :title="row.letter">
+                                {{ row.letter }}
+                            </span>
+                            <div class="rp-hard-body">
+                                <div class="rp-hard-top">
+                                    <b>{{ isWordSign(row.letter) ? 'Kata' : 'Huruf' }} {{ row.letter }}</b>
+                                    <span class="rp-chip">{{ row.language }}</span>
+                                    <span class="rp-rate" :class="difficulty(row.pass_rate).tone">{{ row.pass_rate }}%</span>
                                 </div>
-                                <div class="rp-track"><i :style="{ width: `${row.pass_rate}%` }"></i></div>
+                                <div class="rp-track"><i :class="difficulty(row.pass_rate).tone" :style="{ width: `${Math.max(row.pass_rate, 3)}%` }"></i></div>
+                                <small>{{ row.passed }} dari {{ row.attempts }} percobaan berhasil · {{ difficulty(row.pass_rate).label }}</small>
                             </div>
                         </li>
-                    </ul>
+                    </ol>
                     <div v-else class="st-empty">Belum cukup data (minimal 2 percobaan per huruf).</div>
                 </section>
 
@@ -348,17 +376,30 @@ function statusClass(status) {
                 <section class="st-panel rp-panel">
                     <div class="rp-panel-head">
                         <h2><ClipboardList :size="18" /> Rekap Tugas</h2>
+                        <small v-if="report.assignments.length">{{ report.assignments.length }} tugas</small>
                     </div>
-                    <ul v-if="report.assignments.length" class="rp-tasks">
-                        <li v-for="task in report.assignments" :key="task.id">
-                            <span class="rp-letter is-task">{{ task.lesson }}</span>
-                            <div>
-                                <div class="rp-letter-top">
+                    <ul v-if="report.assignments.length" class="rp-task-list">
+                        <li v-for="task in report.assignments" :key="task.id" class="rp-task">
+                            <div class="rp-task-head">
+                                <div class="rp-task-title">
                                     <b>{{ task.title }}</b>
-                                    <span>{{ task.completed }}/{{ task.total }} selesai</span>
+                                    <div class="rp-task-meta">
+                                        <span class="rp-chip">{{ task.classroom }}</span>
+                                        <span v-if="task.language" class="rp-chip">{{ task.language }}</span>
+                                        <span v-if="task.lesson" class="rp-chip is-lesson">{{ isWordSign(task.lesson) ? 'Kata' : 'Huruf' }} {{ task.lesson }}</span>
+                                    </div>
                                 </div>
-                                <small>{{ task.classroom }} · {{ task.language }} · rata-rata {{ task.avg_score ?? '-' }}{{ task.avg_score !== null ? '%' : '' }}</small>
-                                <div class="rp-track"><i :style="{ width: `${task.total ? (task.completed / task.total) * 100 : 0}%` }"></i></div>
+                                <span class="rp-task-status" :class="taskStatus(task).tone">{{ taskStatus(task).label }}</span>
+                            </div>
+
+                            <div class="rp-task-progress">
+                                <div class="rp-track"><i :class="taskStatus(task).tone" :style="{ width: `${completionPercent(task)}%` }"></i></div>
+                                <span><b>{{ task.completed }}</b>/{{ task.total }} siswa</span>
+                            </div>
+
+                            <div class="rp-task-foot">
+                                <span><CalendarRange :size="13" /> {{ task.due_at ? `Tenggat ${formatDate(task.due_at)}` : 'Tanpa tenggat' }}</span>
+                                <span>Rata-rata skor <b>{{ task.avg_score !== null ? `${task.avg_score}%` : '-' }}</b></span>
                             </div>
                         </li>
                     </ul>
@@ -778,7 +819,7 @@ function statusClass(status) {
 .rp-status.is-warn { color: #8a6a1f; background: #fdf6e6; }
 .rp-status.is-bad { color: #b42318; background: #fef0ee; }
 
-/* Huruf & tugas */
+/* Huruf tersulit & rekap tugas */
 .rp-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -786,8 +827,8 @@ function statusClass(status) {
     align-items: start;
 }
 
-.rp-letters,
-.rp-tasks {
+.rp-hard,
+.rp-task-list {
     display: grid;
     gap: 10px;
     margin: 0;
@@ -795,62 +836,108 @@ function statusClass(status) {
     list-style: none;
 }
 
-.rp-letters li,
-.rp-tasks li {
+.rp-hard li {
     display: flex;
     align-items: center;
     gap: 12px;
+    padding: 10px 12px;
+    background: #fbfdfc;
+    border: 1px solid #edf2ef;
+    border-radius: 14px;
 }
 
-.rp-letters li > div,
-.rp-tasks li > div {
-    display: grid;
-    flex: 1;
-    gap: 4px;
-    min-width: 0;
+.rp-rank {
+    flex-shrink: 0;
+    width: 18px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #9aaba2;
+    text-align: center;
 }
 
-.rp-letter {
+.rp-sign {
     display: grid;
     flex-shrink: 0;
     place-items: center;
-    width: 38px;
-    height: 38px;
-    font-size: 18px;
+    width: 42px;
+    height: 42px;
+    font-size: 19px;
     font-weight: 800;
-    color: #b4562a;
-    background: #fdeee4;
-    border-radius: 11px;
-}
-
-.rp-letter.is-task {
     color: #fff;
-    background: #34b182;
+    border-radius: 12px;
 }
 
-.rp-letter-top {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    font-size: 13px;
-}
-
-.rp-letter-top b {
+.rp-sign.is-word {
+    display: block;
+    width: auto;
+    min-width: 42px;
+    max-width: 92px;
+    padding: 0 8px;
     overflow: hidden;
+    font-size: 12px;
+    line-height: 42px;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rp-sign.is-bad { background: #e25353; }
+.rp-sign.is-warn { background: #f19f38; }
+.rp-sign.is-good { background: #34b182; }
+
+.rp-hard-body {
+    display: grid;
+    flex: 1;
+    gap: 5px;
+    min-width: 0;
+}
+
+.rp-hard-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.rp-hard-top b {
+    overflow: hidden;
+    font-size: 14px;
     color: #14221d;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.rp-letter-top span {
-    flex-shrink: 0;
-    color: #6b8176;
-}
-
-.rp-tasks small {
+.rp-hard-body small {
     font-size: 12px;
     color: #6b8176;
 }
+
+.rp-chip {
+    flex-shrink: 0;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    color: #52685d;
+    background: #eef3f0;
+    border-radius: 6px;
+}
+
+.rp-chip.is-lesson {
+    color: #1e7253;
+    background: #e8f7f0;
+}
+
+.rp-rate {
+    flex-shrink: 0;
+    margin-left: auto;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.rp-rate.is-bad { color: #c2412d; }
+.rp-rate.is-warn { color: #9b6a17; }
+.rp-rate.is-good { color: #1e7253; }
 
 .rp-track {
     height: 8px;
@@ -864,6 +951,97 @@ function statusClass(status) {
     height: 100%;
     background: #279069;
     border-radius: 999px;
+    transition: width 0.4s ease;
+}
+
+.rp-track i.is-bad { background: #e25353; }
+.rp-track i.is-warn { background: #f19f38; }
+.rp-track i.is-good { background: #34b182; }
+.rp-track i.is-muted { background: #c9d6d0; }
+
+.rp-task {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    background: #fbfdfc;
+    border: 1px solid #edf2ef;
+    border-radius: 14px;
+}
+
+.rp-task-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.rp-task-title {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.rp-task-title b {
+    overflow: hidden;
+    font-size: 14px;
+    color: #14221d;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rp-task-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.rp-task-status {
+    flex-shrink: 0;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 800;
+    border-radius: 999px;
+}
+
+.rp-task-status.is-good { color: #1e7253; background: #e8f7f0; }
+.rp-task-status.is-warn { color: #9b6a17; background: #fdf4e7; }
+.rp-task-status.is-bad { color: #c2412d; background: #fdecea; }
+.rp-task-status.is-muted { color: #6b8176; background: #eef3f0; }
+
+.rp-task-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.rp-task-progress .rp-track {
+    flex: 1;
+}
+
+.rp-task-progress span {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #6b8176;
+}
+
+.rp-task-progress b,
+.rp-task-foot b {
+    color: #14221d;
+}
+
+.rp-task-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: 12px;
+    color: #6b8176;
+}
+
+.rp-task-foot span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
 }
 
 @media (max-width: 1180px) {

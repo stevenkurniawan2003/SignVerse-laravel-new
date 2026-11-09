@@ -10,6 +10,7 @@ use App\Models\PracticeSession;
 use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -192,7 +193,7 @@ class TeacherStatsService
         $weekDays = [];
         $dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
         for ($i = 6; $i >= 0; $i--) {
-            $date = \Carbon\CarbonImmutable::today()->subDays($i);
+            $date = CarbonImmutable::today()->subDays($i);
             $key = $date->toDateString();
             $weekDays[] = [
                 'date' => $key,
@@ -342,7 +343,7 @@ class TeacherStatsService
     /**
      * Analisis error: gesture salah terbanyak (opsional per lesson).
      *
-     * @return Collection<int, array{lesson_id: int, lesson: string, gesture: string, wrong: int, total: int, accuracy: int}>
+     * @return Collection<int, array{lesson_id: int, lesson: string, gesture: string, language: string, wrong: int, total: int, confused_with: ?string, accuracy: int}>
      */
     public function errorAnalysisForLesson(?int $lessonId = null, ?Teacher $teacher = null): Collection
     {
@@ -352,7 +353,7 @@ class TeacherStatsService
                 'practiceSession',
                 fn ($session) => $session->whereIn('student_id', $teacher->studentsQuery()->select('students.id')),
             ))
-            ->with('lesson:id,title')
+            ->with('lesson:id,title,material_id', 'lesson.material:id,language')
             ->get();
 
         return $results
@@ -361,8 +362,10 @@ class TeacherStatsService
                 'lesson_id' => $group->first()->lesson_id,
                 'lesson' => $group->first()->lesson?->title ?? 'Lesson #'.$group->first()->lesson_id,
                 'gesture' => $group->first()->expected_gesture,
+                'language' => strtoupper((string) ($group->first()->lesson?->material?->language ?? '')),
                 'wrong' => $group->where('correct', false)->count(),
                 'total' => $group->count(),
+                'confused_with' => $this->mostConfusedWith($group),
             ])
             ->map(function (array $row) {
                 $row['accuracy'] = $row['total'] > 0
@@ -375,6 +378,28 @@ class TeacherStatsService
             ->sortByDesc('wrong')
             ->take(10)
             ->values();
+    }
+
+    /**
+     * Isyarat yang paling sering terbaca keliru untuk satu target (mis. "A" sering
+     * terbaca "S"), atau null bila kesalahannya bukan karena tertukar huruf lain.
+     *
+     * @param  Collection<int, GestureResult>  $group
+     */
+    private function mostConfusedWith(Collection $group): ?string
+    {
+        $expected = strtoupper((string) $group->first()->expected_gesture);
+
+        $confused = $group
+            ->where('correct', false)
+            ->map(fn (GestureResult $result) => strtoupper((string) $result->recognized_gesture))
+            ->filter(fn (string $recognized) => $recognized !== '' && $recognized !== $expected)
+            ->countBy()
+            ->sortDesc()
+            ->keys()
+            ->first();
+
+        return $confused !== null ? (string) $confused : null;
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
+use App\Models\AssignmentSubmission;
 use App\Services\TeacherStatsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -51,6 +52,10 @@ class TeacherDashboardController extends Controller
             'errorAnalysis' => $this->stats->errorAnalysisForLesson(null, $teacher)->take(6)->values(),
             'activeAssignments' => $this->stats->activeAssignments($teacher)
                 ->load('classroom:id,name')
+                ->loadCount([
+                    'submissions',
+                    'submissions as completed_submissions_count' => fn ($query) => $query->where('status', AssignmentSubmission::STATUS_COMPLETED),
+                ])
                 ->map(fn ($assignment) => [
                     'id' => $assignment->id,
                     'title' => $assignment->title,
@@ -58,6 +63,9 @@ class TeacherDashboardController extends Controller
                     'lesson' => $assignment->lesson?->title,
                     'language' => strtoupper((string) $assignment->lesson?->material?->language),
                     'due_at' => $assignment->due_at?->toIso8601String(),
+                    // Tugas dianggap tuntas bila semua siswa penerima sudah menyelesaikannya
+                    'submissions_total' => (int) $assignment->submissions_count,
+                    'submissions_completed' => (int) $assignment->completed_submissions_count,
                 ]),
             'generatedAt' => now()->toIso8601String(),
         ];

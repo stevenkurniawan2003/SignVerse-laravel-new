@@ -143,15 +143,20 @@ const teacherTasks = computed(() => {
     const list = [];
 
     // Active assignments
+    // Tercentang otomatis bila semua siswa penerima tugas sudah menyelesaikannya
     (activeAssignments.value || []).forEach((a) => {
+        const total = Number(a.submissions_total || 0);
+        const completedCount = Number(a.submissions_completed || 0);
         list.push({
             id: `assign_${a.id}`,
             title: `Tugas: ${a.title}`,
-            subtitle: `${a.classroom || 'Kelas'} • ${a.lesson || 'Latihan'}`,
+            subtitle: `${a.classroom || 'Kelas'} • ${a.lesson || 'Latihan'} • ${completedCount}/${total} siswa selesai`,
             date: a.due_at ? new Date(a.due_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : 'Tanpa batas',
             badge: a.language || 'SIBI',
-            completed: false,
-            link: '/teacher/assignments',
+            completed: total > 0 && completedCount === total,
+            progress: completedCount,
+            target: total,
+            link: `/teacher/assignments/${a.id}`,
         });
     });
 
@@ -197,6 +202,23 @@ const teacherTasks = computed(() => {
 
     return list;
 });
+
+/** Judul lebih dari satu karakter huruf (mis. "Aku") ditampilkan sebagai kata. */
+function isWordSign(title) {
+    return /[A-Za-z]{2,}/.test(String(title || ''));
+}
+
+/** Tingkat kesulitan dari akurasi: merah = perlu bimbingan, kuning = cukup sulit, hijau = hampir bisa. */
+function errorSeverity(err) {
+    const accuracy = Number(err?.accuracy ?? 0);
+    if (accuracy < 40) {
+        return { label: 'Perlu bimbingan', tile: 'bg-[#e25353] text-white', badge: 'bg-[#fdecea] text-[#c2412d]', bar: 'bg-[#e25353]' };
+    }
+    if (accuracy < 70) {
+        return { label: 'Cukup sulit', tile: 'bg-[#f19f38] text-white', badge: 'bg-[#fdf4e7] text-[#9b6a17]', bar: 'bg-[#f19f38]' };
+    }
+    return { label: 'Hampir dikuasai', tile: 'bg-[#34B182] text-white', badge: 'bg-[#e8f7f0] text-[#1b735a]', bar: 'bg-[#34B182]' };
+}
 
 // Filtered classrooms based on search query
 const filteredClasses = computed(() => {
@@ -406,25 +428,55 @@ const filteredClasses = computed(() => {
                             </Link>
                         </div>
 
-                        <!-- Error cards grid -->
+                        <!-- Kartu isyarat yang paling sering keliru -->
                         <div v-if="errorAnalysis.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                            <div
+                            <article
                                 v-for="err in errorAnalysis"
-                                :key="err.label"
-                                class="p-3.5 rounded-2xl bg-[#fdfaf8] border border-[#f5e6dc] flex items-start gap-3"
+                                :key="`${err.lesson_id}-${err.gesture}`"
+                                class="flex flex-col gap-3 p-4 rounded-2xl bg-white border border-[#edf2ef]"
                             >
-                                <div class="w-10 h-10 rounded-xl bg-[#e25353] text-white font-display font-extrabold text-base flex items-center justify-center shrink-0 shadow-sm">
-                                    {{ err.label }}
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <div class="font-display font-bold text-xs text-[#14221d] mb-0.5">
-                                        Huruf / Isyarat "{{ err.label }}"
+                                <div class="flex items-start gap-3">
+                                    <span
+                                        class="h-12 rounded-xl font-display font-black flex items-center justify-center shrink-0 px-2"
+                                        :class="[
+                                            errorSeverity(err).tile,
+                                            isWordSign(err.lesson) ? 'min-w-12 text-[13px] max-w-[96px] truncate' : 'w-12 text-xl',
+                                        ]"
+                                        :title="err.lesson"
+                                    >
+                                        {{ err.lesson }}
+                                    </span>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="font-display font-bold text-[13px] text-[#14221d] truncate">
+                                                {{ isWordSign(err.lesson) ? 'Kata' : 'Huruf' }} {{ err.lesson }}
+                                            </span>
+                                            <span v-if="err.language" class="px-1.5 py-0.5 rounded-md bg-[#eef3f0] text-[9px] font-extrabold tracking-wide text-[#52685d]">
+                                                {{ err.language }}
+                                            </span>
+                                        </div>
+                                        <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold" :class="errorSeverity(err).badge">
+                                            {{ errorSeverity(err).label }}
+                                        </span>
                                     </div>
-                                    <div class="text-[11px] text-[#7a8c85]">
-                                        Tingkat Kesalahan: <b class="text-[#e25353]">{{ err.wrong ?? 0 }}x</b> dari {{ err.total ?? 0 }} percobaan
+                                </div>
+
+                                <div>
+                                    <div class="flex items-center justify-between text-[11px] mb-1">
+                                        <span class="text-[#738881]">Akurasi</span>
+                                        <b class="text-[#14221d]">{{ err.accuracy ?? 0 }}%</b>
+                                    </div>
+                                    <div class="h-1.5 rounded-full bg-[#f1f5f3] overflow-hidden">
+                                        <div class="h-full rounded-full transition-all duration-500" :class="errorSeverity(err).bar" :style="{ width: `${err.accuracy ?? 0}%` }"></div>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-2 mt-2 text-[11px] text-[#738881]">
+                                        <span><b class="text-[#c2412d]">{{ err.wrong ?? 0 }}x</b> keliru dari {{ err.total ?? 0 }} percobaan</span>
+                                    </div>
+                                    <div v-if="err.confused_with" class="mt-1.5 text-[11px] text-[#52685d]">
+                                        Sering tertukar dengan <b class="px-1.5 py-0.5 rounded-md bg-[#fdf2f2] text-[#c2412d]">{{ err.confused_with }}</b>
                                     </div>
                                 </div>
-                            </div>
+                            </article>
                         </div>
 
                         <div v-else class="text-center py-6 text-xs text-[#738881]">
@@ -443,7 +495,7 @@ const filteredClasses = computed(() => {
                     />
 
                     <!-- 2. Mini Calendar -->
-                    <MiniCalendar />
+                    <MiniCalendar audience="teacher" />
 
                     <!-- 3. Teacher To-Do List (Assignments & Follow-ups) -->
                     <TodoTasksCard

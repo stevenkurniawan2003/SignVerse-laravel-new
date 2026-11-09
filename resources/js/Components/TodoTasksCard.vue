@@ -20,45 +20,33 @@ const props = defineProps({
 
 const currentFilter = ref('all'); // 'all' | 'open' | 'done'
 
-// Local state for toggled tasks
-const completedTaskIds = ref(new Set());
-
-// Initialize completed tasks from props
-props.tasks.forEach((t) => {
-    if (t.is_completed || t.completed) {
-        completedTaskIds.value.add(t.id);
-    }
-});
-
-function toggleTask(id) {
-    if (completedTaskIds.value.has(id)) {
-        completedTaskIds.value.delete(id);
-    } else {
-        completedTaskIds.value.add(id);
-    }
+/**
+ * Status selesai hanya berasal dari data server (misi harian tercapai, tugas guru
+ * dikumpulkan, dsb.), jadi centang terisi otomatis dan tidak bisa diubah manual.
+ */
+function isDone(task) {
+    return Boolean(task.is_completed || task.completed);
 }
 
-const filteredTasks = computed(() => {
-    return props.tasks.filter((task) => {
-        const isDone = completedTaskIds.value.has(task.id) || task.is_completed || task.completed;
-        if (currentFilter.value === 'open') return !isDone;
-        if (currentFilter.value === 'done') return isDone;
-        return true;
-    });
-});
+const filteredTasks = computed(() => props.tasks.filter((task) => {
+    if (currentFilter.value === 'open') return !isDone(task);
+    if (currentFilter.value === 'done') return isDone(task);
+    return true;
+}));
 
 const counts = computed(() => {
-    const total = props.tasks.length;
-    let done = 0;
-    props.tasks.forEach((t) => {
-        if (completedTaskIds.value.has(t.id) || t.is_completed || t.completed) done++;
-    });
+    const done = props.tasks.filter(isDone).length;
     return {
-        all: total,
-        open: total - done,
+        all: props.tasks.length,
+        open: props.tasks.length - done,
         done,
     };
 });
+
+function progressPercent(task) {
+    if (!task.target) return 0;
+    return Math.min(100, Math.round((Number(task.progress || 0) / Number(task.target)) * 100));
+}
 </script>
 
 <template>
@@ -124,33 +112,35 @@ const counts = computed(() => {
                 :key="task.id"
                 class="group p-3 rounded-2xl border transition-all duration-200"
                 :class="[
-                    completedTaskIds.has(task.id)
+                    isDone(task)
                         ? 'bg-[#fafcfb] border-[#edf2ef] opacity-75'
                         : 'bg-[#fbfdfc] border-[#e7eee9] hover:border-[#34B182]/50 hover:bg-white hover:shadow-sm',
                 ]"
             >
                 <div class="flex items-start gap-3">
-                    <!-- Checkbox button -->
-                    <button
-                        type="button"
+                    <!-- Status selesai (otomatis dari sistem, bukan tombol) -->
+                    <span
                         class="w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 transition-all"
                         :class="[
-                            completedTaskIds.has(task.id)
+                            isDone(task)
                                 ? 'bg-[#34B182] border-[#34B182] text-white'
-                                : 'border-[#b5ccc3] bg-white hover:border-[#34B182]',
+                                : task.overdue
+                                ? 'border-[#e8a39b] bg-[#fdf2f2]'
+                                : 'border-[#b5ccc3] bg-white',
                         ]"
-                        :aria-label="completedTaskIds.has(task.id) ? 'Tandai belum selesai' : 'Tandai selesai'"
-                        @click="toggleTask(task.id)"
+                        role="img"
+                        :aria-label="isDone(task) ? 'Sudah selesai' : task.overdue ? 'Terlewat' : 'Belum selesai'"
+                        :title="isDone(task) ? 'Selesai otomatis' : 'Tercentang otomatis setelah kamu menyelesaikannya'"
                     >
-                        <Check v-if="completedTaskIds.has(task.id)" :size="13" class="stroke-[3]" />
-                    </button>
+                        <Check v-if="isDone(task)" :size="13" class="stroke-[3]" />
+                    </span>
 
                     <!-- Task details -->
                     <div class="min-w-0 flex-1">
                         <Link
                             :href="task.link || (isTeacher ? '/teacher/assignments' : '/practice')"
                             class="block font-display font-bold text-[13px] leading-tight text-[#14221d] hover:text-[#19755d] transition-colors"
-                            :class="{ 'line-through text-[#8b9c96]': completedTaskIds.has(task.id) }"
+                            :class="{ 'line-through text-[#8b9c96]': isDone(task) }"
                         >
                             {{ task.title }}
                         </Link>
@@ -161,9 +151,17 @@ const counts = computed(() => {
                             {{ task.subtitle }}
                         </p>
 
+                        <!-- Progres misi (mis. 2/5 huruf) -->
+                        <div v-if="task.target" class="flex items-center gap-2 mt-1.5">
+                            <div class="flex-1 h-1.5 rounded-full bg-[#eef5f1] overflow-hidden">
+                                <div class="h-full rounded-full bg-[#34B182] transition-all duration-500" :style="{ width: `${progressPercent(task)}%` }"></div>
+                            </div>
+                            <span class="text-[10px] font-bold text-[#52685d] shrink-0">{{ Math.min(task.progress || 0, task.target) }}/{{ task.target }}</span>
+                        </div>
+
                         <!-- Task Footer: Date & Badge -->
                         <div class="flex items-center justify-between gap-2 mt-2 pt-1 border-t border-[#f0f4f1]">
-                            <span class="text-[10px] font-medium text-[#849a92]">
+                            <span class="text-[10px] font-medium" :class="task.overdue && !isDone(task) ? 'text-[#b2382d] font-bold' : 'text-[#849a92]'">
                                 {{ task.due_date || task.date || 'Hari ini' }}
                             </span>
 
@@ -189,7 +187,9 @@ const counts = computed(() => {
         <!-- Empty state -->
         <div v-else class="text-center py-6 px-3 bg-[#fafcfb] rounded-2xl border border-dashed border-[#d9e5df]">
             <Target :size="24" class="mx-auto text-[#94a8a0] mb-2" />
-            <p class="text-xs font-semibold text-[#667a73]">Tidak ada tugas pada filter ini.</p>
+            <p class="text-xs font-semibold text-[#667a73]">
+                {{ tasks.length ? 'Tidak ada tugas pada filter ini.' : 'Belum ada tugas atau misi saat ini.' }}
+            </p>
         </div>
     </div>
 </template>

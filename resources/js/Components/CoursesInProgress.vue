@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
-import { ArrowRight, BookOpen, ChevronLeft, ChevronRight, Clock, Plus, Sparkles, Users } from '@lucide/vue';
+import { ArrowRight, BookOpen, Camera, ChevronLeft, ChevronRight, Clock, Plus, Sparkles } from '@lucide/vue';
 
 const props = defineProps({
     title: {
@@ -38,8 +38,6 @@ const defaultCourses = [
         unitsLabel: 'Huruf',
         duration: '15 mnt',
         xpReward: 260,
-        mentor: 'Bu Siti Rahma',
-        mentorRole: 'Guru Pembimbing',
         link: '/practice',
     },
     {
@@ -55,8 +53,6 @@ const defaultCourses = [
         unitsLabel: 'Angka',
         duration: '10 mnt',
         xpReward: 100,
-        mentor: 'Pak Rahmat S.',
-        mentorRole: 'Guru Isyarat',
         link: '/learn',
     },
     {
@@ -72,8 +68,6 @@ const defaultCourses = [
         unitsLabel: 'Kata',
         duration: '20 mnt',
         xpReward: 150,
-        mentor: 'Bu Ratna Dewi',
-        mentorRole: 'Spesialis SLB',
         link: '/learn',
     },
 ];
@@ -84,18 +78,10 @@ const coursesList = computed(() => {
         return defaultCourses;
     }
 
-    const mentors = [
-        { name: 'Bu Siti Rahma', role: 'Guru Pembimbing' },
-        { name: 'Pak Rahmat S.', role: 'Guru Isyarat' },
-        { name: 'Bu Ratna Dewi', role: 'Spesialis SLB' },
-        { name: 'Pemandu Isyarat SignTech', role: 'Pemandu Belajar' },
-    ];
-
     return props.categories.map((cat, idx) => {
         const total = Number(cat.total) || 10;
         const done = Number(cat.done) || 0;
         const percent = Math.min(100, Math.round((done / Math.max(1, total)) * 100));
-        const mentor = mentors[idx % mentors.length];
 
         const colors = ['teal', 'amber', 'purple', 'rose'];
         const badgeColor = colors[idx % colors.length];
@@ -113,8 +99,6 @@ const coursesList = computed(() => {
             unitsLabel: 'Materi',
             duration: `${total * 2} mnt`,
             xpReward: total * 10,
-            mentor: mentor.name,
-            mentorRole: mentor.role,
             link: cat.slug === 'alphabet' ? '/practice' : '/learn',
         };
     });
@@ -307,18 +291,19 @@ function nextPage() {
                         </div>
                     </div>
 
-                    <!-- Card Footer: Mentor & Action Button -->
+                    <!-- Card Footer: jenis latihan & tombol aksi. Materi ini latihan mandiri
+                         dengan kamera, bukan kelas atau tugas guru, jadi tidak ada nama guru. -->
                     <div class="flex items-center justify-between gap-2 pt-3 border-t border-[#f0f5f2]">
                         <div class="flex items-center gap-2 min-w-0">
-                            <div class="w-7 h-7 rounded-full bg-[#dff3ea] text-[#1e7861] font-bold text-xs flex items-center justify-center shrink-0">
-                                {{ course.mentor.charAt(0) }}
+                            <div class="w-7 h-7 rounded-full bg-[#dff3ea] text-[#1e7861] flex items-center justify-center shrink-0">
+                                <Camera :size="14" class="stroke-[2.2]" />
                             </div>
                             <div class="min-w-0">
                                 <div class="text-xs font-bold text-[#14221d] truncate">
-                                    {{ course.mentor }}
+                                    Latihan Mandiri
                                 </div>
                                 <div class="text-[10px] text-[#8aa098] truncate">
-                                    {{ course.mentorRole }}
+                                    Diperiksa lewat kamera
                                 </div>
                             </div>
                         </div>

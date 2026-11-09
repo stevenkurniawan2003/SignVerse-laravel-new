@@ -7,6 +7,8 @@ import {
     ArrowUp,
     Award,
     CheckCircle2,
+    ChevronDown,
+    ChevronUp,
     Crown,
     Flame,
     RotateCw,
@@ -35,6 +37,7 @@ const props = defineProps({
     weekActivity: { type: Array, default: () => [] },
     user: { type: Object, default: () => null },
     leaderboard: { type: Object, default: () => ({ entries: [], me: null, total: 0 }) },
+    assignments: { type: Array, default: () => [] },
 });
 
 // Search input for quick filtering courses or materials
@@ -73,61 +76,51 @@ const studentTiles = computed(() => [
     },
 ]);
 
-// Build tasks list for TodoTasksCard
+function formatDueDate(iso) {
+    if (!iso) return 'Tanpa batas waktu';
+    return `Tenggat ${new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`;
+}
+
+/**
+ * Daftar Tugas & Misi. Status selesai selalu dari server sehingga tercentang
+ * otomatis: tugas guru saat dikumpulkan, misi harian saat target tercapai.
+ * Rekomendasi latihan hanya berisi pelajaran yang belum dikuasai.
+ */
 const tasksList = computed(() => {
-    const list = [];
+    const assignmentTasks = (props.assignments || []).map((assignment) => ({
+        id: `assignment_${assignment.id}`,
+        title: `Tugas: ${assignment.title}`,
+        subtitle: [assignment.classroom, assignment.lesson_title].filter(Boolean).join(' • ') || 'Tugas dari guru',
+        date: assignment.completed ? 'Sudah dikumpulkan' : assignment.overdue ? 'Terlewat' : formatDueDate(assignment.due_at),
+        reward_xp: assignment.xp_reward,
+        completed: Boolean(assignment.completed),
+        overdue: Boolean(assignment.overdue),
+        link: assignment.link,
+    }));
 
-    // Daily Challenges
-    (props.challenges || []).forEach((ch) => {
-        list.push({
-            id: `challenge_${ch.id}`,
-            title: ch.title || 'Misi Harian Isyarat',
-            subtitle: ch.description || 'Latih gesture untuk bonus XP',
-            date: 'Hari ini',
-            reward_xp: ch.reward_xp || 20,
-            completed: ch.completed || false,
-            link: '/challenge',
-        });
-    });
+    const challengeTasks = (props.challenges || []).map((challenge) => ({
+        id: `challenge_${challenge.id}`,
+        title: challenge.title || 'Misi Harian Isyarat',
+        subtitle: challenge.description || 'Latih gesture untuk bonus XP',
+        date: challenge.completed ? 'Misi tercapai' : 'Hari ini',
+        reward_xp: challenge.reward_xp || 20,
+        completed: Boolean(challenge.completed),
+        progress: Number(challenge.progress || 0),
+        target: Number(challenge.target || 0),
+        link: '/challenge',
+    }));
 
-    // Recommended Lessons
-    (props.recommended || []).forEach((rec) => {
-        list.push({
-            id: `rec_${rec.id}`,
-            title: `Latihan: ${rec.title}`,
-            subtitle: rec.material_title || 'SIBI Dasar',
-            date: 'Rekomendasi',
-            reward_xp: rec.xp_reward || 10,
-            completed: false,
-            link: `/practice?target=${rec.title}`,
-        });
-    });
+    const recommendedTasks = (props.recommended || []).map((lesson) => ({
+        id: `rec_${lesson.id}`,
+        title: `Latihan: ${lesson.title}`,
+        subtitle: lesson.material_title || 'Latihan mandiri',
+        date: 'Rekomendasi',
+        reward_xp: lesson.xp_reward || 10,
+        completed: false,
+        link: `/lesson/${lesson.id}`,
+    }));
 
-    // Fallbacks if empty
-    if (list.length === 0) {
-        list.push(
-            {
-                id: 'task_default_1',
-                title: 'Latihan Huruf Vokal A - E',
-                subtitle: 'Gunakan kamera latihan untuk periksa gerakan tangan',
-                date: 'Hari ini',
-                reward_xp: 25,
-                completed: false,
-                link: '/practice',
-            },
-            {
-                id: 'task_default_2',
-                title: 'Tantangan 3 Gesture Tepat',
-                subtitle: 'Capai akurasi di atas 80%',
-                date: 'Hari ini',
-                reward_xp: 20,
-                completed: false,
-                link: '/challenge',
-            }
-        );
-    }
-
-    return list;
+    return [...assignmentTasks, ...challengeTasks, ...recommendedTasks];
 });
 
 /*
@@ -144,6 +137,25 @@ let clockTimer = null;
 
 const boardEntries = computed(() => board.value?.entries || []);
 const myEntry = computed(() => board.value?.me || null);
+
+// "Semua Peringkat" membuka leaderboard lengkap di kartu yang sama (seperti dashboard lama)
+const showAllRanks = ref(false);
+const meOutsideTop = computed(() => Boolean(myEntry.value) && !boardEntries.value.some((entry) => entry.is_me));
+
+// XP yang dibutuhkan untuk menyalip siswa satu peringkat di atas
+const xpToNextRank = computed(() => {
+    const me = myEntry.value;
+    if (!me || me.rank === 1) return null;
+    const above = [...boardEntries.value, me]
+        .filter((entry) => entry.xp > me.xp)
+        .sort((first, second) => first.xp - second.xp)[0];
+    return above ? { name: above.name, xp: above.xp - me.xp + 1 } : null;
+});
+
+const updatedLabel = computed(() => {
+    const seconds = Math.max(0, Math.round((now.value - lastUpdated.value) / 1000));
+    return seconds < 3 ? 'baru saja' : `${seconds} detik lalu`;
+});
 
 function applyBoard(next) {
     const previousRanks = Object.fromEntries(
@@ -274,17 +286,121 @@ onBeforeUnmount(() => {
                                 </div>
                             </div>
 
-                            <Link
-                                href="/achievement"
+                            <button
+                                v-if="boardEntries.length"
+                                type="button"
                                 class="inline-flex items-center gap-1 text-xs font-bold text-[#1b735a] hover:text-[#34B182] transition-colors"
+                                :aria-expanded="showAllRanks"
+                                aria-controls="leaderboard-full"
+                                @click="showAllRanks = !showAllRanks"
                             >
-                                <span>Semua Peringkat</span>
-                                <ArrowRight :size="13" class="stroke-[2.5]" />
-                            </Link>
+                                <span>{{ showAllRanks ? 'Tampilkan 3 Besar' : 'Semua Peringkat' }}</span>
+                                <ChevronUp v-if="showAllRanks" :size="14" class="stroke-[2.5]" />
+                                <ChevronDown v-else :size="14" class="stroke-[2.5]" />
+                            </button>
                         </div>
 
-                        <!-- Leaderboard Table / Rows -->
-                        <div v-if="boardEntries.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <!-- Leaderboard lengkap (dibuka lewat tombol Semua Peringkat) -->
+                        <div v-if="showAllRanks && boardEntries.length" id="leaderboard-full" class="space-y-3">
+                            <!-- Ringkasan peringkatku -->
+                            <div v-if="myEntry" class="flex items-center gap-3 p-3 rounded-2xl bg-[#eefaf4] border border-[#bfe8d4]">
+                                <span class="font-display font-black text-xl text-[#1e7253] shrink-0">#{{ myEntry.rank }}</span>
+                                <div class="min-w-0 flex-1">
+                                    <div class="text-[13px] font-bold text-[#14221d]">Peringkatmu dari {{ board.total }} siswa</div>
+                                    <div class="text-[11px] text-[#52685d]">
+                                        <template v-if="myEntry.rank === 1">Kamu memimpin! Pertahankan dengan terus berlatih.</template>
+                                        <template v-else-if="xpToNextRank">Butuh <b>{{ xpToNextRank.xp }} XP</b> lagi untuk menyalip {{ xpToNextRank.name }}.</template>
+                                    </div>
+                                </div>
+                                <span class="inline-flex items-center gap-1 text-xs font-extrabold text-[#14221d] shrink-0">
+                                    <Star :size="13" class="fill-[#C29B40] text-[#C29B40]" /> {{ myEntry.xp }} XP
+                                </span>
+                            </div>
+
+                            <!-- Semua baris peringkat -->
+                            <ol class="space-y-1.5">
+                                <li
+                                    v-for="entry in boardEntries"
+                                    :key="entry.user_id"
+                                    class="flex items-center gap-3 px-3 py-2 rounded-xl border transition-colors duration-300"
+                                    :class="[
+                                        entry.is_me
+                                            ? 'bg-[#eefaf4] border-[#bfe8d4]'
+                                            : entry.rank === 1
+                                            ? 'bg-[#fefbf3] border-[#f6e1ba]'
+                                            : 'bg-[#fafcfb] border-[#eef3f0]',
+                                    ]"
+                                >
+                                    <span
+                                        class="w-7 h-7 rounded-lg font-display font-black text-xs flex items-center justify-center shrink-0"
+                                        :class="[
+                                            entry.rank === 1
+                                                ? 'bg-[#C29B40] text-white'
+                                                : entry.rank === 2
+                                                ? 'bg-[#94a8a0] text-white'
+                                                : entry.rank === 3
+                                                ? 'bg-[#b8a07a] text-white'
+                                                : 'bg-[#eef3f0] text-[#52685d]',
+                                        ]"
+                                    >
+                                        <Crown v-if="entry.rank === 1" :size="14" />
+                                        <template v-else>{{ entry.rank }}</template>
+                                    </span>
+                                    <span class="w-8 h-8 rounded-full bg-[#dff3ea] text-[#1e7861] font-bold text-[11px] flex items-center justify-center shrink-0">
+                                        {{ entry.initials }}
+                                    </span>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="font-display font-bold text-[13px] text-[#14221d] truncate">
+                                            {{ entry.name }}
+                                            <span v-if="entry.is_me" class="text-[10px] text-[#34B182] font-extrabold ml-1">(Kamu)</span>
+                                        </div>
+                                        <div class="flex items-center gap-1 text-[11px] text-[#738881]">
+                                            <span>{{ entry.level }}</span>
+                                            <span>·</span>
+                                            <Flame :size="11" class="text-[#f19f38]" />
+                                            <span>{{ entry.streak }} hari</span>
+                                        </div>
+                                    </div>
+                                    <ArrowUp v-if="rankChanges[entry.user_id] === 'up'" :size="15" class="text-[#34B182] animate-bounce shrink-0" />
+                                    <ArrowDown v-else-if="rankChanges[entry.user_id] === 'down'" :size="15" class="text-[#e25353] animate-bounce shrink-0" />
+                                    <span class="text-xs font-extrabold text-[#14221d] shrink-0">{{ entry.xp }} <small class="text-[10px] text-[#738881]">XP</small></span>
+                                </li>
+                            </ol>
+
+                            <!-- Posisiku bila berada di luar daftar teratas -->
+                            <template v-if="meOutsideTop">
+                                <div class="text-center text-[#a3b5ad] tracking-[0.3em] text-xs" aria-hidden="true">•••</div>
+                                <div class="flex items-center gap-3 px-3 py-2 rounded-xl border bg-[#eefaf4] border-[#bfe8d4]">
+                                    <span class="w-7 h-7 rounded-lg bg-[#eef3f0] text-[#52685d] font-display font-black text-xs flex items-center justify-center shrink-0">{{ myEntry.rank }}</span>
+                                    <span class="w-8 h-8 rounded-full bg-[#dff3ea] text-[#1e7861] font-bold text-[11px] flex items-center justify-center shrink-0">{{ myEntry.initials }}</span>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="font-display font-bold text-[13px] text-[#14221d] truncate">
+                                            {{ myEntry.name }} <span class="text-[10px] text-[#34B182] font-extrabold ml-1">(Kamu)</span>
+                                        </div>
+                                        <div class="flex items-center gap-1 text-[11px] text-[#738881]">
+                                            <span>{{ myEntry.level }}</span>
+                                            <span>·</span>
+                                            <Flame :size="11" class="text-[#f19f38]" />
+                                            <span>{{ myEntry.streak }} hari</span>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs font-extrabold text-[#14221d] shrink-0">{{ myEntry.xp }} <small class="text-[10px] text-[#738881]">XP</small></span>
+                                </div>
+                            </template>
+
+                            <div class="flex flex-wrap items-center justify-between gap-2 pt-2 text-[11px] text-[#738881]">
+                                <span class="inline-flex items-center gap-1.5">
+                                    <i class="w-2 h-2 rounded-full" :class="boardError ? 'bg-[#e25353]' : 'bg-[#34B182] animate-pulse'"></i>
+                                    {{ boardError ? 'Koneksi terputus, mencoba lagi...' : `Diperbarui otomatis tiap 5 detik · terakhir ${updatedLabel}` }}
+                                </span>
+                                <Link href="/practice" class="inline-flex items-center gap-1 font-bold text-[#1b735a] hover:text-[#34B182]">
+                                    Tambah XP di Latihan Mandiri <ArrowRight :size="12" class="stroke-[2.5]" />
+                                </Link>
+                            </div>
+                        </div>
+
+                        <!-- 3 Besar (tampilan ringkas) -->
+                        <div v-else-if="boardEntries.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             <div
                                 v-for="entry in boardEntries.slice(0, 3)"
                                 :key="entry.user_id"

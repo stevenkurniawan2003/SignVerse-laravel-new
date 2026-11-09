@@ -5,7 +5,6 @@ namespace Tests\Feature\Teacher;
 use App\Models\Assignment;
 use App\Models\AssignmentSubmission;
 use App\Models\Category;
-use App\Models\ChallengeProgress;
 use App\Models\Classroom;
 use App\Models\GestureResult;
 use App\Models\Lesson;
@@ -14,7 +13,6 @@ use App\Models\PracticeSession;
 use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\User;
-use App\Services\ChallengeService;
 use App\Services\GamificationService;
 use App\Services\TeacherStatsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -203,6 +201,47 @@ class TeacherModuleTest extends TestCase
         $this->assertSame(3, $row['wrong']);
         $this->assertSame(4, $row['total']);
         $this->assertSame(25, $row['accuracy']);
+    }
+
+    public function test_error_analysis_reports_sign_language_and_most_confused_sign(): void
+    {
+        $lesson = Lesson::factory()
+            ->for(Material::factory()->for(Category::factory())->state(['language' => Material::LANGUAGE_BISINDO]))
+            ->create(['title' => 'A', 'gesture_label' => 'a']);
+        $session = PracticeSession::factory()->completed()->for(Student::factory())->create();
+
+        GestureResult::factory()->for($session)->count(4)->sequence(
+            ['recognized_gesture' => 's', 'correct' => false],
+            ['recognized_gesture' => 'S', 'correct' => false],
+            ['recognized_gesture' => 'e', 'correct' => false],
+            ['recognized_gesture' => 'a', 'correct' => true],
+        )->create(['lesson_id' => $lesson->id, 'expected_gesture' => 'a']);
+
+        $row = app(TeacherStatsService::class)->errorAnalysisForLesson()->sole();
+
+        $this->assertSame('A', $row['lesson']);
+        $this->assertSame('BISINDO', $row['language']);
+        $this->assertSame('S', $row['confused_with']);
+        $this->assertSame(3, $row['wrong']);
+    }
+
+    public function test_teacher_dashboard_error_analysis_payload_has_the_sign_title(): void
+    {
+        [$teacher, $student] = $this->teacherWithStudent();
+        $lesson = Lesson::factory()->for(Material::factory()->for(Category::factory()))->create(['title' => 'K', 'gesture_label' => 'k']);
+        $session = PracticeSession::factory()->completed()->for($student)->create();
+        GestureResult::factory()->for($session)->create([
+            'lesson_id' => $lesson->id,
+            'expected_gesture' => 'k',
+            'recognized_gesture' => 'v',
+            'correct' => false,
+        ]);
+
+        $this->actingAs($teacher)->getJson('/teacher/dashboard/live')
+            ->assertOk()
+            ->assertJsonPath('errorAnalysis.0.lesson', 'K')
+            ->assertJsonPath('errorAnalysis.0.confused_with', 'V')
+            ->assertJsonPath('errorAnalysis.0.accuracy', 0);
     }
 
     public function test_error_analysis_for_student_scopes_to_that_student(): void
