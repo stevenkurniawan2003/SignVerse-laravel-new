@@ -18,6 +18,7 @@ import {
     Layers,
     Lightbulb,
     Menu,
+    Play,
     Plus,
     RotateCw,
     School,
@@ -56,15 +57,6 @@ function closeGestureModal() {
 const openFaqIndex = ref(0);
 function toggleFaq(index) {
     openFaqIndex.value = openFaqIndex.value === index ? null : index;
-}
-
-// Footer Contact Form state ala Menuin
-const contactMessage = ref('');
-function sendContactMessage() {
-    if (!contactMessage.value.trim()) return;
-    const text = encodeURIComponent(`Halo Tim SignTech, saya punya pertanyaan: ${contactMessage.value.trim()}`);
-    window.open(`https://wa.me/6282235594074?text=${text}`, '_blank');
-    contactMessage.value = '';
 }
 
 // Gesture dataset for interactive explorer
@@ -288,169 +280,96 @@ const loginLabel = computed(() => (authUser.value ? 'Buka Dashboard' : 'Masuk Ak
             </div>
         </header>
 
-        <!-- Hero Section (Clean, Human, Conversion-Driven ala Menuin) -->
-        <section class="relative overflow-hidden pt-12 pb-18 sm:pt-20 sm:pb-24 border-b border-[#e7eee9]">
-            <!-- Subtle background glows -->
-            <div class="pointer-events-none absolute -top-32 -right-32 h-96 w-96 rounded-full bg-[#34B182]/10 blur-3xl"></div>
-            <div class="pointer-events-none absolute top-48 -left-32 h-80 w-80 rounded-full bg-[#C29B40]/10 blur-3xl"></div>
-
+        <!-- Hero Section (Editorial Collage ala Podcasty Style) -->
+        <section class="relative overflow-hidden pt-10 pb-14 sm:pt-16 sm:pb-20 border-b border-[#e7eee9] bg-white">
             <div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                <!-- Text Header Area -->
-                <div class="mx-auto max-w-3xl text-center">
-                    <!-- Top Pill Tag -->
-                    <div class="inline-flex items-center gap-2 rounded-full border border-[#cde8dc] bg-[#eefaf4] px-4 py-1.5 text-xs font-bold text-[#1a6e55] shadow-xs">
-                        <Sparkles :size="14" class="text-[#C29B40]" />
-                        <span>Platform Belajar Bahasa Isyarat Interaktif untuk Sekolah Luar Biasa</span>
-                    </div>
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+                    <!-- Left Column: Editorial Catchy Headline & CTAs ala Podcasty -->
+                    <div class="lg:col-span-6 flex flex-col justify-center text-left">
+                        <!-- Main Catchy Editorial Headline -->
+                        <h1 class="font-display font-black text-4xl sm:text-6xl lg:text-[64px] text-[#14221d] leading-[1.06] tracking-tight">
+                            Belajar dan kuasai<br />
+                            bahasa isyarat<br />
+                            dengan mudah!
+                        </h1>
 
-                    <!-- Main Catchy Headline -->
-                    <h1 class="mt-6 font-display font-extrabold text-3xl sm:text-5xl lg:text-6xl text-[#14221d] leading-[1.18] tracking-tight">
-                        Belajar Bahasa Isyarat Jadi Lebih Mudah, Seru, dan Percaya Diri
-                    </h1>
+                        <!-- Clear Educational Subtitle (Human, no AI buzzwords) -->
+                        <p class="mt-6 text-sm sm:text-base text-[#526660] leading-relaxed max-w-md font-normal">
+                            Platform pembelajaran bahasa isyarat SIBI dan BISINDO yang dirancang khusus untuk siswa SLB, guru, dan keluarga agar dapat berkomunikasi mandiri dan percaya diri.
+                        </p>
 
-                    <!-- Clear Awam-Friendly Subtitle -->
-                    <p class="mx-auto mt-5 max-w-2xl text-sm sm:text-base text-[#617770] leading-relaxed font-medium">
-                        Dirancang khusus untuk siswa SLB dan teman tuli. Latihan mandiri di depan kamera dengan koreksi posisi tangan seketika, kuis visual bergambar, dan pemantauan guru secara langsung.
-                    </p>
-
-                    <!-- CTAs -->
-                    <div class="mt-8 flex flex-col items-center justify-center gap-3.5 sm:flex-row">
-                        <Link
-                            href="/register"
-                            class="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-[#34B182] hover:bg-[#28996e] text-white text-sm font-bold shadow-lg shadow-[#34B182]/25 transition-all transform hover:-translate-y-0.5"
-                        >
-                            <span>Mulai Belajar Sekarang</span>
-                            <ArrowRight :size="16" class="stroke-[2.5]" />
-                        </Link>
-                        <Link
-                            href="/practice"
-                            class="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3.5 rounded-2xl border border-[#d8e3dc] bg-white text-[#14221d] text-sm font-bold hover:bg-[#f4f8f6] shadow-xs transition-colors"
-                        >
-                            <Camera :size="16" class="text-[#34B182]" />
-                            <span>Coba Latihan Depan Kamera</span>
-                        </Link>
-                    </div>
-
-                    <!-- Trust Checklist Bar -->
-                    <div class="mt-8 flex flex-wrap items-center justify-center gap-5 sm:gap-7 text-xs font-bold text-[#556d67]">
-                        <span class="flex items-center gap-1.5">
-                            <CheckCircle2 :size="16" class="text-[#34B182]" />
-                            <span>100% Panduan Visual Ramah SLB</span>
-                        </span>
-                        <span class="flex items-center gap-1.5">
-                            <CheckCircle2 :size="16" class="text-[#34B182]" />
-                            <span>Koreksi Posisi Jari Seketika</span>
-                        </span>
-                        <span class="flex items-center gap-1.5">
-                            <CheckCircle2 :size="16" class="text-[#C29B40]" />
-                            <span>Dilengkapi Timer Hitung Mundur</span>
-                        </span>
-                    </div>
-                </div>
-
-                <!-- Interactive App Showcase / Mockup Preview (ala Menuin) -->
-                <div class="mt-14 max-w-5xl mx-auto rounded-3xl bg-white border border-[#e2ede6] p-4 sm:p-7 shadow-xl shadow-[#14221d]/5">
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
-                        <!-- Left Mockup: Live Camera Practice Simulator -->
-                        <div class="lg:col-span-7 bg-[#0f2a24] rounded-2xl p-5 text-white relative overflow-hidden flex flex-col justify-between min-h-[340px]">
-                            <div class="flex items-center justify-between z-10">
-                                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-[#34B182]/20 text-[#6fe3b7] border border-[#34B182]/30">
-                                    <span class="w-2 h-2 rounded-full bg-[#34B182] animate-ping"></span>
-                                    <span>Kamera Latihan Aktif</span>
-                                </span>
-                                <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-white/10 text-white">
-                                    Target: Huruf A (SIBI)
-                                </span>
-                            </div>
-
-                            <!-- Mockup Center: Hand Target Visual + Verification Box -->
-                            <div class="my-6 flex flex-col items-center justify-center text-center z-10">
-                                <div class="w-28 h-28 rounded-2xl border-2 border-dashed border-[#34B182] bg-white/5 flex items-center justify-center relative mb-3">
-                                    <Hand :size="60" class="text-[#34B182]" />
-                                    <div class="absolute -bottom-3 px-2.5 py-0.5 rounded-full bg-[#34B182] text-[#14221d] font-extrabold text-[11px] shadow-sm">
-                                        98% Tepat!
-                                    </div>
-                                </div>
-                                <h4 class="font-display font-bold text-base text-white">
-                                    Bentuk Tangan Sesuai Kaidah Isyarat
-                                </h4>
-                                <p class="text-xs text-[#9bbcb3] mt-1 max-w-xs">
-                                    Ibu jari tegak menempel di sisi luar jari telunjuk. Lanjutkan ke huruf berikutnya!
-                                </p>
-                            </div>
-
-                            <div class="flex items-center justify-between pt-3 border-t border-white/10 text-xs text-[#9bbcb3] z-10">
-                                <span>Poin Didapat: <b class="text-[#f4cd6f]">+20 XP</b></span>
-                                <span class="text-[#34B182] font-bold">Lulus Evaluasi ✓</span>
-                            </div>
-                        </div>
-
-                        <!-- Right Mockup: Student Learning Dashboard Card -->
-                        <div class="lg:col-span-5 flex flex-col gap-4">
-                            <!-- Card 1: Student Level Card -->
-                            <div class="p-4 rounded-2xl bg-[#f8fbf9] border border-[#e5ece7]">
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="text-xs font-bold text-[#627a72]">Peringkat Belajar</span>
-                                    <span class="inline-flex items-center gap-1 text-xs font-bold text-[#b48825] bg-[#fef7ee] px-2 py-0.5 rounded-full">
-                                        <Star :size="12" class="fill-[#C29B40] text-[#C29B40]" />
-                                        <span>530 XP</span>
-                                    </span>
-                                </div>
-                                <div class="font-display font-extrabold text-lg text-[#14221d]">
-                                    Penjelajah Isyarat
-                                </div>
-                                <div class="w-full h-2 rounded-full bg-[#e3ece7] mt-2 overflow-hidden">
-                                    <div class="h-full rounded-full bg-[#34B182]" style="width: 75%"></div>
-                                </div>
-                                <small class="text-[10px] text-[#788e86] mt-1 block">70 XP lagi menuju level Mahir</small>
-                            </div>
-
-                            <!-- Card 2: Streak Card -->
-                            <div class="p-4 rounded-2xl bg-[#fffaf5] border border-[#fce9d7] flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-[#e8633a] text-white flex items-center justify-center font-bold shrink-0 shadow-sm">
-                                    <Flame :size="20" class="fill-white" />
-                                </div>
-                                <div>
-                                    <div class="font-display font-bold text-sm text-[#14221d]">7 Hari Berturut-turut</div>
-                                    <p class="text-xs text-[#7d8f88]">Luar biasa! Konsistensi latihanmu terjaga minggu ini.</p>
-                                </div>
-                            </div>
-
-                            <!-- Card 3: Class Task -->
-                            <div class="p-4 rounded-2xl bg-[#f5f8ff] border border-[#e1e9fa] flex items-center justify-between">
-                                <div>
-                                    <span class="text-[10px] font-bold text-[#355bb0] uppercase tracking-wider">Tugas dari Guru</span>
-                                    <div class="font-display font-bold text-xs text-[#14221d] mt-0.5">Latihan Huruf Vokal A - E</div>
-                                </div>
-                                <span class="px-2.5 py-1 rounded-lg bg-[#355bb0] text-white text-[11px] font-bold">
-                                    Selesai ✓
-                                </span>
-                            </div>
+                        <!-- CTA Button: 1 Bulat Pill Saja Berwarna Cerah -->
+                        <div class="mt-8 flex items-center">
+                            <Link
+                                href="/register"
+                                class="inline-flex items-center justify-center px-8 py-3.5 rounded-full bg-[#34B182] hover:bg-[#28996e] text-white text-sm sm:text-base font-bold shadow-lg shadow-[#34B182]/30 hover:shadow-xl hover:shadow-[#34B182]/40 transition-all transform hover:-translate-y-0.5"
+                            >
+                                <span>Mulai Belajar Sekarang</span>
+                            </Link>
                         </div>
                     </div>
-                </div>
 
-                <!-- 4 Highlights Metrics Bar (ala Menuin) -->
-                <div class="mx-auto mt-12 grid max-w-4xl grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
-                    <div class="rounded-2xl border border-[#e5ebe7] bg-white p-5 text-center shadow-xs">
-                        <div class="font-display text-2xl sm:text-3xl font-extrabold text-[#14221d]">2 Sistem</div>
-                        <div class="text-xs font-bold text-[#627a72] mt-1">SIBI & BISINDO</div>
-                        <div class="text-[11px] text-[#8aa098] mt-0.5">Satu & Dua Tangan</div>
-                    </div>
-                    <div class="rounded-2xl border border-[#e5ebe7] bg-white p-5 text-center shadow-xs">
-                        <div class="font-display text-2xl sm:text-3xl font-extrabold text-[#34B182]">A–Z</div>
-                        <div class="text-xs font-bold text-[#627a72] mt-1">Alfabet & Angka</div>
-                        <div class="text-[11px] text-[#8aa098] mt-0.5">Materi Terstruktur</div>
-                    </div>
-                    <div class="rounded-2xl border border-[#e5ebe7] bg-white p-5 text-center shadow-xs">
-                        <div class="font-display text-2xl sm:text-3xl font-extrabold text-[#C29B40]">100% Visual</div>
-                        <div class="text-xs font-bold text-[#627a72] mt-1">Bebas Beban Audio</div>
-                        <div class="text-[11px] text-[#8aa098] mt-0.5">Ramah Siswa Tuli</div>
-                    </div>
-                    <div class="rounded-2xl border border-[#e5ebe7] bg-white p-5 text-center shadow-xs">
-                        <div class="font-display text-2xl sm:text-3xl font-extrabold text-[#167b71]">Seketika</div>
-                        <div class="text-xs font-bold text-[#627a72] mt-1">Koreksi Bentuk Jari</div>
-                        <div class="text-[11px] text-[#8aa098] mt-0.5">Umpan Balik Cepat</div>
+                    <!-- Right Column: Asymmetrical Editorial Collage ala Podcasty Reference -->
+                    <div class="lg:col-span-6 relative flex flex-col items-center justify-center py-4">
+                        <div class="relative w-full max-w-[490px] h-[410px] sm:h-[460px] mx-auto">
+                            <!-- 1. Back Card (Soft Sage Green Background) -->
+                            <div class="absolute top-2 left-2 sm:left-4 w-[56%] h-[72%] rounded-2xl sm:rounded-3xl bg-[#d8eae0] overflow-hidden shadow-md border border-[#c6dfd0]">
+                                <img
+                                    :src="'/Hero/image.png'"
+                                    alt="Dashboard Siswa SignTech"
+                                    class="w-full h-full object-cover object-top opacity-90 transition-opacity hover:opacity-100"
+                                />
+                            </div>
+
+                            <!-- 2. Floating Top-Right Dark Metric Card -->
+                            <div class="absolute -top-3 right-1 sm:right-4 z-20 rounded-xl bg-[#15191d] text-white p-3 sm:p-3.5 shadow-2xl border border-white/10 min-w-[145px]">
+                                <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Total Kosakata</div>
+                                <div class="mt-0.5 flex items-baseline gap-1.5">
+                                    <span class="text-lg sm:text-xl font-black text-white">50+</span>
+                                    <span class="text-[11px] text-gray-300 font-semibold">Isyarat</span>
+                                </div>
+                                <div class="mt-2 text-[10px] text-gray-400 flex items-center gap-1.5">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-[#34B182]"></span>
+                                    <span class="text-[9px] text-emerald-400 font-bold">SIBI & BISINDO Lengkap</span>
+                                </div>
+                            </div>
+
+                            <!-- 3. Foreground Front Card (Shifted Down & Right with Illustration) -->
+                            <div class="absolute bottom-2 right-1 sm:right-3 w-[66%] h-[74%] rounded-2xl sm:rounded-3xl bg-[#eef6f1] overflow-hidden shadow-2xl border-2 border-white flex items-center justify-center p-2 z-10">
+                                <img
+                                    :src="'/Hero/Sign Language Connection Illustration.png'"
+                                    alt="Ilustrasi Belajar Bahasa Isyarat"
+                                    class="w-full h-full object-contain rounded-xl select-none"
+                                />
+                            </div>
+
+                            <!-- 4. Floating Gesture / Voice Player Widget (Middle Left) -->
+                            <div class="absolute top-[48%] -left-2 sm:-left-6 z-20 rounded-xl bg-white p-2.5 sm:p-3 shadow-xl border border-[#e2eae5] flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-[#14221d] flex items-center justify-center text-white shrink-0 shadow-xs">
+                                    <Play :size="13" class="fill-white translate-x-0.5" />
+                                </div>
+                                <div class="flex items-center gap-1 h-6 px-1">
+                                    <span class="w-[3px] bg-[#14221d] rounded-full h-2"></span>
+                                    <span class="w-[3px] bg-[#14221d] rounded-full h-4"></span>
+                                    <span class="w-[3px] bg-[#14221d] rounded-full h-5"></span>
+                                    <span class="w-[3px] bg-[#14221d] rounded-full h-3"></span>
+                                    <span class="w-[3px] bg-[#34B182] rounded-full h-6 animate-pulse"></span>
+                                    <span class="w-[3px] bg-[#34B182] rounded-full h-5"></span>
+                                    <span class="w-[3px] bg-[#14221d] rounded-full h-3"></span>
+                                    <span class="w-[3px] bg-[#14221d] rounded-full h-5"></span>
+                                    <span class="w-[3px] bg-[#14221d] rounded-full h-2"></span>
+                                </div>
+                            </div>
+
+                            <!-- 5. Orange Doodle Zigzag Brush Stroke Accent (Under Player Widget) -->
+                            <div class="absolute top-[60%] -left-1 sm:-left-5 z-10 pointer-events-none select-none">
+                                <svg class="w-28 sm:w-34 h-10" viewBox="0 0 140 45" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M 6 10 C 40 12 80 8 134 11" stroke="#ff6e3a" stroke-width="7" stroke-linecap="round" />
+                                    <path d="M 38 24 C 68 22 98 25 132 22" stroke="#ff6e3a" stroke-width="6" stroke-linecap="round" />
+                                    <path d="M 12 37 C 45 35 78 38 120 36" stroke="#ff6e3a" stroke-width="7" stroke-linecap="round" />
+                                </svg>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -876,73 +795,22 @@ const loginLabel = computed(() => (authUser.value ? 'Buka Dashboard' : 'Masuk Ak
             </div>
         </section>
 
-        <!-- Final CTA Banner (Warm Forest Green ala Menuin) -->
-        <section class="py-16 sm:py-20 bg-gradient-to-b from-[#143d34] to-[#0c2822] text-white relative overflow-hidden">
-            <div class="pointer-events-none absolute -top-24 -left-24 w-80 h-80 rounded-full bg-[#34B182]/20 blur-3xl"></div>
-            <div class="pointer-events-none absolute -bottom-24 -right-24 w-80 h-80 rounded-full bg-[#C29B40]/20 blur-3xl"></div>
-
-            <div class="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
-                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-white/10 text-[#7de0b9] border border-white/15 mb-4">
-                    <Sparkles :size="13" class="text-[#f4cd6f]" />
-                    <span>Mulai Petualangan Belajarmu</span>
-                </span>
-
-                <h2 class="font-display font-extrabold text-3xl sm:text-5xl text-white tracking-tight leading-tight">
-                    Siap Menguasai Bahasa Isyarat dengan Menyenangkan?
-                </h2>
-
-                <p class="mt-4 text-sm sm:text-base text-[#9bc0b7] max-w-xl mx-auto leading-relaxed">
-                    Daftar gratis sekarang dan buka kemudahan belajar isyarat bagi siswa, guru, dan keluarga inklusif di seluruh Indonesia.
-                </p>
-
-                <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5">
-                    <Link
-                        href="/register"
-                        class="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[#C29B40] hover:bg-[#d8b04e] text-[#14221d] text-sm font-bold shadow-lg shadow-[#C29B40]/25 transition-all transform hover:-translate-y-0.5"
-                    >
-                        <span>Daftar Akun Gratis</span>
-                        <ArrowRight :size="16" class="stroke-[2.5]" />
-                    </Link>
-                    <Link
-                        href="/login"
-                        class="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-7 py-3.5 rounded-2xl border border-white/20 bg-white/10 text-white text-sm font-bold hover:bg-white/15 transition-colors"
-                    >
-                        <span>Masuk ke Akun</span>
-                    </Link>
-                </div>
-            </div>
-        </section>
-
-        <!-- Footer Section (Identik ala Menuin.id) -->
-        <footer class="w-full min-h-[85vh] bg-[#0E59F9] text-white overflow-hidden pt-16 sm:pt-20 lg:pt-24 pb-8 sm:pb-12 px-6 sm:px-10 lg:px-14 select-none flex flex-col justify-between">
+        <!-- Footer Section (Identik ala Menuin.id - Versi Hijau SignTech) -->
+        <footer class="w-full min-h-[70vh] bg-[#14483b] text-white overflow-hidden pt-16 sm:pt-20 lg:pt-24 pb-8 sm:pb-12 px-6 sm:px-10 lg:px-14 select-none flex flex-col justify-between">
             <div class="mx-auto w-full max-w-[1400px] flex-1 flex flex-col justify-between">
-                <!-- Top 4 Columns Grid -->
+                <!-- Top 3 Columns Grid -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-10 lg:gap-8 items-start">
-                    <!-- Column 1: Contact Us -->
-                    <div class="lg:col-span-4 flex flex-col justify-start">
+                    <!-- Column 1: Contact Us (Tanpa Kotak Kirim Sesuai Permintaan) -->
+                    <div class="lg:col-span-5 flex flex-col justify-start">
                         <h4 class="font-semibold uppercase text-[11px] sm:text-[12px] text-white/50 tracking-[0.22em] mb-5">
                             Contact Us
                         </h4>
-                        <p class="text-[22px] sm:text-[24px] lg:text-[26px] font-medium leading-tight tracking-[-0.02em] text-white mb-10">
+                        <p class="text-[22px] sm:text-[24px] lg:text-[26px] font-medium leading-tight tracking-[-0.02em] text-white mb-3">
                             Ada pertanyaan?
                         </p>
-                        <form @submit.prevent="sendContactMessage" class="max-w-sm">
-                            <div class="relative border-b-2 border-white/70 focus-within:border-white pb-2 flex items-center justify-between group transition-colors">
-                                <input
-                                    v-model="contactMessage"
-                                    type="text"
-                                    placeholder="Ketik pesan Anda..."
-                                    class="bg-transparent text-[15px] sm:text-[16px] font-normal placeholder:text-white/60 focus:outline-none w-full text-white pr-3"
-                                />
-                                <button
-                                    type="submit"
-                                    aria-label="Kirim ke WhatsApp"
-                                    class="text-[14px] font-semibold text-white hover:text-white/80 active:scale-95 transition-all shrink-0 cursor-pointer flex items-center gap-1"
-                                >
-                                    <span>Kirim</span>
-                                </button>
-                            </div>
-                        </form>
+                        <p class="text-xs sm:text-sm text-white/75 leading-relaxed max-w-sm">
+                            Hubungi tim SignTech untuk informasi seputar kurikulum SLB, kemitraan sekolah, atau panduan belajar bahasa isyarat.
+                        </p>
                     </div>
 
                     <!-- Column 2: Navigation -->
@@ -950,7 +818,7 @@ const loginLabel = computed(() => (authUser.value ? 'Buka Dashboard' : 'Masuk Ak
                         <h4 class="font-semibold uppercase text-[11px] sm:text-[12px] text-white/50 tracking-[0.22em] mb-5">
                             Navigation
                         </h4>
-                        <ul class="space-y-2 text-[22px] sm:text-[24px] lg:text-[26px] font-medium leading-tight tracking-[-0.02em] text-white">
+                        <ul class="space-y-2.5 text-[20px] sm:text-[22px] lg:text-[24px] font-medium leading-tight tracking-[-0.02em] text-white">
                             <li><a class="hover:text-white/75 transition-colors inline-block" href="#alur">Tentang</a></li>
                             <li><a class="hover:text-white/75 transition-colors inline-block" href="#fitur">Fitur</a></li>
                             <li><a class="hover:text-white/75 transition-colors inline-block" href="#kamus">Kamus Isyarat</a></li>
@@ -960,49 +828,13 @@ const loginLabel = computed(() => (authUser.value ? 'Buka Dashboard' : 'Masuk Ak
                     </div>
 
                     <!-- Column 3: Our Mission -->
-                    <div class="lg:col-span-3 flex flex-col justify-start">
+                    <div class="lg:col-span-4 flex flex-col justify-start">
                         <h4 class="font-semibold uppercase text-[11px] sm:text-[12px] text-white/50 tracking-[0.22em] mb-5">
                             Our Mission
                         </h4>
-                        <p class="text-[22px] sm:text-[24px] lg:text-[26px] font-medium leading-[1.3] tracking-[-0.02em] text-white max-w-[340px]">
-                            Mewujudkan pembelajaran bahasa isyarat yang mudah, interaktif, dan inklusif bagi semua.
+                        <p class="text-[20px] sm:text-[22px] lg:text-[24px] font-medium leading-[1.35] tracking-[-0.02em] text-white max-w-[360px]">
+                            Mewujudkan pembelajaran bahasa isyarat yang mudah, interaktif, dan inklusif bagi semua anak Indonesia.
                         </p>
-                    </div>
-
-                    <!-- Column 4: Follow Us -->
-                    <div class="lg:col-span-2 flex flex-col justify-start">
-                        <h4 class="font-semibold uppercase text-[11px] sm:text-[12px] text-white/50 tracking-[0.22em] mb-5">
-                            Follow Us
-                        </h4>
-                        <div class="flex items-center gap-5 pt-1 text-white/85">
-                            <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="Twitter / X" class="hover:text-white hover:scale-110 transition-all duration-200">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
-                                    <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path>
-                                </svg>
-                            </a>
-                            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram" class="hover:text-white hover:scale-110 transition-all duration-200">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
-                                    <rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect>
-                                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                                    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line>
-                                </svg>
-                            </a>
-                            <a href="https://wa.me/6282235594074" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" class="hover:text-white hover:scale-110 transition-all duration-200">
-                                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
-                                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-                                </svg>
-                            </a>
-                            <a href="https://tiktok.com" target="_blank" rel="noopener noreferrer" aria-label="TikTok" class="hover:text-white hover:scale-110 transition-all duration-200">
-                                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
-                                    <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path>
-                                </svg>
-                            </a>
-                            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook" class="hover:text-white hover:scale-110 transition-all duration-200">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
-                                    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
-                                </svg>
-                            </a>
-                        </div>
                     </div>
                 </div>
 
