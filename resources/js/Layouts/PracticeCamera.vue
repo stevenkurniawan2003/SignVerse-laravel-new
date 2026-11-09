@@ -86,17 +86,17 @@ function cancelCountdown() {
 const busy = computed(() => scanning.value || countdown.value > 0);
 
 const detectLabel = computed(() => {
-    if (scanning.value) return 'AI sedang memeriksa...';
+    if (scanning.value) return 'Sedang memeriksa isyarat...';
     if (countdown.value > 0) return `Tahan posisi... ${countdown.value}`;
     if (!cameraActive.value) return 'Nyalakan kamera dulu';
     if (props.attempted) return 'Coba Lagi';
     return selectedTimer.value > 0 ? `Mulai Peragaan (${selectedTimer.value} detik)` : 'Periksa Sekarang';
 });
 
-// Keterbatasan model AI: huruf BISINDO D/F/P sering tertukar pada webcam
+// Huruf BISINDO D/F/P agak mirip pada webcam
 const confusableNote = computed(() =>
     props.system === 'BISINDO' && ['D', 'F', 'P'].includes(props.letter)
-        ? 'AI kadang tertukar antara huruf D, F, dan P BISINDO. Tunjukkan kedua tangan dengan jelas dan pencahayaan yang cukup.'
+        ? 'Bentuk huruf D, F, dan P BISINDO agak mirip di kamera. Tunjukkan kedua tangan dengan jelas dan pencahayaan yang cukup.'
         : ''
 );
 
@@ -269,7 +269,7 @@ defineExpose({ busy, scanning, startDetection, reset });
                     </div>
                     <div v-else-if="scanning" class="ps-overlay">
                         <RefreshCw :size="34" class="ps-spin" />
-                        <b>AI sedang memeriksa isyaratmu...</b>
+                        <b>Sedang memeriksa bentuk tanganmu...</b>
                     </div>
                 </div>
 
@@ -305,7 +305,7 @@ defineExpose({ busy, scanning, startDetection, reset });
                 <ol class="ps-steps">
                     <li><span>1</span><p>Posisikan tangan di dalam kotak panduan.</p></li>
                     <li><span>2</span><p>Tekan <b>Mulai Peragaan</b>, lalu tahan bentuk tangan.</p></li>
-                    <li><span>3</span><p>AI menilai otomatis. Benar = huruf dikuasai.</p></li>
+                    <li><span>3</span><p>Pemeriksaan otomatis. Pas = huruf dikuasai.</p></li>
                 </ol>
     </div>
 </template>

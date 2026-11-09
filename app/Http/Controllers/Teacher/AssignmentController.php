@@ -83,7 +83,7 @@ class AssignmentController extends Controller
             'xp_reward' => ['required', 'integer', 'min:1', 'max:500'],
             'due_at' => ['nullable', 'date', 'after:now'],
         ], [
-            'min_score.min' => 'Skor minimal tidak boleh di bawah '.PracticeService::PASS_SCORE.' (batas lulus AI).',
+            'min_score.min' => 'Skor minimal tidak boleh di bawah '.PracticeService::PASS_SCORE.' (batas minimal kelulusan).',
             'due_at.after' => 'Batas waktu harus setelah sekarang.',
         ]);
 

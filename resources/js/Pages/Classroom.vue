@@ -148,11 +148,11 @@ const filteredStudents = computed(() => {
                 <div class="card side-analysis-card">
                     <div class="card-header">
                         <div>
-                            <span class="sub-label">Analisis AI</span>
-                            <h2>Gesture Paling Sering Keliru</h2>
+                            <span class="sub-label">Analisis Gerakan</span>
+                            <h2>Isyarat Paling Sering Keliru</h2>
                         </div>
                     </div>
-                    <p class="section-desc">Gunakan data kesalahan gesture ini untuk memberikan bimbingan orientasi jemari saat tatap muka.</p>
+                    <p class="section-desc">Gunakan data isyarat yang sering keliru ini untuk memberikan bimbingan posisi jemari saat tatap muka.</p>
 
                     <div class="error-list">
                         <div v-for="item in errorData" :key="item.gesture" class="error-item">

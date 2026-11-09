@@ -389,10 +389,10 @@ const filteredClasses = computed(() => {
                                 </div>
                                 <div>
                                     <h3 class="font-display font-extrabold text-[17px] text-[#14221d] tracking-tight">
-                                        Analisis Kesalahan Gesture Siswa
+                                        Analisis Gerakan yang Perlu Bimbingan
                                     </h3>
                                     <p class="text-[11px] text-[#738881]">
-                                        Gesture yang paling sering salah saat latihan AI real-time, perlu evaluasi tambahan.
+                                        Bentuk isyarat yang paling sering keliru saat latihan mandiri, perlu bimbingan tambahan.
                                     </p>
                                 </div>
                             </div>

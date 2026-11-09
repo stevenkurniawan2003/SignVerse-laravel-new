@@ -22,7 +22,7 @@ use Inertia\Response;
  */
 class ModuleController extends Controller
 {
-    private const ALPHABET_LOCKED_MESSAGE = 'Huruf A–Z selalu tersedia di AI Practice untuk SIBI dan BISINDO, jadi tidak bisa dihapus, diganti, atau dipindahkan. XP dan tingkat kesulitannya tetap bisa diubah.';
+    private const ALPHABET_LOCKED_MESSAGE = 'Huruf A–Z selalu tersedia di Latihan Mandiri untuk SIBI dan BISINDO, jadi tidak bisa dihapus, diganti, atau dipindahkan. XP dan tingkat kesulitannya tetap bisa diubah.';
 
     public function index(): Response
     {
@@ -211,7 +211,7 @@ class ModuleController extends Controller
             'xp_reward' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'difficulty' => ['sometimes', 'integer', 'min:1', 'max:3'],
         ], [
-            'title.regex' => 'Pelajaran alfabet harus berupa satu huruf A–Z agar bisa dinilai AI.',
+            'title.regex' => 'Pelajaran alfabet harus berupa satu huruf A–Z agar bisa diperiksa secara otomatis.',
         ]);
     }
 

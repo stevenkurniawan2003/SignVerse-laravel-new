@@ -35,13 +35,13 @@
                 Belajar bahasa isyarat jadi lebih interaktif, mudah, dan terarah.
             </h2>
             <p class="mt-4 text-lg text-white/90 leading-relaxed">
-                Latihan langsung dengan kamera AI, peroleh evaluasi real-time, kumpulkan XP & badge — guru dapat memantau perkembangan kelas secara komprehensif.
+                Latihan langsung di depan kamera, peroleh koreksi gerakan seketika, kumpulkan XP & lencana prestasi — bapak/ibu guru dapat memantau perkembangan kelas secara mudah.
             </p>
 
             <ul class="mt-8 space-y-3 text-sm font-semibold">
                 <li class="flex items-center gap-3 rounded-xl bg-white/15 px-4 py-3 backdrop-blur border border-white/20">
                     <x-icon name="camera" class="h-5 w-5 text-secondary" />
-                    <span>AI Practice dengan deteksi gesture otomatis</span>
+                    <span>Latihan mandiri dengan koreksi gerakan otomatis</span>
                 </li>
                 <li class="flex items-center gap-3 rounded-xl bg-white/15 px-4 py-3 backdrop-blur border border-white/20">
                     <x-icon name="trophy" class="h-5 w-5 text-secondary" />

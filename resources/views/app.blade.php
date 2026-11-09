@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#34B182">
     <link rel="icon" type="image/png" href="{{ asset('LOGO.png') }}">
 
-    <title inertia>{{ config('app.name', 'SignTech') }} — Platform AI Belajar Bahasa Isyarat</title>
+    <title inertia>{{ config('app.name', 'SignTech') }} — Belajar Bahasa Isyarat Interaktif</title>
 
     <!-- Fonts: Giphurs & Poppins -->
     <link href="https://db.onlinewebfonts.com/c/1ba1357fdc97b7e0c11d1f7fd2453585?family=Giphurs" rel="stylesheet">

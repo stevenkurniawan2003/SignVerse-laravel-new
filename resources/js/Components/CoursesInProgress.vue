@@ -88,7 +88,7 @@ const coursesList = computed(() => {
         { name: 'Bu Siti Rahma', role: 'Guru Pembimbing' },
         { name: 'Pak Rahmat S.', role: 'Guru Isyarat' },
         { name: 'Bu Ratna Dewi', role: 'Spesialis SLB' },
-        { name: 'SignTech AI Coach', role: 'Mentor AI' },
+        { name: 'Pemandu Isyarat SignTech', role: 'Pemandu Belajar' },
     ];
 
     return props.categories.map((cat, idx) => {

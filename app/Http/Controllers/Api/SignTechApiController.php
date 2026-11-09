@@ -289,7 +289,7 @@ class SignTechApiController extends Controller
             return response()->json([
                 'status' => 'error',
                 'completed' => false,
-                'message' => "Peragakan isyarat {$lesson->title} di depan kamera sampai dinyatakan benar oleh AI untuk menyelesaikan pelajaran ini.",
+                'message' => "Peragakan isyarat {$lesson->title} di depan kamera sampai gerakan tanganmu dinilai tepat untuk menyelesaikan pelajaran ini.",
             ], 422);
         }
 
@@ -378,7 +378,7 @@ class SignTechApiController extends Controller
         if (! PracticeService::isAiSupported($lesson)) {
             return response()->json([
                 'status' => 'error',
-                'message' => "Isyarat {$lesson->title} belum bisa dinilai AI. Saat ini AI hanya mengenali isyarat huruf alfabet.",
+                'message' => "Isyarat {$lesson->title} belum bisa diperiksa kamera mandiri. Saat ini kamera mandiri baru mendukung latihan huruf alfabet.",
             ], 422);
         }
 

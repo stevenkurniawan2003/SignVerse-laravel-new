@@ -186,11 +186,11 @@ const totalCompletedCount = computed(() => categoryList.value.reduce((acc, cat) 
                         <span v-if="selectedLesson.aiGraded" class="st-badge st-badge--gold">+{{ selectedLesson.xp_reward || 10 }} XP</span>
                     </div>
                     <h2 id="lesson-modal-title">Isyarat {{ selectedLesson.title }}</h2>
-                    <p>{{ selectedLesson.materialTitle }} — {{ selectedLesson.aiGraded ? 'pelajari dan peragakan bentuk isyarat ini dengan bantuan deteksi AI.' : 'pelajari isyarat ini dan latih bersama guru. AI belum bisa menilai isyarat ini.' }}</p>
+                    <p>{{ selectedLesson.materialTitle }} — {{ selectedLesson.aiGraded ? 'pelajari dan peragakan bentuk isyarat ini dengan bantuan kamera latihan mandiri.' : 'pelajari isyarat ini dan latih bersama guru di kelas.' }}</p>
 
                     <div class="modal-meta">
                         <span><Clock3 :size="16" /> ± 5 menit</span>
-                        <span><Target :size="16" /> {{ selectedLesson.aiGraded ? 'Deteksi AI' : 'Latihan bersama guru' }}</span>
+                        <span><Target :size="16" /> {{ selectedLesson.aiGraded ? 'Kamera Mandiri' : 'Latihan Bersama Guru' }}</span>
                     </div>
 
                     <Link

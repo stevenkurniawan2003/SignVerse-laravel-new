@@ -171,8 +171,8 @@ function confirmDelete() {
                 <article v-for="category in categories" :key="category.id" class="st-card">
                     <div class="st-card-head">
                         <h2><BookOpen :size="18" /> {{ categoryLabel(category) }}</h2>
-                        <span v-if="category.ai_supported" class="st-chip" title="Isyarat pada kategori ini dinilai AI lewat kamera">Dinilai AI</span>
-                        <span v-else class="st-chip st-chip--muted" title="AI baru mengenali huruf alfabet, jadi isi kategori ini dilatih bersama guru">Latihan bersama guru</span>
+                        <span v-if="category.ai_supported" class="st-chip" title="Isyarat pada kategori ini diperiksa otomatis lewat kamera">Kamera Mandiri</span>
+                        <span v-else class="st-chip st-chip--muted" title="Pemeriksaan kamera otomatis saat ini baru untuk huruf alfabet; materi ini dilatih bersama guru">Latihan bersama guru</span>
                     </div>
 
                     <div v-for="material in category.materials" :key="material.id" class="st-material">

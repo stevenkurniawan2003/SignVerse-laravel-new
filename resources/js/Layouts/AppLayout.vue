@@ -136,7 +136,7 @@ const nav = computed(() => {
         : [
               { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
               { to: '/learn', label: 'Materi Belajar', icon: BookOpen },
-              { to: '/practice', label: 'AI Practice', icon: Hand },
+              { to: '/practice', label: 'Latihan Mandiri', icon: Hand },
               { to: '/challenge', label: 'Challenge Harian', icon: Target },
               { to: '/student/assignments', label: 'Tugas Guru', icon: CalendarCheck },
               { to: '/achievement', label: 'Achievement', icon: Trophy },
@@ -158,7 +158,7 @@ const mobileNav = computed(() =>
         : [
               { to: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
               { to: '/learn', label: 'Materi', icon: BookOpen },
-              { to: '/practice', label: 'Practice', icon: Hand },
+              { to: '/practice', label: 'Latihan', icon: Hand },
               { to: '/student/assignments', label: 'Tugas', icon: CalendarCheck },
               { to: '/profile', label: 'Profil', icon: UserRound },
           ],
@@ -239,7 +239,7 @@ const streakWeek = computed(() => {
                             Sign<span class="text-[#34B182]">Tech</span>
                         </div>
                         <small class="text-[10px] text-[#8ea299] font-medium block truncate mt-0.5">
-                            Platform AI Isyarat
+                            Belajar Isyarat Interaktif
                         </small>
                     </div>
                 </Link>
@@ -249,7 +249,7 @@ const streakWeek = computed(() => {
                     v-else
                     href="/dashboard"
                     class="mx-auto flex items-center justify-center py-1"
-                    title="SignTech — Platform AI Bahasa Isyarat"
+                    title="SignTech — Belajar Bahasa Isyarat Interaktif"
                     @click="menuOpen = false"
                 >
                     <div class="w-10 h-10 rounded-xl bg-[#dff2e9] flex items-center justify-center shadow-xs hover:scale-105 transition-transform">

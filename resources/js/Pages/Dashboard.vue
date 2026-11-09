@@ -109,7 +109,7 @@ const tasksList = computed(() => {
             {
                 id: 'task_default_1',
                 title: 'Latihan Huruf Vokal A - E',
-                subtitle: 'Gunakan kamera AI untuk verifikasi gesture',
+                subtitle: 'Gunakan kamera latihan untuk periksa gerakan tangan',
                 date: 'Hari ini',
                 reward_xp: 25,
                 completed: false,

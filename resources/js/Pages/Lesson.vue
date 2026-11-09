@@ -272,12 +272,12 @@ function retryFromPopup() {
                 </div>
             </div>
 
-            <!-- Step 3 (isyarat belum didukung AI): tidak bisa diverifikasi kamera -->
+            <!-- Step 3 (isyarat dilatih bersama guru): tidak lewat kamera mandiri -->
             <div v-else-if="currentType === 'practice' && !aiSupported">
                 <h1>Peragakan Isyarat {{ targetGesture }}</h1>
                 <div class="practice-feedback" role="status">
-                    <b>Isyarat ini belum bisa dinilai AI.</b>
-                    <small>Saat ini AI SignTech baru mengenali isyarat huruf alfabet. Latih isyarat {{ targetGesture }} bersama guru dulu; pelajaran ini akan bisa diselesaikan dan memberi XP setelah AI mendukungnya.</small>
+                    <b>Isyarat ini dilatih langsung bersama guru.</b>
+                    <small>Saat ini kamera latihan mandiri dikhususkan untuk latihan huruf alfabet. Latih isyarat {{ targetGesture }} bersama bimbingan guru di kelas ya!</small>
                 </div>
                 <Link href="/learn" class="st-btn st-btn--primary st-btn--block">
                     <span>Kembali ke Materi</span>

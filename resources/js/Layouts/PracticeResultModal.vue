@@ -38,8 +38,8 @@ const failure = computed(() => {
     const unreachable = ['service_unreachable', 'http_error'].includes(r.detectionStatus) || r.detectionStatus.startsWith('http_');
     if (unreachable) {
         return {
-            title: 'AI sedang tidak bisa dihubungi',
-            reason: 'Isyaratmu belum sempat dinilai karena layanan AI tidak merespons. Ini bukan kesalahanmu.',
+            title: 'Kamera belum dapat memeriksa',
+            reason: 'Isyaratmu belum sempat diperiksa karena koneksi sistem latihan sedang terganggu. Ini bukan kesalahanmu.',
             tips: ['Periksa koneksi internet.', 'Tunggu sebentar, lalu coba lagi.'],
         };
     }
@@ -55,7 +55,7 @@ const failure = computed(() => {
     if (!r.evaluated) {
         return {
             title: 'Tangan belum terlihat',
-            reason: 'AI tidak menemukan tangan di dalam bingkai kamera, jadi isyaratmu belum bisa dinilai.',
+            reason: 'Kamera belum menemukan tangan di dalam kotak panduan, jadi isyaratmu belum bisa dinilai.',
             tips: [
                 r.system === 'BISINDO' ? 'Masukkan kedua tangan ke dalam kotak panduan.' : 'Masukkan satu tanganmu ke dalam kotak panduan.',
                 'Gunakan ruangan yang terang dan hindari cahaya dari belakang.',
@@ -67,7 +67,7 @@ const failure = computed(() => {
     if (r.recognized && r.recognized !== r.letter) {
         return {
             title: `Terbaca sebagai huruf ${r.recognized}`,
-            reason: `AI membaca isyaratmu sebagai huruf ${r.recognized} (akurasi ${r.confidence}%), padahal targetnya huruf ${r.letter}.`,
+            reason: `Gerakan tanganmu terbaca mirip huruf ${r.recognized} (akurasi ${r.confidence}%), padahal targetnya huruf ${r.letter}.`,
             tips: [
                 `Perhatikan lagi posisi jari untuk huruf ${r.letter} ${r.system}.`,
                 'Tahan bentuk tangan tetap diam sampai hitung mundur selesai.',
@@ -166,7 +166,7 @@ onBeforeUnmount(() => {
                     <template v-if="result.success">
                         <span class="ps-modal-icon"><Check :size="40" /></span>
                         <h2 id="ps-modal-title">Hebat! Isyarat {{ result.letter }} benar</h2>
-                        <p class="ps-modal-sub">AI mengenali isyarat huruf {{ result.letter }} ({{ result.system }}) kamu.</p>
+                        <p class="ps-modal-sub">Kamu berhasil memperagakan isyarat huruf {{ result.letter }} ({{ result.system }}) dengan tepat.</p>
 
                         <div class="ps-modal-voice">
                             <div v-if="result.recognized" class="ps-voice-read">

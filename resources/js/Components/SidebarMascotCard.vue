@@ -15,11 +15,11 @@ const props = defineProps({
     },
 });
 
-const title = computed(() => (props.isTeacher ? 'Kelola Kelas & Tugas' : 'Latihan Mandiri AI'));
+const title = computed(() => (props.isTeacher ? 'Kelola Kelas & Tugas' : 'Latihan Mandiri'));
 const description = computed(() =>
     props.isTeacher
-        ? 'Buat tugas baru dan pantau kemajuan gesture siswa secara realtime.'
-        : 'Asah ketepatan isyaratmu dengan deteksi kamera AI real-time sekarang.'
+        ? 'Buat tugas baru dan pantau kemajuan isyarat siswa secara langsung.'
+        : 'Asah ketepatan gerakan isyaratmu di depan kamera latihan secara langsung.'
 );
 const ctaLabel = computed(() => (props.isTeacher ? 'Beri Tugas' : 'Mulai Latihan'));
 const ctaLink = computed(() => (props.isTeacher ? '/teacher/assignments' : '/practice'));
@@ -61,7 +61,7 @@ const ctaLink = computed(() => (props.isTeacher ? '/teacher/assignments' : '/pra
                     class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-[#34B182]/20 text-[#7ce0b8] border border-[#34B182]/30 mb-2"
                 >
                     <Sparkles :size="11" class="text-[#f4cd6f]" />
-                    <span>{{ isTeacher ? 'Studio Guru' : 'AI Isyarat SLB' }}</span>
+                    <span>{{ isTeacher ? 'Studio Guru' : 'Studio Isyarat' }}</span>
                 </span>
 
                 <h4 class="font-display font-extrabold text-[15px] leading-tight text-white mb-1.5 tracking-tight">
