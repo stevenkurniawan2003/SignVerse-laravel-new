@@ -4,7 +4,7 @@ import { createInertiaApp } from '@inertiajs/vue3';
 import ToastNotification from './Layouts/ToastNotification.vue';
 
 createInertiaApp({
-    title: (title) => (title ? `${title} — SignTech` : 'SignTech — Platform AI Belajar Bahasa Isyarat'),
+    title: (title) => (title ? `${title} — SignTech` : 'SignTech — Belajar Bahasa Isyarat Interaktif'),
     resolve: (name) => {
         const pages = import.meta.glob('./Pages/**/*.vue', { eager: true });
         const page = pages[`./Pages/${name}.vue`];

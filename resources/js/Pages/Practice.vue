@@ -202,15 +202,15 @@ onBeforeUnmount(() => {
 
 <template>
     <AppLayout>
-        <Head title="AI Practice Studio" />
+        <Head title="Studio Latihan Mandiri" />
 
         <div class="st-page ps" :class="activeSystem === 'BISINDO' ? 'ps--bisindo' : 'ps--sibi'">
             <!-- Judul & pilihan sistem isyarat -->
             <header class="ps-header">
                 <div class="ps-intro">
-                    <span class="ps-kicker"><Hand :size="14" /> AI Practice</span>
+                    <span class="ps-kicker"><Hand :size="14" /> Latihan Mandiri</span>
                     <h1>Latihan Isyarat dengan Kamera</h1>
-                    <p>Pilih huruf, peragakan di depan kamera, lalu AI akan menilai isyaratmu secara otomatis.</p>
+                    <p>Pilih huruf, peragakan di depan kamera, dan gerakanmu akan diperiksa secara otomatis.</p>
                 </div>
 
                 <div class="ps-systems" role="tablist" aria-label="Pilih sistem bahasa isyarat">
@@ -319,9 +319,9 @@ onBeforeUnmount(() => {
                     </dl>
 
                     <details class="ps-rules">
-                        <summary>Bagaimana AI menilai?</summary>
+                        <summary>Bagaimana gerakan diperiksa?</summary>
                         <ul>
-                            <li>Huruf yang dibaca AI harus sama dengan target.</li>
+                            <li>Bentuk tangan di kamera harus sesuai dengan huruf target.</li>
                             <li>Akurasi minimal 60% agar dinyatakan benar.</li>
                             <li>XP diberikan saat pertama kali menguasai sebuah huruf.</li>
                         </ul>

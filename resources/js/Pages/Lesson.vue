@@ -361,7 +361,7 @@ function verifyAnswer() {
 const infoSpeech = computed(() => {
     if (isSpellingLesson.value) {
         return `${spellingKindTitle.value} ${spelling.value.word} dieja ${spelling.value.letters.join(', ')}. `
-            + `Ini latihan ejaan jari: AI menilai satu huruf setiap kali, bukan satu isyarat utuh untuk ${spellingKind.value}.`;
+            + `Ini latihan ejaan jari: kamera memeriksa satu huruf setiap kali, bukan satu isyarat utuh untuk ${spellingKind.value}.`;
     }
     return `Huruf ${targetGesture.value}, bahasa isyarat ${languageLabel.value}. `
         + `Amati dan peragakan bentuk jemari untuk isyarat ${targetGesture.value} sesuai kaidah ${languageLabel.value}. ${handTip.value}`;
@@ -743,7 +743,7 @@ onBeforeUnmount(() => {
                     <span v-else class="gesture-letter">{{ currentLesson.title }}</span>
                 </div>
                 <p v-if="isSpellingLesson" class="exercise-detail">
-                    Eja <strong>{{ spelling.word }}</strong> dengan fingerspelling {{ languageLabel }}. AI memeriksa setiap huruf secara terpisah, bukan mengenali satu isyarat {{ spellingKind }} utuh.
+                    Eja <strong>{{ spelling.word }}</strong> dengan fingerspelling {{ languageLabel }}. Kamera memeriksa setiap huruf secara terpisah, bukan satu isyarat {{ spellingKind }} utuh.
                 </p>
                 <p v-else class="exercise-detail">Peragakan bentuk jemari untuk isyarat <strong>{{ currentLesson.title }}</strong> sesuai kaidah {{ languageLabel }}.</p>
                 <button type="button" class="st-btn st-btn--primary st-btn--block exercise-submit" @click="advance">
@@ -824,13 +824,13 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
-            <!-- Step 3 (isyarat belum didukung AI): tidak bisa diverifikasi kamera -->
+            <!-- Step 3 (isyarat dilatih bersama guru): tidak lewat kamera mandiri -->
             <div v-else-if="currentType === 'practice' && !practiceSupported">
                 <h1>{{ isVocabularyCategory ? `Latihan Ejaan ${String(currentLesson.title).toUpperCase()}` : `Peragakan Isyarat ${targetGesture}` }}</h1>
                 <div class="practice-feedback" role="status">
-                    <b>Isyarat ini belum bisa dinilai AI.</b>
-                    <small v-if="isVocabularyCategory">Judul materi ini belum dapat dijadikan ejaan jari A–Z. Latih bersama guru atau pilih materi kata/frasa lain yang didukung.</small>
-                    <small v-else>Saat ini AI SignTech baru mengenali isyarat huruf alfabet. Latih isyarat {{ targetGesture }} bersama guru dulu; pelajaran ini akan bisa diselesaikan dan memberi XP setelah AI mendukungnya.</small>
+                    <b>Isyarat ini dilatih langsung bersama guru.</b>
+                    <small v-if="isVocabularyCategory">Judul materi ini belum dapat dijadikan ejaan jari A–Z. Latih bersama guru di kelas atau pilih materi kata/frasa lain.</small>
+                    <small v-else>Saat ini kamera latihan mandiri dikhususkan untuk latihan huruf alfabet serta ejaan kata dan frasa. Latih isyarat {{ targetGesture }} bersama bimbingan guru di kelas ya!</small>
                 </div>
                 <Link href="/learn" class="st-btn st-btn--primary st-btn--block">
                     <span>Kembali ke Materi</span>
@@ -846,7 +846,7 @@ onBeforeUnmount(() => {
                 </div>
                 <div v-if="!isSpellingLesson || !spelling.word_completed" class="hand-tip">
                     <Lightbulb :size="16" />
-                    <p>{{ isSpellingLesson ? `AI menilai satu huruf per foto. ${handTip}` : handTip }}</p>
+                    <p>{{ isSpellingLesson ? `Kamera memeriksa satu huruf per foto. ${handTip}` : handTip }}</p>
                 </div>
 
                 <div v-if="isSpellingLesson" class="spelling-progress">

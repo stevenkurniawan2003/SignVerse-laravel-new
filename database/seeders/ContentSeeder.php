@@ -64,31 +64,39 @@ class ContentSeeder extends Seeder
         ];
 
         foreach ($categories as $index => $data) {
-            $category = Category::create([
-                'name' => $data['name'],
-                'slug' => str($data['name'])->slug(),
-                'icon' => $data['icon'],
-                'description' => $data['description'],
-                'order' => $index,
-            ]);
+            $slug = str($data['name'])->slug()->value();
+            $category = Category::firstOrCreate(
+                ['slug' => $slug],
+                [
+                    'name' => $data['name'],
+                    'icon' => $data['icon'],
+                    'description' => $data['description'],
+                    'order' => $index,
+                ]
+            );
 
             foreach ($data['materials'] as $mIndex => $materialData) {
-                $material = $category->materials()->create([
-                    'title' => $materialData['title'],
-                    'slug' => str($materialData['title'])->slug(),
-                    'language' => $materialData['language'],
-                    'difficulty' => $materialData['difficulty'],
-                    'order' => $mIndex,
-                ]);
+                $matSlug = str($materialData['title'])->slug()->value();
+                $material = $category->materials()->firstOrCreate(
+                    ['slug' => $matSlug],
+                    [
+                        'title' => $materialData['title'],
+                        'language' => $materialData['language'],
+                        'difficulty' => $materialData['difficulty'],
+                        'order' => $mIndex,
+                    ]
+                );
 
                 foreach ($materialData['lessons'] as $lIndex => $lessonTitle) {
-                    $material->lessons()->create([
-                        'title' => $lessonTitle,
-                        'gesture_label' => str($lessonTitle)->lower()->snake()->value(),
-                        'xp_reward' => 10,
-                        'difficulty' => $materialData['difficulty'],
-                        'order' => $lIndex,
-                    ]);
+                    $material->lessons()->firstOrCreate(
+                        ['title' => $lessonTitle],
+                        [
+                            'gesture_label' => str($lessonTitle)->lower()->snake()->value(),
+                            'xp_reward' => 10,
+                            'difficulty' => $materialData['difficulty'],
+                            'order' => $lIndex,
+                        ]
+                    );
                 }
             }
         }

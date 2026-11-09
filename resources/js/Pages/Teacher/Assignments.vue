@@ -48,7 +48,7 @@ function destroy(row) {
                 <div class="st-page-header-main">
                     <span class="st-badge st-badge--primary">Tugas</span>
                     <h1>Tugas untuk Siswa</h1>
-                    <p>Tugas akan muncul otomatis di menu Tugas siswa anggota kelasnya, dan selesai sendiri saat mereka lulus peragaan AI.</p>
+                    <p>Tugas akan muncul otomatis di menu Tugas siswa anggota kelasnya, dan selesai sendiri saat peragaan mereka dinilai tepat di depan kamera.</p>
                 </div>
                 <div class="st-page-header-aside">
                     <button type="button" class="st-btn st-btn--primary" @click="showCreate = !showCreate" :disabled="classes.length === 0">
@@ -74,7 +74,7 @@ function destroy(row) {
                             </select>
                         </label>
                         <label class="st-field">
-                            <span>Pelajaran yang dinilai AI <em>*</em></span>
+                            <span>Pelajaran yang diperiksa kamera mandiri <em>*</em></span>
                             <select v-model="createForm.lesson_id" required>
                                 <option v-for="lesson in lessons" :key="lesson.id" :value="lesson.id">
                                     {{ lesson.title }} — {{ lesson.language }}
@@ -94,7 +94,7 @@ function destroy(row) {
                         <label class="st-field">
                             <span>Skor minimal kelulusan (%) <em>*</em></span>
                             <input v-model.number="createForm.min_score" type="number" min="60" max="100" />
-                            <small>AI menilai lulus mulai skor 60; tugas selesai otomatis saat siswa mengcapai skor ini.</small>
+                            <small>Sistem menilai lulus mulai skor 60; tugas selesai otomatis saat siswa mencapai skor ini.</small>
                         </label>
                         <label class="st-field">
                             <span>Bonus XP <em>*</em></span>

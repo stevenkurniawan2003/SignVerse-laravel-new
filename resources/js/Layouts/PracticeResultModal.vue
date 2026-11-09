@@ -49,8 +49,8 @@ const failure = computed(() => {
     const unreachable = ['service_unreachable', 'http_error'].includes(detectionStatus) || Number(r.httpStatus) >= 500;
     if (unreachable) {
         return {
-            title: 'AI sedang tidak bisa dihubungi',
-            reason: 'Isyaratmu belum sempat dinilai karena layanan AI tidak merespons. Ini bukan kesalahanmu.',
+            title: 'Kamera belum dapat memeriksa',
+            reason: 'Isyaratmu belum sempat diperiksa karena koneksi sistem latihan sedang terganggu. Ini bukan kesalahanmu.',
             tips: ['Periksa koneksi internet.', 'Tunggu sebentar, lalu coba lagi.'],
         };
     }
@@ -74,7 +74,7 @@ const failure = computed(() => {
     if (!r.evaluated) {
         return {
             title: 'Tangan belum terlihat',
-            reason: 'AI tidak menemukan tangan di dalam bingkai kamera, jadi isyaratmu belum bisa dinilai.',
+            reason: 'Kamera belum menemukan tangan di dalam kotak panduan, jadi isyaratmu belum bisa dinilai.',
             tips: [
                 r.system === 'BISINDO' ? 'Masukkan kedua tangan ke dalam kotak panduan.' : 'Masukkan satu tanganmu ke dalam kotak panduan.',
                 'Gunakan ruangan yang terang dan hindari cahaya dari belakang.',
@@ -86,7 +86,7 @@ const failure = computed(() => {
     if (r.recognized && r.recognized !== r.letter) {
         return {
             title: `Terbaca sebagai huruf ${r.recognized}`,
-            reason: `AI membaca isyaratmu sebagai huruf ${r.recognized} (akurasi ${r.confidence}%), padahal targetnya huruf ${r.letter}.`,
+            reason: `Gerakan tanganmu terbaca mirip huruf ${r.recognized} (akurasi ${r.confidence}%), padahal targetnya huruf ${r.letter}.`,
             tips: [
                 `Perhatikan lagi posisi jari untuk huruf ${r.letter} ${r.system}.`,
                 'Tahan bentuk tangan tetap diam sampai hitung mundur selesai.',
@@ -123,7 +123,7 @@ const resultSpeech = computed(() => {
                 `${spellingKindTitle.value} ${r.spelling.word} berhasil dieja.`,
                 `Semua ${r.spelling.letters.length} huruf sudah benar.`,
                 `Rata-rata akurasi ${percentText(r.confidence)}.`,
-                `AI menilai setiap huruf dalam ejaan jari, bukan satu isyarat ${r.spellingKind || 'kata'} utuh.`,
+                `Setiap huruf ejaan jari diperiksa satu per satu, bukan satu isyarat ${r.spellingKind || 'kata'} utuh.`,
             ]
             : [
                 `Isyaratmu terbaca huruf ${r.letter}. Benar!`,
@@ -279,8 +279,8 @@ onBeforeUnmount(() => {
                         </h2>
                         <p class="ps-modal-sub">
                             {{ isSpellingComplete
-                                ? `AI menilai setiap huruf ejaan jari ${result.system} kamu, bukan satu isyarat ${result.spellingKind || 'kata'} utuh.`
-                                : `AI mengenali isyarat huruf ${result.letter} (${result.system}) kamu.`
+                                ? `Setiap huruf ejaan jari ${result.system} kamu sudah diperiksa satu per satu dan semuanya tepat.`
+                                : `Kamu berhasil memperagakan isyarat huruf ${result.letter} (${result.system}) dengan tepat.`
                             }}
                         </p>
 

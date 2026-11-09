@@ -217,13 +217,13 @@ const totalCompletedCount = computed(() => categoryList.value.reduce((acc, cat) 
                         {{ selectedLesson.fingerspelling ? `Ejaan ${selectedLesson.spellingKind} ${selectedLesson.displayTitle}` : `Isyarat ${selectedLesson.displayTitle}` }}
                     </h2>
                     <p v-if="selectedLesson.fingerspelling">
-                        {{ selectedLesson.materialTitle }} — eja huruf demi huruf dengan kamera. AI menilai setiap huruf, bukan satu isyarat {{ selectedLesson.spellingKind }} utuh.
+                        {{ selectedLesson.materialTitle }} — eja huruf demi huruf di depan kamera latihan mandiri. Setiap huruf diperiksa satu per satu.
                     </p>
-                    <p v-else>{{ selectedLesson.materialTitle }} — {{ selectedLesson.aiGraded ? 'pelajari dan peragakan bentuk isyarat ini dengan bantuan deteksi AI.' : 'pelajari isyarat ini dan latih bersama guru. AI belum bisa menilai isyarat ini.' }}</p>
+                    <p v-else>{{ selectedLesson.materialTitle }} — {{ selectedLesson.aiGraded ? 'pelajari dan peragakan bentuk isyarat ini dengan bantuan kamera latihan mandiri.' : 'pelajari isyarat ini dan latih bersama guru di kelas.' }}</p>
 
                     <div class="modal-meta">
                         <span><Clock3 :size="16" /> ± 5 menit</span>
-                        <span><Target :size="16" /> {{ selectedLesson.fingerspelling ? 'Ejaan jari dengan AI' : selectedLesson.aiGraded ? 'Deteksi AI' : 'Latihan bersama guru' }}</span>
+                        <span><Target :size="16" /> {{ selectedLesson.fingerspelling ? 'Ejaan Kamera Mandiri' : selectedLesson.aiGraded ? 'Kamera Mandiri' : 'Latihan Bersama Guru' }}</span>
                     </div>
 
                     <Link

@@ -77,7 +77,7 @@ const earnedXp = computed(() => props.completed.reduce((sum, task) => sum + (tas
                 <div>
                     <span class="sa-kicker"><ClipboardList :size="14" /> Tugas &amp; Kelas</span>
                     <h1>Tugas dari Gurumu</h1>
-                    <p>Kerjakan tugas dengan memperagakan isyarat di kamera. Tugas selesai otomatis saat AI menyatakan peragaanmu benar.</p>
+                    <p>Kerjakan tugas dengan memperagakan isyarat di kamera. Tugas selesai otomatis saat peragaan tanganmu dinilai tepat.</p>
                 </div>
                 <dl class="sa-summary">
                     <div><dt>Kelas</dt><dd>{{ classes.length }}</dd></div>

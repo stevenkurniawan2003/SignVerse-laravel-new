@@ -134,7 +134,7 @@ async function claim(ch) {
                         </span>
 
                         <Link v-else href="/practice" class="st-btn st-btn--primary">
-                            <span>Lanjutkan di AI Practice</span>
+                            <span>Lanjutkan di Latihan Mandiri</span>
                             <ArrowRight :size="16" />
                         </Link>
                     </div>

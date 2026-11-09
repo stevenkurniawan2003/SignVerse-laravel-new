@@ -41,6 +41,7 @@ class TeacherDashboardController extends Controller
 
         return [
             'overview' => $this->stats->teacherOverview($teacher),
+            'weekActivity' => $this->stats->weeklyActivity($teacher),
             'classes' => $teacher->classrooms()
                 ->withCount(['students', 'assignments'])
                 ->orderBy('name')

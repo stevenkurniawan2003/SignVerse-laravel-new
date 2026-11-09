@@ -93,7 +93,7 @@ function timeAgo(iso) {
                         <span class="st-icon st-icon--green"><TrendingUp :size="20" /></span>
                     </div>
                     <div class="st-stat-value">{{ summary.avg_score || 0 }}<small>%</small></div>
-                    <div class="st-stat-foot">akurasi peragaan AI</div>
+                    <div class="st-stat-foot">akurasi peragaan kamera</div>
                 </article>
                 <article class="st-stat">
                     <div class="st-stat-head">

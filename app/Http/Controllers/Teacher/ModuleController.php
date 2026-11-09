@@ -22,7 +22,7 @@ use Inertia\Response;
  */
 class ModuleController extends Controller
 {
-    private const ALPHABET_LOCKED_MESSAGE = 'Huruf A–Z selalu tersedia di AI Practice untuk SIBI dan BISINDO, jadi tidak bisa dihapus, diganti, atau dipindahkan. XP dan tingkat kesulitannya tetap bisa diubah.';
+    private const ALPHABET_LOCKED_MESSAGE = 'Huruf A–Z selalu tersedia di Latihan Mandiri untuk SIBI dan BISINDO, jadi tidak bisa dihapus, diganti, atau dipindahkan. XP dan tingkat kesulitannya tetap bisa diubah.';
 
     private const SPELLING_CATEGORIES = ['word', 'phrase'];
 
@@ -217,7 +217,7 @@ class ModuleController extends Controller
             'difficulty' => ['sometimes', 'integer', 'min:1', 'max:3'],
         ], [
             'title.regex' => $isAlphabet
-                ? 'Pelajaran alfabet harus berupa satu huruf A–Z agar bisa dinilai AI.'
+                ? 'Pelajaran alfabet harus berupa satu huruf A–Z agar bisa diperiksa secara otomatis.'
                 : 'Judul kata atau frasa hanya boleh berisi huruf A–Z dan spasi agar bisa dieja.',
         ]);
     }

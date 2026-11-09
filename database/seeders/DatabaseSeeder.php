@@ -56,5 +56,22 @@ class DatabaseSeeder extends Seeder
             BadgeSeeder::class,
             DemoPracticeSeeder::class,
         ]);
+
+        // Pastikan guru demo memiliki kelas default dan siswa terdaftar di dalamnya.
+        $teacherUser = User::where('email', 'guru@signteach.id')->first();
+        if ($teacherUser?->teacher) {
+            $classroom = \App\Models\Classroom::firstOrCreate(
+                ['teacher_id' => $teacherUser->teacher->id, 'name' => 'Kelas Isyarat SLB-A'],
+                [
+                    'description' => 'Kelas pengenalan bahasa isyarat SIBI dan BISINDO untuk siswa SLB.',
+                    'code' => 'SIGN01',
+                ],
+            );
+
+            $students = Student::all();
+            if ($students->isNotEmpty()) {
+                $classroom->students()->syncWithoutDetaching($students->pluck('id'));
+            }
+        }
     }
 }
