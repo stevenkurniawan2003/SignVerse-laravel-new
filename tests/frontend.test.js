@@ -911,3 +911,85 @@ test('teacher report shows hardest signs and assignment status clearly', (t) => 
     assert.ok(text.includes('Tanpa tenggat'));
     assert.equal(fixture.state.difficulty(25).label, 'perlu bimbingan');
 });
+
+test('todo card shows open tasks first, hides the plus button for students and collapses long lists', async (t) => {
+    const tasks = Array.from({ length: 6 }, (_, index) => ({ id: `t${index}`, title: `Tugas ${index}`, completed: index === 0 }));
+    const fixture = mount(t, 'Components/TodoTasksCard.vue', { tasks });
+
+    assert.deepEqual(fixture.state.visibleTasks.map((task) => task.id), ['t1', 't2', 't3', 't4']);
+    assert.equal(fixture.state.hiddenCount, 2);
+    assert.equal(fixture.nodes().filter((node) => node.type === 'stub-link' && node.props.title === 'Lihat Semua / Tambah').length, 0);
+
+    fixture.state.isExpanded = true;
+    await flush();
+    assert.deepEqual(fixture.state.visibleTasks.map((task) => task.id), ['t1', 't2', 't3', 't4', 't5', 't0']);
+
+    fixture.state.currentFilter = 'done';
+    await flush();
+    assert.equal(fixture.state.isExpanded, false);
+    assert.equal(fixture.state.hiddenCount, 0);
+});
+
+test('level ladder marks reached, current and next levels from total XP', (t) => {
+    const fixture = mount(t, 'Components/LevelLadderCard.vue', {
+        levels: [
+            { name: 'Beginner', min_xp: 0 },
+            { name: 'Explorer', min_xp: 300 },
+            { name: 'Communicator', min_xp: 900 },
+            { name: 'Inclusive Champion', min_xp: 2000 },
+        ],
+        summary: { xp: 450, level: { name: 'Explorer', next_xp: 900, pct: 25 } },
+    });
+
+    const steps = fixture.state.levelSteps;
+    assert.deepEqual(steps.map((step) => [step.isReached, step.isCurrent, step.isNext]), [
+        [true, false, false], [true, true, false], [false, false, true], [false, false, false],
+    ]);
+    assert.equal(steps[2].status, 'Butuh 450 XP lagi');
+    assert.equal(fixture.state.xpToNextLevel, 450);
+    assert.ok(fixture.nodes().map(textOf).join(' ').includes('Tingkatan Level'));
+});
+
+test('word challenges lead to learning materials instead of self practice', (t) => {
+    t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+    const dashboard = mount(t, 'Pages/Dashboard.vue', {
+        challenges: [
+            { id: 1, title: 'Praktik 5 huruf', category: 'alfabet', progress: 1, target: 5, completed: false },
+            { id: 2, title: 'Eja 3 kata', category: 'kosakata', progress: 0, target: 3, completed: false },
+            { id: 3, title: 'Eja 3 kata', category: 'kosakata', progress: 3, target: 3, completed: true },
+        ],
+    });
+    assert.deepEqual(dashboard.state.tasksList.map((task) => task.link), ['/practice', '/learn?bab=kosakata', '/challenge']);
+
+    const challenge = mount(t, 'Pages/Challenge.vue', { challenges: [] });
+    assert.deepEqual(challenge.state.challengeDestination({ category: 'kosakata' }), { href: '/learn?bab=kosakata', label: 'Lanjutkan di Materi Belajar' });
+    assert.equal(challenge.state.challengeDestination({ category: 'alfabet' }).href, '/practice');
+});
+
+test('letter lessons show the SIBI or BISINDO sign image instead of the hand icon', async (t) => {
+    const images = (fixture) => fixture.nodes().filter((node) => node.type === 'img').map((node) => node.props.src);
+    const letter = mount(t, 'Pages/Lesson.vue', {
+        lesson: { id: 5, title: 'K', xp_reward: 10 },
+        material: { title: 'Alfabet', language: 'bisindo' },
+        category: { slug: 'alphabet' }, ai_supported: true, spelling: null, relatedLessons: [],
+    });
+    assert.deepEqual(images(letter), ['/images/isyarat/bisindo/K.png']);
+    assert.equal(letter.nodes().filter((node) => node.type === 'stub-hand' && node.props.size === 80).length, 0);
+
+    letter.state.advance();
+    await flush();
+    assert.deepEqual(images(letter), ['/images/isyarat/bisindo/K.png'], 'kuis memakai gambar huruf yang sama');
+
+    const word = mount(t, 'Pages/Lesson.vue', lessonProps('AKU'));
+    assert.deepEqual(images(word), ['A', 'K', 'U'].map((char) => `/images/isyarat/sibi/${char}.png`));
+    word.state.advance();
+    await flush();
+    assert.deepEqual(images(word), ['/images/isyarat/sibi/A.png'], 'kuis ejaan menampilkan huruf yang ditanyakan');
+
+    const number = mount(t, 'Pages/Lesson.vue', {
+        lesson: { id: 9, title: '7', xp_reward: 10 },
+        material: { title: 'Angka', language: 'sibi' },
+        category: { slug: 'number' }, ai_supported: false, spelling: null, relatedLessons: [],
+    });
+    assert.equal(images(number).length, 0, 'materi selain huruf A–Z tetap memakai ikon tangan');
+});

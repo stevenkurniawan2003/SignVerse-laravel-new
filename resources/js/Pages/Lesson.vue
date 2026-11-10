@@ -234,6 +234,20 @@ const quizOrdinal = computed(() => ordinalOf(quizIndex.value));
 const types = ['info', 'choice', 'practice'];
 const currentType = computed(() => types[step.value] || 'info');
 const languageLabel = computed(() => String(currentMaterial.value?.language || 'SIBI').toUpperCase());
+/**
+ * Gambar contoh huruf isyarat A–Z sesuai sistem (SIBI/BISINDO). Selain huruf
+ * tunggal A–Z (mis. angka) tidak punya gambar, sehingga ikon tangan tetap dipakai.
+ */
+function signImageUrl(letter) {
+    const normalized = String(letter || '').trim().toUpperCase();
+    if (!/^[A-Z]$/.test(normalized)) return null;
+    return `/images/isyarat/${languageLabel.value === 'BISINDO' ? 'bisindo' : 'sibi'}/${normalized}.png`;
+}
+
+const lessonSignImage = computed(() => (isSpellingLesson.value ? null : signImageUrl(currentLesson.value?.title)));
+const quizSignImage = computed(() => signImageUrl(quizTarget.value));
+const practiceSignImage = computed(() => signImageUrl(targetGesture.value));
+
 const handTip = computed(() =>
     languageLabel.value === 'BISINDO'
         ? 'BISINDO umumnya memakai dua tangan. Pastikan kedua tangan masuk ke dalam bingkai kamera.'
@@ -734,13 +748,24 @@ onBeforeUnmount(() => {
                     <h1>{{ isSpellingLesson ? `Pelajari Ejaan ${spellingKindTitle} ${spelling.word}` : `Amati Bentuk Isyarat ${currentLesson.title}` }}</h1>
                     <SpeakButton :text="infoSpeech" />
                 </div>
-                <div class="gesture-demo" :class="{ 'gesture-demo--spelling': isSpellingLesson }">
-                    <span class="gesture-hand"><Hand :size="80" class="text-primary" /></span>
+                <div class="gesture-demo" :class="{ 'gesture-demo--spelling': isSpellingLesson, 'gesture-demo--image': lessonSignImage }">
                     <template v-if="isSpellingLesson">
+                        <div class="sign-strip" :aria-label="`Urutan isyarat huruf ${spelling.word}`">
+                            <div v-for="(group, groupIndex) in spellingGroups" :key="groupIndex" class="sign-strip-group">
+                                <figure v-for="position in group" :key="position.index" class="sign-strip-item">
+                                    <img :src="signImageUrl(position.letter)" :alt="`Isyarat huruf ${position.letter} (${languageLabel})`" loading="lazy" />
+                                    <figcaption>{{ position.letter }}</figcaption>
+                                </figure>
+                            </div>
+                        </div>
                         <strong class="spelling-hero-word">{{ spelling.word }}</strong>
                         <small class="spelling-mode-note">Eja satu huruf setiap kali</small>
                     </template>
-                    <span v-else class="gesture-letter">{{ currentLesson.title }}</span>
+                    <template v-else>
+                        <img v-if="lessonSignImage" :src="lessonSignImage" class="sign-image" :alt="`Isyarat huruf ${currentLesson.title} (${languageLabel})`" />
+                        <span v-else class="gesture-hand"><Hand :size="80" class="text-primary" /></span>
+                        <span class="gesture-letter">{{ currentLesson.title }}</span>
+                    </template>
                 </div>
                 <p v-if="isSpellingLesson" class="exercise-detail">
                     Eja <strong>{{ spelling.word }}</strong> dengan fingerspelling {{ languageLabel }}. Kamera memeriksa setiap huruf secara terpisah, bukan satu isyarat {{ spellingKind }} utuh.
@@ -758,8 +783,15 @@ onBeforeUnmount(() => {
                     <h1>{{ isSpellingLesson ? `Huruf ${quizOrdinal} ${spellingKind} ini apa?` : 'Isyarat yang baru kamu amati melambangkan apa?' }}</h1>
                     <SpeakButton :text="quizSpeech" :related-texts="[answerSpeech]" />
                 </div>
-                <div class="gesture-demo" :class="{ 'gesture-demo--spelling': isSpellingLesson }">
-                    <span class="gesture-hand"><Hand :size="80" class="text-primary" /></span>
+                <div class="gesture-demo" :class="{ 'gesture-demo--spelling': isSpellingLesson, 'gesture-demo--image': quizSignImage }">
+                    <img
+                        v-if="quizSignImage"
+                        :src="quizSignImage"
+                        class="sign-image"
+                        :class="{ 'sign-image--small': isSpellingLesson }"
+                        :alt="isSpellingLesson ? `Isyarat huruf ${quizOrdinal} (${languageLabel})` : `Isyarat yang ditanyakan (${languageLabel})`"
+                    />
+                    <span v-else class="gesture-hand"><Hand :size="80" class="text-primary" /></span>
                     <template v-if="isSpellingLesson">
                         <strong class="spelling-hero-word">{{ spelling.word }}</strong>
                         <div class="quiz-letters" :aria-label="`Pertanyaan ${quizIndex + 1} dari ${spelling.letters.length}`">
@@ -843,6 +875,14 @@ onBeforeUnmount(() => {
                 <div class="title-row">
                     <h1>{{ isSpellingLesson ? spelling.word_completed ? `${spellingKindTitle} ${spelling.word} Selesai Dieja` : `Eja ${spellingKindTitle} ${spelling.word}: Huruf ${targetGesture}` : `Peragakan Isyarat ${targetGesture}` }}</h1>
                     <SpeakButton :text="practiceSpeech" :related-texts="[spellingFeedback?.message]" />
+                </div>
+                <div v-if="practiceSignImage && (!isSpellingLesson || !spelling.word_completed)" class="sign-reference">
+                    <img :src="practiceSignImage" :alt="`Contoh isyarat huruf ${targetGesture} (${languageLabel})`" />
+                    <div>
+                        <small>Contoh isyarat</small>
+                        <b>Huruf {{ targetGesture }} · {{ languageLabel }}</b>
+                        <span>Tiru bentuk tangan ini di depan kamera.</span>
+                    </div>
                 </div>
                 <div v-if="!isSpellingLesson || !spelling.word_completed" class="hand-tip">
                     <Lightbulb :size="16" />
@@ -1028,6 +1068,95 @@ onBeforeUnmount(() => {
     justify-content: center;
     position: relative;
     margin-bottom: 16px;
+}
+.gesture-demo--image {
+    height: 220px;
+    background: #fff;
+}
+.sign-image {
+    width: 190px;
+    height: 190px;
+    object-fit: contain;
+    border-radius: 14px;
+}
+.sign-image--small {
+    width: 120px;
+    height: 120px;
+}
+.sign-strip {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 14px;
+    margin-bottom: 4px;
+}
+.sign-strip-group {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+}
+.sign-strip-item {
+    margin: 0;
+    width: 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid #d5f3e5;
+    border-radius: 12px;
+}
+.sign-strip-item img {
+    width: 54px;
+    height: 54px;
+    object-fit: contain;
+}
+.sign-strip-item figcaption {
+    font-size: 12px;
+    font-weight: 800;
+    color: #1e7253;
+}
+.sign-reference {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 14px 10px 10px;
+    margin-bottom: 12px;
+    background: #f6fbf8;
+    border: 1px solid #d5f3e5;
+    border-radius: 16px;
+}
+.sign-reference img {
+    width: 84px;
+    height: 84px;
+    flex-shrink: 0;
+    object-fit: contain;
+    background: #fff;
+    border-radius: 12px;
+}
+.sign-reference div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.sign-reference small {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #738881;
+}
+.sign-reference b {
+    font-size: 16px;
+    font-weight: 800;
+    color: #14221d;
+}
+.sign-reference span {
+    font-size: 12px;
+    color: #52685d;
 }
 .gesture-letter {
     position: absolute;

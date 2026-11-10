@@ -154,6 +154,7 @@ class SignTechApiController extends Controller
                     'id' => (int) $c->id,
                     'title' => $c->title,
                     'description' => $c->description,
+                    'category' => $c->category,
                     'progress' => (int) $c->progress,
                     'target' => (int) $c->target,
                     'completed' => (bool) $c->completed,

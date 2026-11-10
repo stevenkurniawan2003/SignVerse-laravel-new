@@ -100,6 +100,7 @@ class DashboardTasksTest extends TestCase
         $challenges = collect($this->actingAs($user)->getJson('/api/dashboard')->json('challenges'))->keyBy('id');
 
         $this->assertTrue($challenges[$alphabet->id]['completed']);
+        $this->assertSame('alfabet', $challenges[$alphabet->id]['category']);
         $this->assertSame($alphabet->target, $challenges[$alphabet->id]['progress']);
         $this->assertFalse($challenges->firstWhere('id', '!=', $alphabet->id)['completed']);
     }

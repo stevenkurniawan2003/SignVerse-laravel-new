@@ -47,6 +47,7 @@ function readSystem() {
 }
 
 const activeSystem = ref(readSystem());
+
 const selectedId = ref(null);
 
 function lettersFor(system) {
@@ -68,6 +69,13 @@ const masteredInSystem = computed(() => letters.value.filter(isMastered).length)
 const progressPercent = computed(() => Math.round((masteredInSystem.value / (letters.value.length || 1)) * 100));
 
 const target = computed(() => letters.value.find((item) => item.id === selectedId.value) || letters.value[0] || null);
+
+/** Gambar contoh huruf target dari public/images/isyarat sesuai sistem yang dipilih. */
+const targetSignImage = computed(() => {
+    const letter = String(target.value?.letter || '').trim().toUpperCase();
+    if (!/^[A-Z]$/.test(letter)) return null;
+    return `/images/isyarat/${activeSystem.value === 'BISINDO' ? 'bisindo' : 'sibi'}/${letter}.png`;
+});
 const targetIndex = computed(() => letters.value.findIndex((item) => item.id === target.value?.id));
 
 // Huruf berikutnya yang belum dikuasai (melingkar), atau huruf setelahnya
@@ -241,7 +249,11 @@ onBeforeUnmount(() => {
                             <ChevronLeft :size="22" />
                         </button>
                         <div class="ps-target-main">
-                            <span class="ps-target-letter">{{ target?.letter || '-' }}</span>
+                            <span v-if="targetSignImage" class="ps-target-sign">
+                                <img :src="targetSignImage" :alt="`Contoh isyarat huruf ${target.letter} (${activeSystem})`" />
+                                <b>{{ target.letter }}</b>
+                            </span>
+                            <span v-else class="ps-target-letter">{{ target?.letter || '-' }}</span>
                             <div>
                                 <small>Peragakan huruf ({{ activeSystem }})</small>
                                 <b>{{ target ? `Huruf ${target.letter}` : 'Belum ada huruf' }}</b>
@@ -547,6 +559,40 @@ onBeforeUnmount(() => {
     border-radius: 16px;
 }
 
+.ps-target-sign {
+    position: relative;
+    flex-shrink: 0;
+    width: 88px;
+    height: 88px;
+    padding: 4px;
+    background: #fff;
+    border: 2px solid var(--sys);
+    border-radius: 18px;
+}
+
+.ps-target-sign img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.ps-target-sign b {
+    position: absolute;
+    right: -8px;
+    bottom: -8px;
+    display: grid;
+    place-items: center;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    font-size: 15px;
+    font-weight: 800;
+    color: #fff;
+    background: var(--sys);
+    border: 2px solid #fff;
+    border-radius: 10px;
+}
+
 .ps-target-main small {
     display: block;
     font-size: 12px;
@@ -841,6 +887,11 @@ onBeforeUnmount(() => {
         width: 52px;
         height: 52px;
         font-size: 28px;
+    }
+
+    .ps-target-sign {
+        width: 68px;
+        height: 68px;
     }
 
     .ps-target {

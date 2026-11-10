@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import {
     ArrowRight,
@@ -22,6 +22,17 @@ const categoryList = ref(Array.isArray(props.categories) && props.categories.len
 const completedIds = ref(new Set((props.completedLessonIds || []).map((id) => Number(id))));
 const selectedLesson = ref(null);
 
+/**
+ * Tautan dari Challenge Harian (?bab=kosakata) langsung menggulir ke bab kata/frasa.
+ */
+function scrollToRequestedChapter() {
+    const chapter = new URLSearchParams(window.location?.search || '').get('bab');
+    if (chapter !== 'kosakata') return;
+    const target = visibleCategories.value.find((cat) => isVocabularyCategory(cat));
+    const element = target && typeof document.getElementById === 'function' ? document.getElementById(`kategori-${target.slug}`) : null;
+    element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 onMounted(async () => {
     if (categoryList.value.length === 0) {
         try {
@@ -40,6 +51,8 @@ onMounted(async () => {
             }
         } catch {}
     }
+    await nextTick();
+    scrollToRequestedChapter();
 });
 
 const categoryIcons = {
@@ -154,6 +167,7 @@ const totalCompletedCount = computed(() => categoryList.value.reduce((acc, cat) 
             <section
                 v-for="(cat, cIndex) in visibleCategories"
                 :key="cat.id"
+                :id="`kategori-${cat.slug}`"
                 class="st-panel"
             >
                 <div class="st-panel-head chapter-head">
@@ -241,6 +255,10 @@ const totalCompletedCount = computed(() => categoryList.value.reduce((acc, cat) 
 </template>
 
 <style scoped>
+.st-panel[id^="kategori-"] {
+    scroll-margin-top: 88px;
+}
+
 .chapter-head {
     padding-bottom: 16px;
     border-bottom: 1px solid var(--st-line-soft);

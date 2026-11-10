@@ -15,6 +15,17 @@ const challengeList = ref(Array.isArray(props.challenges) && props.challenges.le
 const rewardsList = ref(Array.isArray(props.rewards) ? props.rewards : []);
 const claimingId = ref(null);
 
+/**
+ * Challenge kata/frasa dikerjakan lewat Materi Belajar (ejaan per huruf),
+ * sedangkan challenge huruf tetap lewat Latihan Mandiri.
+ */
+function challengeDestination(ch) {
+    if (ch?.category === 'kosakata') {
+        return { href: '/learn?bab=kosakata', label: 'Lanjutkan di Materi Belajar' };
+    }
+    return { href: '/practice', label: 'Lanjutkan di Latihan Mandiri' };
+}
+
 function challengePercent(ch) {
     return Math.min(100, Math.round(((ch.progress || 0) / (ch.target || 1)) * 100));
 }
@@ -133,8 +144,8 @@ async function claim(ch) {
                             <CircleCheck :size="15" /> Hadiah sudah diklaim
                         </span>
 
-                        <Link v-else href="/practice" class="st-btn st-btn--primary">
-                            <span>Lanjutkan di Latihan Mandiri</span>
+                        <Link v-else :href="challengeDestination(ch).href" class="st-btn st-btn--primary">
+                            <span>{{ challengeDestination(ch).label }}</span>
                             <ArrowRight :size="16" />
                         </Link>
                     </div>

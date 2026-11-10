@@ -25,6 +25,7 @@ import CoursesInProgress from '../Components/CoursesInProgress.vue';
 import ProfileOverviewCard from '../Components/ProfileOverviewCard.vue';
 import MiniCalendar from '../Components/MiniCalendar.vue';
 import TodoTasksCard from '../Components/TodoTasksCard.vue';
+import LevelLadderCard from '../Components/LevelLadderCard.vue';
 
 const props = defineProps({
     summary: { type: Object, default: () => ({}) },
@@ -82,6 +83,15 @@ function formatDueDate(iso) {
 }
 
 /**
+ * Misi kata/frasa dikerjakan lewat Materi Belajar (ejaan per huruf), misi huruf lewat
+ * Latihan Mandiri. Misi yang sudah tercapai diarahkan ke halaman Challenge untuk klaim XP.
+ */
+function challengeLink(challenge) {
+    if (challenge.completed) return '/challenge';
+    return challenge.category === 'kosakata' ? '/learn?bab=kosakata' : '/practice';
+}
+
+/**
  * Daftar Tugas & Misi. Status selesai selalu dari server sehingga tercentang
  * otomatis: tugas guru saat dikumpulkan, misi harian saat target tercapai.
  * Rekomendasi latihan hanya berisi pelajaran yang belum dikuasai.
@@ -107,7 +117,7 @@ const tasksList = computed(() => {
         completed: Boolean(challenge.completed),
         progress: Number(challenge.progress || 0),
         target: Number(challenge.target || 0),
-        link: '/challenge',
+        link: challengeLink(challenge),
     }));
 
     const recommendedTasks = (props.recommended || []).map((lesson) => ({
@@ -261,6 +271,9 @@ onBeforeUnmount(() => {
                             :tiles="studentTiles"
                         />
                     </div>
+
+                    <!-- Tingkatan level siswa berdasarkan total XP -->
+                    <LevelLadderCard :levels="props.levels" :summary="props.summary" />
 
                     <!-- Row 2: Courses in Progress (3 Card Grid) -->
                     <CoursesInProgress

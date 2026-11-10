@@ -1,7 +1,7 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Link } from '@inertiajs/vue3';
-import { Check, Plus, Sparkles, Target } from '@lucide/vue';
+import { Check, ChevronDown, ChevronUp, Plus, Sparkles, Target } from '@lucide/vue';
 
 const props = defineProps({
     title: {
@@ -16,6 +16,11 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    /** Jumlah item yang tampil sebelum daftar dibuka penuh. */
+    visibleLimit: {
+        type: Number,
+        default: 4,
+    },
 });
 
 const currentFilter = ref('all'); // 'all' | 'open' | 'done'
@@ -28,11 +33,24 @@ function isDone(task) {
     return Boolean(task.is_completed || task.completed);
 }
 
-const filteredTasks = computed(() => props.tasks.filter((task) => {
-    if (currentFilter.value === 'open') return !isDone(task);
-    if (currentFilter.value === 'done') return isDone(task);
-    return true;
-}));
+/** Tugas yang belum selesai selalu di atas agar yang perlu dikerjakan langsung terlihat. */
+const filteredTasks = computed(() => props.tasks
+    .filter((task) => {
+        if (currentFilter.value === 'open') return !isDone(task);
+        if (currentFilter.value === 'done') return isDone(task);
+        return true;
+    })
+    .map((task, index) => ({ task, index }))
+    .sort((first, second) => Number(isDone(first.task)) - Number(isDone(second.task)) || first.index - second.index)
+    .map(({ task }) => task));
+
+const isExpanded = ref(false);
+watch(currentFilter, () => {
+    isExpanded.value = false;
+});
+
+const visibleTasks = computed(() => (isExpanded.value ? filteredTasks.value : filteredTasks.value.slice(0, props.visibleLimit)));
+const hiddenCount = computed(() => Math.max(0, filteredTasks.value.length - props.visibleLimit));
 
 const counts = computed(() => {
     const done = props.tasks.filter(isDone).length;
@@ -57,7 +75,8 @@ function progressPercent(task) {
                 {{ title }}
             </h3>
             <Link
-                :href="isTeacher ? '/teacher/assignments' : '/challenge'"
+                v-if="isTeacher"
+                href="/teacher/assignments"
                 class="w-7 h-7 rounded-full flex items-center justify-center bg-[#f0f7f3] text-[#1e7861] hover:bg-[#34B182] hover:text-white transition-colors"
                 title="Lihat Semua / Tambah"
             >
@@ -106,11 +125,11 @@ function progressPercent(task) {
         </div>
 
         <!-- Task List Items -->
-        <div v-if="filteredTasks.length" class="flex flex-col gap-2.5">
+        <div v-if="filteredTasks.length" class="flex flex-col gap-2">
             <div
-                v-for="task in filteredTasks"
+                v-for="task in visibleTasks"
                 :key="task.id"
-                class="group p-3 rounded-2xl border transition-all duration-200"
+                class="group px-3 py-2.5 rounded-2xl border transition-all duration-200"
                 :class="[
                     isDone(task)
                         ? 'bg-[#fafcfb] border-[#edf2ef] opacity-75'
@@ -160,7 +179,7 @@ function progressPercent(task) {
                         </div>
 
                         <!-- Task Footer: Date & Badge -->
-                        <div class="flex items-center justify-between gap-2 mt-2 pt-1 border-t border-[#f0f4f1]">
+                        <div class="flex items-center justify-between gap-2 mt-1.5">
                             <span class="text-[10px] font-medium" :class="task.overdue && !isDone(task) ? 'text-[#b2382d] font-bold' : 'text-[#849a92]'">
                                 {{ task.due_date || task.date || 'Hari ini' }}
                             </span>
@@ -182,6 +201,17 @@ function progressPercent(task) {
                     </div>
                 </div>
             </div>
+
+            <button
+                v-if="hiddenCount"
+                type="button"
+                class="mt-1 inline-flex items-center justify-center gap-1 w-full py-2 rounded-xl text-[11px] font-bold text-[#1b735a] bg-[#f4f8f5] hover:bg-[#eaf2ee] transition-colors"
+                :aria-expanded="isExpanded"
+                @click="isExpanded = !isExpanded"
+            >
+                <template v-if="isExpanded">Tampilkan lebih sedikit <ChevronUp :size="14" class="stroke-[2.5]" /></template>
+                <template v-else>Lihat {{ hiddenCount }} lainnya <ChevronDown :size="14" class="stroke-[2.5]" /></template>
+            </button>
         </div>
 
         <!-- Empty state -->
