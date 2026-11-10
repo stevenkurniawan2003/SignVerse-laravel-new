@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
-import { Check, Flame, MoreVertical, Sparkles, Star } from '@lucide/vue';
+import { Check, Flame, MoreVertical, Sparkles, Star, Users } from '@lucide/vue';
 
 const props = defineProps({
     user: {
@@ -35,12 +35,31 @@ const initials = computed(() => {
         .join('');
 });
 
-const totalXp = computed(() => props.summary?.total_xp ?? 0);
-const streak = computed(() => props.summary?.current_streak ?? 0);
+const totalXp = computed(() => Number(props.summary?.xp ?? props.summary?.total_xp ?? 0));
+const streak = computed(() => Number(props.summary?.streak ?? props.summary?.current_streak ?? 0));
 const levelName = computed(() => props.summary?.level?.name || 'Beginner');
 
-// Progress ring around avatar (e.g. 70% of level completion)
-const levelPct = computed(() => props.summary?.level?.pct || 65);
+/**
+ * Siswa melihat XP & streak, guru melihat jumlah siswa & status aktif (guru tidak punya XP/level).
+ */
+const statPills = computed(() => (props.isTeacher
+    ? [
+        { id: 'students', label: `${Number(props.summary?.students ?? 0)} Siswa`, icon: Users, tone: 'amber' },
+        { id: 'active', label: 'Guru Aktif', icon: Sparkles, tone: 'mint' },
+    ]
+    : [
+        { id: 'xp', label: `${totalXp.value.toLocaleString('id-ID')} XP`, icon: Star, tone: 'amber' },
+        { id: 'streak', label: `${streak.value} Hari`, icon: Flame, tone: 'rose' },
+    ]));
+
+const PILL_TONES = {
+    mint: { pill: 'bg-[#edf8f2] text-[#1b735a] border-[#d7efe3]', icon: 'text-[#34B182]' },
+    amber: { pill: 'bg-[#fef7ee] text-[#b48825] border-[#fbe9cd]', icon: 'fill-[#C29B40] text-[#C29B40]' },
+    rose: { pill: 'bg-[#fdf2ec] text-[#d46535] border-[#fcdccf]', icon: 'fill-[#E8633A] text-[#E8633A]' },
+};
+
+// Cincin di sekitar avatar menunjukkan progres level siswa; guru tidak memakai level
+const levelPct = computed(() => (props.isTeacher ? 100 : Number(props.summary?.level?.pct ?? 0)));
 const ringSize = 88;
 const strokeWidth = 5;
 const radius = (ringSize - strokeWidth) / 2;
@@ -110,32 +129,20 @@ const strokeDashoffset = computed(() => {
 
         <!-- Role / Level Subtitle -->
         <p class="text-xs font-semibold text-[#738881] mb-4">
-            {{ userRole }} • <span class="text-[#20755f] font-bold">{{ levelName }}</span>
+            {{ userRole }}<template v-if="!isTeacher"> • <span class="text-[#20755f] font-bold">{{ levelName }}</span></template>
         </p>
 
-        <!-- Stats row: XP & Streak pills -->
-        <div class="flex items-center justify-center gap-2 pt-3 border-t border-[#f0f5f2]">
-            <div
-                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#fef7ee] text-[#b48825] border border-[#fbe9cd]"
+        <!-- Pill statistik sesuai peran pengguna -->
+        <div class="flex flex-wrap items-center justify-center gap-2.5 pt-4 pb-1 px-1 border-t border-[#f0f5f2]">
+            <span
+                v-for="pill in statPills"
+                :key="pill.id"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold border"
+                :class="PILL_TONES[pill.tone].pill"
             >
-                <Star :size="13" class="fill-[#C29B40] text-[#C29B40]" />
-                <span>{{ totalXp }} XP</span>
-            </div>
-
-            <div
-                v-if="!isTeacher"
-                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#fdf2ec] text-[#d46535] border border-[#fcdccf]"
-            >
-                <Flame :size="13" class="fill-[#E8633A] text-[#E8633A]" />
-                <span>{{ streak }} Hari</span>
-            </div>
-            <div
-                v-else
-                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#edf8f2] text-[#1b735a] border border-[#d7efe3]"
-            >
-                <Sparkles :size="13" class="text-[#34B182]" />
-                <span>Guru Aktif</span>
-            </div>
+                <component :is="pill.icon" :size="14" :class="PILL_TONES[pill.tone].icon" />
+                <span>{{ pill.label }}</span>
+            </span>
         </div>
     </div>
 </template>

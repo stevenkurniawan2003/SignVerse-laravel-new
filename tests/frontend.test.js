@@ -993,3 +993,41 @@ test('letter lessons show the SIBI or BISINDO sign image instead of the hand ico
     });
     assert.equal(images(number).length, 0, 'materi selain huruf A–Z tetap memakai ikon tangan');
 });
+
+test('teacher dashboard keeps gesture analysis and classes short with a "lihat selengkapnya" toggle', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+    const errorAnalysis = Array.from({ length: 5 }, (_, index) => ({
+        lesson_id: index + 1, lesson: String.fromCharCode(65 + index), gesture: `g${index}`, language: 'SIBI', wrong: 2, total: 4, accuracy: 50,
+    }));
+    const classes = Array.from({ length: 4 }, (_, index) => ({ id: index + 1, name: `Kelas ${index + 1}`, code: `KODE${index}` }));
+    const fixture = mount(t, 'Pages/Teacher/Dashboard.vue', { errorAnalysis, classes });
+
+    assert.equal(fixture.state.visibleErrors.length, 3);
+    assert.equal(fixture.state.hiddenErrorCount, 2);
+    assert.equal(fixture.state.visibleClasses.length, 3);
+    assert.ok(fixture.nodes().map(textOf).join(' ').includes('Lihat selengkapnya (2 lainnya)'));
+
+    fixture.state.showAllErrors = true;
+    fixture.state.showAllClasses = true;
+    await flush();
+    assert.equal(fixture.state.visibleErrors.length, 5);
+    assert.equal(fixture.state.visibleClasses.length, 4);
+    assert.ok(fixture.nodes().map(textOf).join(' ').includes('Tampilkan lebih sedikit'));
+});
+
+test('profile card shows student count for teachers but XP and streak for students', (t) => {
+    const teacher = mount(t, 'Components/ProfileOverviewCard.vue', {
+        user: { name: 'Budi Santoso' }, isTeacher: true, summary: { classes: 2, students: 14 },
+    });
+    const teacherText = teacher.nodes().map(textOf).join(' ');
+    assert.deepEqual(teacher.state.statPills.map((pill) => pill.label), ['14 Siswa', 'Guru Aktif']);
+    assert.ok(!teacherText.includes('XP'), 'guru tidak punya XP');
+    assert.ok(!teacherText.includes('Beginner'), 'guru tidak punya level');
+
+    const student = mount(t, 'Components/ProfileOverviewCard.vue', {
+        user: { name: 'Rina Putri' }, summary: { xp: 1250, streak: 3, level: { name: 'Communicator', pct: 40 } },
+    });
+    assert.deepEqual(student.state.statPills.map((pill) => pill.label), ['1.250 XP', '3 Hari']);
+    assert.equal(student.state.levelPct, 40);
+    assert.ok(student.nodes().map(textOf).join(' ').includes('Communicator'));
+});

@@ -192,7 +192,7 @@ defineExpose({ loadWeek, daysByDate, selectedDay });
                     class="w-8 h-10 sm:h-11 rounded-xl flex items-center justify-center text-xs font-bold transition-all duration-200"
                     :class="[
                         day.isToday
-                            ? 'bg-[#143d34] text-white shadow-md shadow-[#143d34]/30 scale-105'
+                            ? 'bg-[#34B182] text-white shadow-md shadow-[#34B182]/30 scale-105'
                             : day.isSelected
                             ? 'bg-[#e2f2ea] text-[#167b71]'
                             : 'text-[#425952] hover:bg-[#f3f7f5]',

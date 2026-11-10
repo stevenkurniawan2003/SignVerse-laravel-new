@@ -91,7 +91,7 @@ function progressPercent(task) {
                 class="px-2.5 py-1 rounded-full transition-all"
                 :class="[
                     currentFilter === 'all'
-                        ? 'bg-[#143d34] text-white shadow-sm'
+                        ? 'bg-[#34B182] text-white shadow-sm'
                         : 'bg-[#f4f8f5] text-[#69827b] hover:bg-[#eaf2ee]',
                 ]"
                 @click="currentFilter = 'all'"
@@ -103,7 +103,7 @@ function progressPercent(task) {
                 class="px-2.5 py-1 rounded-full transition-all"
                 :class="[
                     currentFilter === 'open'
-                        ? 'bg-[#143d34] text-white shadow-sm'
+                        ? 'bg-[#34B182] text-white shadow-sm'
                         : 'bg-[#f4f8f5] text-[#69827b] hover:bg-[#eaf2ee]',
                 ]"
                 @click="currentFilter = 'open'"
@@ -115,7 +115,7 @@ function progressPercent(task) {
                 class="px-2.5 py-1 rounded-full transition-all"
                 :class="[
                     currentFilter === 'done'
-                        ? 'bg-[#143d34] text-white shadow-sm'
+                        ? 'bg-[#34B182] text-white shadow-sm'
                         : 'bg-[#f4f8f5] text-[#69827b] hover:bg-[#eaf2ee]',
                 ]"
                 @click="currentFilter = 'done'"
@@ -210,7 +210,7 @@ function progressPercent(task) {
                 @click="isExpanded = !isExpanded"
             >
                 <template v-if="isExpanded">Tampilkan lebih sedikit <ChevronUp :size="14" class="stroke-[2.5]" /></template>
-                <template v-else>Lihat {{ hiddenCount }} lainnya <ChevronDown :size="14" class="stroke-[2.5]" /></template>
+                <template v-else>Lihat selengkapnya ({{ hiddenCount }} lainnya) <ChevronDown :size="14" class="stroke-[2.5]" /></template>
             </button>
         </div>
 

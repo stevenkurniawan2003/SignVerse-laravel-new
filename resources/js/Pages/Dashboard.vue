@@ -57,21 +57,21 @@ const studentTiles = computed(() => [
     {
         id: 'mastered',
         label: 'Huruf Dikuasai',
-        value: masteredCount.value || 8,
+        value: masteredCount.value,
         icon: CheckCircle2,
         color: 'purple',
     },
     {
         id: 'in_progress',
         label: 'Modul Berjalan',
-        value: props.progress.filter((p) => p.done > 0 && p.done < p.total).length || 3,
+        value: props.progress.filter((p) => p.done > 0 && p.done < p.total).length,
         icon: RotateCw,
         color: 'amber',
     },
     {
         id: 'challenges',
         label: 'Target Hari Ini',
-        value: props.challenges.filter((c) => !c.completed).length || 4,
+        value: props.challenges.filter((c) => !c.completed).length,
         icon: Target,
         color: 'rose',
     },
@@ -228,7 +228,7 @@ onBeforeUnmount(() => {
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 class="font-display font-extrabold text-2xl sm:text-3xl text-[#14221d] tracking-tight">
-                        Welcome back, {{ userName }} 👋
+                        Selamat datang kembali, {{ userName }} 👋
                     </h1>
                     <p class="text-xs sm:text-sm text-[#667e76] font-medium mt-1">
                         Ayo mulai belajar sesuatu yang baru dan asah kemampuan isyaratmu hari ini!
@@ -265,9 +265,9 @@ onBeforeUnmount(() => {
                         <ProgressOverviewCard
                             title="Kemajuan Isyarat"
                             period-label="Bulan ini"
-                            :percent="avgScore || 78"
+                            :percent="avgScore"
                             ring-label="Akurasi"
-                            trend-text="+12% peningkatan dari awal"
+                            :trend-text="`${sessionsCount} sesi latihan tervalidasi`"
                             :tiles="studentTiles"
                         />
                     </div>

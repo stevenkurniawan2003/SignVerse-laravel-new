@@ -9,6 +9,8 @@ import {
     BookOpenCheck,
     Check,
     CheckCircle2,
+    ChevronDown,
+    ChevronUp,
     ClipboardList,
     Copy,
     GraduationCap,
@@ -220,6 +222,20 @@ function errorSeverity(err) {
     return { label: 'Hampir dikuasai', tile: 'bg-[#34B182] text-white', badge: 'bg-[#e8f7f0] text-[#1b735a]', bar: 'bg-[#34B182]' };
 }
 
+/** Ruang kelas dibatasi satu baris kecuali saat mencari, agar dashboard tidak memanjang. */
+const CLASS_PREVIEW_LIMIT = 3;
+const showAllClasses = ref(false);
+const visibleClasses = computed(() => (
+    showAllClasses.value || searchQuery.value.trim() ? filteredClasses.value : filteredClasses.value.slice(0, CLASS_PREVIEW_LIMIT)
+));
+const hiddenClassCount = computed(() => (searchQuery.value.trim() ? 0 : Math.max(0, filteredClasses.value.length - CLASS_PREVIEW_LIMIT)));
+
+/** Analisis gerakan dibatasi 3 kartu (satu baris) agar tidak memanjang; sisanya lewat "Lihat selengkapnya". */
+const ERROR_PREVIEW_LIMIT = 3;
+const showAllErrors = ref(false);
+const visibleErrors = computed(() => (showAllErrors.value ? errorAnalysis.value : errorAnalysis.value.slice(0, ERROR_PREVIEW_LIMIT)));
+const hiddenErrorCount = computed(() => Math.max(0, errorAnalysis.value.length - ERROR_PREVIEW_LIMIT));
+
 // Filtered classrooms based on search query
 const filteredClasses = computed(() => {
     const q = searchQuery.value.trim().toLowerCase();
@@ -239,7 +255,7 @@ const filteredClasses = computed(() => {
             <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
                     <h1 class="font-display font-extrabold text-2xl sm:text-3xl text-[#14221d] tracking-tight">
-                        Welcome back, Bu/Pak {{ teacherName }} 👋
+                        Selamat datang kembali, Bu/Pak {{ teacherName }} 👋
                     </h1>
                     <p class="text-xs sm:text-sm text-[#667e76] font-medium mt-1">
                         Pantau aktivitas siswa, kelola modul isyarat, dan evaluasi hasil belajar secara realtime.
@@ -262,7 +278,7 @@ const filteredClasses = computed(() => {
                     <!-- Quick Action Buttons -->
                     <Link
                         href="/teacher/classes"
-                        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#143d34] hover:bg-[#1a4a40] text-white text-xs font-bold shadow-xs transition-colors"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#34B182] hover:bg-[#2b9a70] text-white text-xs font-bold shadow-sm shadow-[#34B182]/25 transition-colors"
                     >
                         <Plus :size="14" class="stroke-[2.5]" />
                         <span>Buat Kelas</span>
@@ -270,7 +286,7 @@ const filteredClasses = computed(() => {
 
                     <Link
                         href="/teacher/assignments"
-                        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#e8f7f0] hover:bg-[#34B182] text-[#1b735a] hover:text-white text-xs font-bold shadow-xs transition-colors"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white border border-[#cfe9dc] hover:border-[#34B182] hover:bg-[#e8f7f0] text-[#1b735a] text-xs font-bold shadow-xs transition-colors"
                     >
                         <ClipboardList :size="14" class="stroke-[2.5]" />
                         <span>Beri Tugas</span>
@@ -305,7 +321,7 @@ const filteredClasses = computed(() => {
 
                     <!-- Row 2: Active Classrooms (Playful Cards Grid) -->
                     <div class="classrooms-section">
-                        <div class="flex items-center justify-between gap-3 mb-4">
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                             <div>
                                 <h3 class="font-display font-extrabold text-xl text-[#14221d] tracking-tight">
                                     Ruang Kelas Dikelola
@@ -325,9 +341,10 @@ const filteredClasses = computed(() => {
                         </div>
 
                         <!-- Classroom Cards Grid -->
-                        <div v-if="filteredClasses.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                        <template v-if="filteredClasses.length">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                             <div
-                                v-for="cls in filteredClasses"
+                                v-for="cls in visibleClasses"
                                 :key="cls.id"
                                 class="classroom-card bg-white rounded-[24px] p-5 sm:p-6 border border-[#e8efe9] shadow-sm flex flex-col justify-between transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group"
                             >
@@ -387,6 +404,18 @@ const filteredClasses = computed(() => {
                             </div>
                         </div>
 
+                        <button
+                            v-if="hiddenClassCount"
+                            type="button"
+                            class="mt-3 inline-flex items-center justify-center gap-1 w-full py-2 rounded-xl text-xs font-bold text-[#1b735a] bg-white border border-[#e8efe9] hover:bg-[#f4f8f5] transition-colors"
+                            :aria-expanded="showAllClasses"
+                            @click="showAllClasses = !showAllClasses"
+                        >
+                            <template v-if="showAllClasses">Tampilkan lebih sedikit <ChevronUp :size="14" class="stroke-[2.5]" /></template>
+                            <template v-else>Lihat selengkapnya ({{ hiddenClassCount }} kelas lainnya) <ChevronDown :size="14" class="stroke-[2.5]" /></template>
+                        </button>
+                        </template>
+
                         <!-- Empty state -->
                         <div v-else class="text-center py-10 bg-white rounded-[24px] border border-dashed border-[#d9e5df]">
                             <School :size="32" class="mx-auto text-[#94a8a0] mb-2" />
@@ -404,9 +433,9 @@ const filteredClasses = computed(() => {
 
                     <!-- Row 3: Gesture Error Analysis / Tantangan Isyarat Siswa -->
                     <div class="error-analysis-section bg-white rounded-[24px] p-5 sm:p-6 border border-[#e8efe9] shadow-sm">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="flex items-center gap-2.5">
-                                <div class="w-8 h-8 rounded-xl bg-[#fef1f0] text-[#e25353] flex items-center justify-center">
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                <div class="w-8 h-8 rounded-xl shrink-0 bg-[#fef1f0] text-[#e25353] flex items-center justify-center">
                                     <AlertTriangle :size="18" class="stroke-[2.2]" />
                                 </div>
                                 <div>
@@ -431,7 +460,7 @@ const filteredClasses = computed(() => {
                         <!-- Kartu isyarat yang paling sering keliru -->
                         <div v-if="errorAnalysis.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             <article
-                                v-for="err in errorAnalysis"
+                                v-for="err in visibleErrors"
                                 :key="`${err.lesson_id}-${err.gesture}`"
                                 class="flex flex-col gap-3 p-4 rounded-2xl bg-white border border-[#edf2ef]"
                             >
@@ -478,6 +507,17 @@ const filteredClasses = computed(() => {
                                 </div>
                             </article>
                         </div>
+
+                        <button
+                            v-if="hiddenErrorCount"
+                            type="button"
+                            class="mt-3 inline-flex items-center justify-center gap-1 w-full py-2 rounded-xl text-xs font-bold text-[#1b735a] bg-[#f4f8f5] hover:bg-[#eaf2ee] transition-colors"
+                            :aria-expanded="showAllErrors"
+                            @click="showAllErrors = !showAllErrors"
+                        >
+                            <template v-if="showAllErrors">Tampilkan lebih sedikit <ChevronUp :size="14" class="stroke-[2.5]" /></template>
+                            <template v-else>Lihat selengkapnya ({{ hiddenErrorCount }} lainnya) <ChevronDown :size="14" class="stroke-[2.5]" /></template>
+                        </button>
 
                         <div v-else class="text-center py-6 text-xs text-[#738881]">
                             Belum ada rekaman kesalahan signifikan dari siswa. Semua latihan berjalan lancar!
